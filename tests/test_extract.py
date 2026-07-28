@@ -2,9 +2,9 @@
 
 from types import SimpleNamespace
 
-from polygraph.extract.entities import Entity, SimpleExtractor
-from polygraph.extract.graphgen import GraphGenExtractor
-from polygraph.extract.relations import RelationExtractor
+from polygraph.kg_build.extract.entities import Entity, SimpleExtractor
+from polygraph.kg_build.extract.graphgen import GraphGenExtractor
+from polygraph.kg_build.extract.relations import RelationExtractor
 
 
 def test_simple_extractor_captures_capitalized():

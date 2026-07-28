@@ -3,7 +3,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from polygraph.evaluate.model_eval.dataset_gen import (
+from polygraph.finetune.dataset import (
     QADatasetGenerator,
     balance_jsonl_token_volume,
     estimate_qa_tokens,

@@ -1,6 +1,6 @@
 """Tests for deterministic graph identifiers."""
 
-from polygraph.identity import chunk_id, document_id, entity_id
+from polygraph._shared import chunk_id, document_id, entity_id
 
 
 def test_entity_id_is_stable_and_unicode_safe():

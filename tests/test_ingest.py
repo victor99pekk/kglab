@@ -3,8 +3,8 @@
 import tempfile
 from pathlib import Path
 
-from polygraph.config import Language
-from polygraph.ingest.loader import DataLoader, Document
+from polygraph._shared import Language
+from polygraph.preprocess.load import DataLoader, Document
 
 
 def test_load_txt():
@@ -34,7 +34,7 @@ def test_load_json():
 
 
 def test_cleaner_normalizes_whitespace():
-    from polygraph.ingest.cleaner import TextCleaner
+    from polygraph.preprocess.clean import TextCleaner
 
     doc = Document(content="  Hello   world!\n\nExtra  spaces.  ")
     cleaner = TextCleaner()
@@ -44,7 +44,7 @@ def test_cleaner_normalizes_whitespace():
 
 
 def test_semantic_chunker_splits_at_topic_shift_with_fake_encoder():
-    from polygraph.ingest.chunker import SemanticChunker
+    from polygraph.preprocess.chunk import SemanticChunker
 
     text = "Mèo thích ngủ trong nhà. Mèo thường chơi vào buổi tối. Tên lửa đưa vệ tinh lên quỹ đạo."
 

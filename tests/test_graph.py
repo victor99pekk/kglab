@@ -2,7 +2,7 @@
 
 import networkx as nx
 
-from polygraph.graph.builder import GraphBuilder
+from polygraph.kg_build.build import GraphBuilder
 
 
 def test_build_graph():
@@ -74,8 +74,8 @@ def test_graph_edge_preserves_relationship_provenance():
 
 
 def test_deduplication_removes_exact_duplicates():
-    from polygraph.dedup.near_dedup import Deduplicator
-    from polygraph.ingest.loader import Document
+    from polygraph.preprocess.dedup import Deduplicator
+    from polygraph.preprocess.load import Document
 
     docs = [
         Document(content="Unique document one.", doc_id="1"),
@@ -92,8 +92,8 @@ def test_deduplication_removes_exact_duplicates():
 
 
 def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
-    from polygraph.dedup.near_dedup import Deduplicator
-    from polygraph.ingest.loader import Document
+    from polygraph.preprocess.dedup import Deduplicator
+    from polygraph.preprocess.load import Document
 
     documents = [
         Document(content="London is the capital of England.", doc_id="a"),
@@ -113,7 +113,7 @@ def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
 
 
 def test_embedding_resolution_does_not_merge_semantically_related_names():
-    from polygraph.resolve.resolver import EntityResolver
+    from polygraph.kg_build.resolve import EntityResolver
 
     entities = [
         {"id": "a", "name": "khoa học", "type": "CONCEPT", "aliases": []},
@@ -129,8 +129,8 @@ def test_embedding_resolution_does_not_merge_semantically_related_names():
 
 
 def test_quality_filter_removes_short_docs():
-    from polygraph.dedup.quality import QualityFilter
-    from polygraph.ingest.loader import Document
+    from polygraph.preprocess.load import Document
+    from polygraph.preprocess.quality import QualityFilter
 
     docs = [
         Document(content="Short."),
