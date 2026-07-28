@@ -21,9 +21,9 @@ variant      ?= both
 DEVICE       ?= cpu
 wiki_count   ?= 100
 wiki_lang    ?= en
-scrape_seed  ?= data/download_data/seeds/vietnamese_sources.txt
+scrape_seed  ?= data/download_data/seeds/discovered_urls.txt
 scrape_count ?= 50
-scrape_lang  ?= vi
+scrape_lang  ?= en
 scrape_time  ?= 600
 scrape_depth ?= 2
 
@@ -43,11 +43,11 @@ help:
 	@echo "   clean            Remove generated output folders"
 	@echo ""
 	@echo "── Data Acquisition ─────────────────────────────────"
-	@echo "   scrape           Scrape web pages into JSONL (Vietnamese by default)"
+	@echo "   scrape           Scrape web pages into JSONL"
 	@echo "   scrape-llm-discover  Use LLM to extract article URLs from listing pages"
 	@echo "   scrape-llm-clean     Score, filter, and LLM-clean scraped pages"
 	@echo "   scrape-full      Full scrape → discover → re-scrape → clean"
-	@echo "   download-wikipedia   Download Wikipedia articles [wiki_count=100] [wiki_lang=en|vi]"
+	@echo "   download-wikipedia   Download Wikipedia articles [wiki_count=100] [wiki_lang=en]"
 	@echo ""
 	@echo "── Pipeline (single command) ────────────────────────"
 	@echo "   new-graph        Build KG [mode=local|neo4j] [dataset=...]"
@@ -112,7 +112,7 @@ clean:
 
 ## scrape: Scrape web pages into JSONL  [scrape_seed=path] [scrape_count=50] [scrape_lang=vi] [scrape_depth=2]
 scrape:
-	$(VENV) && python scripts/scraper.py \
+	$(VENV) && kg-gen scrape \
 		--seed-file $(scrape_seed) \
 		--max-pages $(scrape_count) \
 		--language $(scrape_lang) \
@@ -124,21 +124,21 @@ scrape:
 
 ## scrape-llm-discover: Use LLM to extract article URLs from listing pages  [scrape_count=50]
 scrape-llm-discover:
-	$(VENV) && python scripts/llm_cleaner.py discover \
+	$(VENV) && python -m kg_generator.ingest.llm_cleaner discover \
 		data/scraped/vn_web_$(scrape_count)/vn_web_$(scrape_count).jsonl \
 		-o data/download_data/seeds/discovered_urls.txt
 
 ## scrape-llm-clean: Score, filter, and LLM-clean scraped pages  [scrape_count=50] [llm_min_score=5]
 llm_min_score ?= 5
 scrape-llm-clean:
-	$(VENV) && python scripts/llm_cleaner.py clean \
+	$(VENV) && python -m kg_generator.ingest.llm_cleaner clean \
 		data/scraped/vn_web_$(scrape_count)/vn_web_$(scrape_count).jsonl \
 		-o data/scraped/vn_web_$(scrape_count)/vn_web_$(scrape_count)_clean.jsonl \
 		--min-score $(llm_min_score)
 
 ## scrape-full: Scrape + LLM discover article URLs + re-scrape articles + LLM clean
 scrape-full: scrape scrape-llm-discover
-	$(VENV) && python scripts/scraper.py \
+	$(VENV) && kg-gen scrape \
 		--seed-file data/download_data/seeds/discovered_urls.txt \
 		--max-pages $$(wc -l < data/download_data/seeds/discovered_urls.txt) \
 		--language $(scrape_lang) \
@@ -146,19 +146,16 @@ scrape-full: scrape scrape-llm-discover
 		--depth 0 \
 		--discovery exact \
 		--output data/scraped/vn_web_articles/ && \
-	$(VENV) && python scripts/llm_cleaner.py clean \
+	$(VENV) && python -m kg_generator.ingest.llm_cleaner clean \
 		data/scraped/vn_web_articles/vn_web_articles.jsonl \
 		-o data/scraped/vn_web_articles/vn_web_articles_clean.jsonl \
 		--min-score 3
 
 ## download-wikipedia: Download Wikipedia articles as JSONL  [wiki_count=100] [wiki_lang=en]
 download-wikipedia:
-	@vietnam_flag=""; \
-	if [ "$(wiki_lang)" = "vi" ]; then vietnam_flag="--vietnam-only"; fi; \
-	$(VENV) && uv pip install -e ".[data]" && python scripts/download_wikipedia.py \
+	$(VENV) && uv pip install -e ".[data]" && python -m kg_generator.ingest.wikipedia \
 		--language $(wiki_lang) \
 		--count $(wiki_count) \
-		$$vietnam_flag \
 		--output data/wikipedia/wikipedia_$(wiki_lang)_$(wiki_count).jsonl
 
 # ═══════════════════════════════════════════════════════════

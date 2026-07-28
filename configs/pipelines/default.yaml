@@ -2,7 +2,7 @@
 # Use: kg-gen run -c configs/pipelines/default.yaml
 
 pipeline:
-  language: en                     # en | vi
+  language: en                     # en
   graph_backend: networkx          # networkx | neo4j
 
   # Input sources
@@ -15,7 +15,7 @@ pipeline:
     - json
     - csv
 
-  # The same strategies are available for English and Vietnamese.
+  # The same strategies are available for English.
   chunking:
     method: sentence                # none | fixed | sentence | semantic
     target_tokens: 450

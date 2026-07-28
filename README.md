@@ -22,9 +22,9 @@ Turn unstructured text into structured knowledge graphs, then into high-quality 
 
 <img src="figures/meta_award.png" alt="Meta Award" width="350" align="right"/>
 
-Polygraph began as a hackathon project at the **[Vietnam AI Innovation Challenge](https://www.vietnamaichallenge.com)** co-organized by the National Innovation Center (NIC), Meta, and the AI for Vietnam Foundation. Built over 48 hours, it took on the real-world problem of generating high-quality, fact-grounded training data for Vietnamese LLMs.
+Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge** co-organized by the National Innovation Center (NIC), Meta, and the AI for Vietnam Foundation. Built over 48 hours, it took on the real-world problem of generating high-quality, fact-grounded training data for LLMs.
 
-The project won the **$5,000 USD Meta Prize** and was subsequently developed further as a research initiative under the **[AI for Vietnam Foundation](https://aiforvietnam.org)**, a non-profit dedicated to accelerating Vietnam's AI ecosystem through open datasets, training, and applied research.
+The project won the **$5,000 USD Meta Prize** and was subsequently developed further as a research initiative, funded by and recognized at the hackathon.
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ make test                           # Verify everything works
 
 # Scraping
 make scrape                         # Scrape web pages into JSONL
-make download-wikipedia wiki_lang=vi wiki_count=500
+make download-wikipedia wiki_lang=en wiki_count=500
 make scrape-full                    # Full scrape → discover → re-scrape → clean
 
 # Knowledge Graph Generation
@@ -103,7 +103,7 @@ tests/                      pytest test suite (71 tests)
 demo/                       Interactive web demo
 presentation/               Project presentation deck
 ```
-<!-- 
+<!--
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and PR guidelines.
@@ -111,4 +111,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and P
 ## License
 
 MIT — see [LICENSE](LICENSE) for details. -->
-

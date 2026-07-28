@@ -2,13 +2,25 @@
 
 import networkx as nx
 
-from kg_generator.graph.builder import GraphBuilder
+from polygraph.kg_build.build import GraphBuilder
 
 
 def test_build_graph():
     entities = [
-        {"id": "entity:alice", "name": "Alice", "type": "PERSON", "aliases": ["alice"], "confidenceScore": 0.9},
-        {"id": "entity:acme", "name": "Acme Corp", "type": "ORG", "aliases": ["acme corp"], "confidenceScore": 0.95},
+        {
+            "id": "entity:alice",
+            "name": "Alice",
+            "type": "PERSON",
+            "aliases": ["alice"],
+            "confidenceScore": 0.9,
+        },
+        {
+            "id": "entity:acme",
+            "name": "Acme Corp",
+            "type": "ORG",
+            "aliases": ["acme corp"],
+            "confidenceScore": 0.95,
+        },
     ]
     triples = [("entity:alice", "works_at", "entity:acme")]
 
@@ -52,16 +64,18 @@ def test_graph_edge_preserves_relationship_provenance():
     graph = GraphBuilder().build(entities, triples)
     edge = graph.edges["entity:alice", "entity:acme"]
 
-    assert edge["relations"] == [{
-        "predicate": "works_at",
-        "evidence_sentence": "Alice works at Acme.",
-        "source_chunk_id": "chunk:123",
-    }]
+    assert edge["relations"] == [
+        {
+            "predicate": "works_at",
+            "evidence_sentence": "Alice works at Acme.",
+            "source_chunk_id": "chunk:123",
+        }
+    ]
 
 
 def test_deduplication_removes_exact_duplicates():
-    from kg_generator.dedup.near_dedup import Deduplicator
-    from kg_generator.ingest.loader import Document
+    from polygraph.preprocess.dedup import Deduplicator
+    from polygraph.preprocess.load import Document
 
     docs = [
         Document(content="Unique document one.", doc_id="1"),
@@ -78,12 +92,12 @@ def test_deduplication_removes_exact_duplicates():
 
 
 def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
-    from kg_generator.dedup.near_dedup import Deduplicator
-    from kg_generator.ingest.loader import Document
+    from polygraph.preprocess.dedup import Deduplicator
+    from polygraph.preprocess.load import Document
 
     documents = [
-        Document(content="Hà Nội là thủ đô Việt Nam.", doc_id="a"),
-        Document(content="Thủ đô của Việt Nam là Hà Nội.", doc_id="b"),
+        Document(content="London is the capital of England.", doc_id="a"),
+        Document(content="The capital of England is London.", doc_id="b"),
         Document(content="Tên lửa bay vào không gian.", doc_id="c"),
     ]
     embeddings = [[1.0, 0.0], [0.99, 0.01], [0.0, 1.0]]
@@ -99,7 +113,7 @@ def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
 
 
 def test_embedding_resolution_does_not_merge_semantically_related_names():
-    from kg_generator.resolve.resolver import EntityResolver
+    from polygraph.kg_build.resolve import EntityResolver
 
     entities = [
         {"id": "a", "name": "khoa học", "type": "CONCEPT", "aliases": []},
@@ -115,12 +129,14 @@ def test_embedding_resolution_does_not_merge_semantically_related_names():
 
 
 def test_quality_filter_removes_short_docs():
-    from kg_generator.dedup.quality import QualityFilter
-    from kg_generator.ingest.loader import Document
+    from polygraph.preprocess.load import Document
+    from polygraph.preprocess.quality import QualityFilter
 
     docs = [
         Document(content="Short."),
-        Document(content="A properly sized document with enough words to pass the quality filter check."),
+        Document(
+            content="A properly sized document with enough words to pass the quality filter check."
+        ),
     ]
 
     qf = QualityFilter(min_chars=40, min_words=5)

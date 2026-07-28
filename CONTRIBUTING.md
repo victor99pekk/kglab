@@ -6,7 +6,7 @@ Thanks for your interest in contributing to the Knowledge Graph Generator!
 
 ```bash
 # Clone and set up
-git clone https://github.com/vietnam-ai-challenge/kg-generator.git
+git clone https://github.com/your-org/kg-generator.git
 cd kg-generator
 
 # Using uv (recommended)

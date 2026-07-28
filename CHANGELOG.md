@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 - Multi-format data loading (JSONL, CSV, TXT, JSON)
 - MinHash, SimHash, n-gram, and semantic document deduplication
 - Heuristic quality filtering for noisy text sources
-- spaCy-based English NER and `underthesea`-based Vietnamese NER
+- spaCy-based English NER
 - GraphGen-style LLM extraction via DeepSeek (paper-faithful Figure 8 + Figure 9)
 - NetworkX in-memory graph backend and Neo4j on-disk backend
 - Entity resolution (string-similarity and embedding-based)
@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - CLI (`kg-gen`) with subcommands for pipeline, curation, and evaluation
 - FastAPI demo backend with web frontend
 - Docker support for cloud deployment
-- Vietnamese language pipeline (tokenization, NER, chunking, GraphGen prompts)
+- Language pipeline (tokenization, NER, chunking, GraphGen prompts)
 - Dataset curation toolkit with provenance tracking and audit reports
 - Web scraping pipeline with LLM-assisted content cleaning
 - Wikipedia article downloader
