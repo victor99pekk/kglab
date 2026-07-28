@@ -1,20 +1,24 @@
 # Polygraph: KG-Grounded SFT Data for LLMs
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 💬 Generate QA pairs → 🎯 Fine-tune LLM
 
-Turn unstructured text into structured knowledge graphs, then into high-quality QA pairs for SFT fine tuning of LLMs. This repository implements the full pipeline from Legal data scraping, to measuring the benefits of supervised fine tuning with QA-pairs generated from KG-data as opposed to unstructured processed texts.
+Research toolkit for building high-quality knowledge graphs and using them to ground LLM training data.
 
 <details>
 <summary><strong>📑 Contents</strong></summary>
 
 - [Polygraph: KG-Grounded SFT Data for LLMs](#polygraph-kg-grounded-sft-data-for-llms)
   - [About the Project](#about-the-project)
+  - [Creating a Pipeline Variant](#creating-a-pipeline-variant)
   - [Quick Start](#quick-start)
-  - [Results](#results)
-  - [Project Structure](#project-structure)
+  - [Quick Start](#quick-start-1)
+    - [Hackathon Results](#hackathon-results)
+  - [Architecture](#architecture)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 </details>
 
@@ -24,43 +28,48 @@ Turn unstructured text into structured knowledge graphs, then into high-quality 
 
 Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge** co-organized by the National Innovation Center (NIC), Meta, and the AI for Vietnam Foundation. Built over 48 hours, it took on the real-world problem of generating high-quality, fact-grounded training data for LLMs.
 
-The project won the **$5,000 USD Meta Prize** and was subsequently developed further as a research initiative, funded by and recognized at the hackathon.
+The project won the **$5,000 USD Meta Prize** and has since been refactored into a modular research toolkit for studying how knowledge graph quality affects downstream LLM performance.
+
+## Creating a Pipeline Variant
+
+```python
+# src/polygraph/pipelines/graphgen.py
+from polygraph.pipelines import Baseline
+from polygraph.kg_build import extract, resolve, build
+
+class GraphGenVariant(Baseline):
+    """Same as Baseline but uses LLM extraction."""
+
+    def build_kg(self, chunks):
+        entities, triples = extract.with_graphgen(chunks, model="deepseek-v4-pro")
+        resolved = resolve.by_embedding(entities, threshold=0.85)
+        graph = build.from_resolved(resolved, triples)
+        return {"graph": graph, "entities": resolved, "triples": triples}
+```
 
 ## Quick Start
 
-All commands are driven through `make`. Run `make help` for the full list.
+## Quick Start
 
 ```bash
-make install                        # One-time: set up venv and all dependencies
-make test                           # Verify everything works
+uv sync                                    # install dependencies
+python -m spacy download en_core_web_sm    # download NER model
 
-# Scraping
-make scrape                         # Scrape web pages into JSONL
-make download-wikipedia wiki_lang=en wiki_count=500
-make scrape-full                    # Full scrape → discover → re-scrape → clean
+# Run the baseline pipeline
+uv run python main.py
 
-# Knowledge Graph Generation
-make new-graph dataset=wikipedia    # Build KG (default mode=local: NetworkX → save to disk)
-make new-graph dataset=wikipedia mode=neo4j  # Build KG directly in Neo4j (scales beyond RAM)
-make eval                           # Structural audit, SFT pair quality, fact coverage — runs in seconds
+# Custom input / output
+uv run python main.py -i data/my_corpus/ -o output/experiment_1/
 
-# Neo4j
-make neo4j-clear                    # Remove all nodes and edges
-make neo4j-upload dataset=wikipedia # Wipe Neo4j, then upload a locally-built KG
-make neo4j-merge dataset=wikipedia  # Add a KG into an existing Neo4j graph (no wipe)
-
-# Fine-Tuning
-make eval-datasets                  # Generate QA training pairs from the knowledge graph
-make eval-finetune variant=kg       # Fine-tune base → KG-managed → raw-text and benchmark all three (CPU)
-make eval-finetune variant=kg DEVICE=cuda  # Same, on GPU
-make eval-full                      # Quality → datasets → finetune → benchmark end-to-end
+# Run tests
+uv run pytest
 ```
 
-See [docs/usage.md](docs/usage.md) for the full command reference.
+**Outputs** (in `output/baseline/`): `knowledge_graph.json`, `knowledge_graph.graphml`, `metrics.json`
 
-## Results
+### Hackathon Results
 
-We fine-tuned [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) and ran an ablation study comparing three model variants on 10 Vietnamese Wikipedia articles with 50 held-out test samples:
+During the 48-hour competition, we ran an ablation study on 10 Wikipedia articles with 50 held-out test samples:
 
 | Metric | Base Model | KG-Trained (B) | Flat (C) | Improvement |
 |---|---|---|---|---|
@@ -68,46 +77,29 @@ We fine-tuned [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-I
 | **Multi-hop Accuracy** | 2.7% | **18.1%** | 4.2% | 6.8× over base |
 | **Hallucination Rate** | 94% | **0%** | 36% | Eliminated entirely |
 | **Consistency Score** | 0.56 | **0.83** | 0.76 | +48% |
-| **Avg Response Length** | 82 words | **21 words** | 24 words | 74% shorter, more concise |
 
-> *(B) KG-Trained: fine-tuned on QA pairs generated from the knowledge graph. (C) Flat: fine-tuned on QA pairs generated directly from the same documents, without KG structuring — not raw unformatted text.*
+> *(B) KG-Trained: fine-tuned on QA pairs from the knowledge graph. (C) Flat: QA pairs from the same documents without KG structuring.*
 
-**Key takeaway:** KG-structured training data eliminated hallucinations and delivered 6.8× better factual accuracy. Flat fine-tuning alone barely moved the needle (4.2% vs 2.7%) — the knowledge graph structure is what matters.
+These early results suggested that KG-structured training data could eliminate hallucinations and deliver 6.8× better factual accuracy, motivating further development into a general research toolkit.
 
-> *Note: Results are from a small pilot study. Metrics are heuristic (token-overlap F1, word-count proxies) with wide confidence intervals. Full-scale evaluation with more documents and robust metrics is ongoing.*
-
-## Project Structure
+## Architecture
 
 ```
-src/kg_generator/           Main package
-├── ingest/                 Data loading, cleaning, chunking
-├── dedup/                  Document & chunk deduplication, quality filtering
-├── curate/                 Dataset curation with provenance tracking
-├── extract/                Entity & relation extraction (spaCy, underthesea, GraphGen/LLM)
-├── resolve/                Entity resolution & deduplication
-├── graph/                  Graph construction (NetworkX, Neo4j)
-├── evaluate/               Evaluation suite
-│   ├── data_eval/          Structural audit, SFT quality, fact coverage
-│   ├── model_eval/         QA dataset generation, LoRA fine-tuning, ablation benchmarking
-│   ├── graphgen/           Paper-inspired subgraph + multi-hop QA
-│   └── plots/              Visualization utilities
-├── export/                 JSON, GraphML, Neo4j CSV, RDF, Cytoscape.js
-├── cli.py                  Command-line interface (kg-gen)
-├── pipeline.py             Pipeline orchestrator
-└── api.py                  FastAPI demo backend
-
-configs/                    YAML pipeline presets
-docs/                       Documentation
-data/                       Sample inputs & curated outputs
-tests/                      pytest test suite (71 tests)
-demo/                       Interactive web demo
-presentation/               Project presentation deck
+src/polygraph/
+├── pipelines/        # swappable pipeline variants (baseline.py)
+├── preprocess/       # load → clean → chunk → quality → dedup
+├── kg_build/         # extract entities → resolve → build graph
+├── kg_eval/          # quality metrics + structural audit
+├── kg_export/        # JSON, GraphML, Neo4j
+├── finetune/         # generate training data from KG
+└── _shared/          # config, identity, types
 ```
-<!--
+
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and PR guidelines.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details. -->
+MIT — see [LICENSE](LICENSE) for details.
