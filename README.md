@@ -14,7 +14,6 @@ Research toolkit for building high-quality knowledge graphs and using them to gr
   - [About the Project](#about-the-project)
   - [Creating a Pipeline Variant](#creating-a-pipeline-variant)
   - [Quick Start](#quick-start)
-  - [Quick Start](#quick-start-1)
     - [Hackathon Results](#hackathon-results)
   - [Architecture](#architecture)
   - [Contributing](#contributing)
@@ -49,21 +48,36 @@ class GraphGenVariant(Baseline):
 
 ## Quick Start
 
-## Quick Start
-
 ```bash
-uv sync                                    # install dependencies
-python -m spacy download en_core_web_sm    # download NER model
+# One-time setup
+make install
 
-# Run the baseline pipeline
-uv run python main.py
+# Verify everything works
+make test
+
+# Build a knowledge graph (preprocess → build KG → evaluate → export)
+make build-kg
 
 # Custom input / output
-uv run python main.py -i data/my_corpus/ -o output/experiment_1/
+make build-kg INPUT=data/my_corpus/ OUTPUT=output/experiment_1/
 
-# Run tests
-uv run pytest
+# Or run directly with uv / python:
+uv run python main.py -i data/my_corpus/ -o output/experiment_1/
 ```
+
+You can also import and run the pipeline programmatically:
+
+```python
+from polygraph.pipelines import Baseline
+
+pipeline = Baseline(
+    input_paths=["data/my_corpus/"],
+    output_dir="output/experiment_1/",
+)
+pipeline.execute()
+```
+
+See `make help` for all available targets.
 
 **Outputs** (in `output/baseline/`): `knowledge_graph.json`, `knowledge_graph.graphml`, `metrics.json`
 

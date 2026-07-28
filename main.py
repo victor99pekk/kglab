@@ -29,7 +29,7 @@ def main() -> None:
         input_paths=[str(p) for p in args.input],
         output_dir=str(args.output),
     )
-    pipeline.run()
+    pipeline.execute()
 
 
 if __name__ == "__main__":

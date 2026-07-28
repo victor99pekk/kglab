@@ -3,7 +3,7 @@
 from polygraph.pipelines.baseline import Baseline
 
 pipe = Baseline(input_paths=["data/"], output_dir="output/")
-pipe.run()
+pipe.execute()
 """
 
 from polygraph._shared import Document

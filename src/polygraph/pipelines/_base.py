@@ -22,7 +22,7 @@ class Pipeline(ABC):
             def build_kg(self, chunks) -> dict: ...
 
         pipe = MyPipeline(input_paths=["data/"], output_dir="output/")
-        pipe.run()              # full pipeline
+        pipe.execute()              # full pipeline
         # — or —
         chunks = pipe.preprocess()
         kg = pipe.build_kg(chunks)
@@ -93,7 +93,7 @@ class Pipeline(ABC):
 
     # ── Orchestration ───────────────────────────────────────────
 
-    def run(self) -> None:
+    def execute(self) -> None:
         """Full pipeline: preprocess → build → evaluate → export."""
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
