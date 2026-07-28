@@ -15,6 +15,7 @@ Research toolkit for building high-quality knowledge graphs and using them to gr
   - [Creating a Pipeline Variant](#creating-a-pipeline-variant)
   - [Quick Start](#quick-start)
     - [Hackathon Results](#hackathon-results)
+  - [Adding a new build_kg method](#adding-a-new-build_kg-method)
   - [Architecture](#architecture)
   - [Contributing](#contributing)
   - [License](#license)
@@ -40,9 +41,9 @@ class GraphGenVariant(Baseline):
     """Same as Baseline but uses LLM extraction."""
 
     def build_kg(self, chunks):
-        entities, triples = extract.with_graphgen(chunks, model="deepseek-v4-pro")
-        resolved = resolve.by_embedding(entities, threshold=0.85)
-        graph = build.from_resolved(resolved, triples)
+        entities, triples = extract.graphgen(chunks, model="gpt-4o")
+        resolved = resolve.embedding(entities, threshold=0.85)
+        graph = build.default(resolved, triples)
         return {"graph": graph, "entities": resolved, "triples": triples}
 ```
 
@@ -96,18 +97,42 @@ During the 48-hour competition, we ran an ablation study on 10 Wikipedia article
 
 These early results suggested that KG-structured training data could eliminate hallucinations and deliver 6.8× better factual accuracy, motivating further development into a general research toolkit.
 
+## Adding a new build_kg method
+
+The KG pipeline is three swappable stages: **extract → resolve → build**. Each lives in a folder under `kg_build/` with one `.py` file per method.
+
+**1. Drop a backend file** — e.g. `kg_build/extract/my_method.py`:
+```python
+def my_method(chunks, **kwargs):
+    entities = [...]   # your custom extraction logic
+    triples = [...]    # (subject_id, predicate, object_id, evidence, chunk_id)
+    return entities, triples
+```
+
+**2. Wire it** in `kg_build/__init__.py` (2 lines):
+```python
+from polygraph.kg_build.extract.my_method import my_method
+extract.my_method = my_method
+```
+
+**3. Use it** in a pipeline variant — then run `python main.py --variant myvariant`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for backend signatures and a full walkthrough.
+
 ## Architecture
 
 ```
 src/polygraph/
-├── pipelines/        # swappable pipeline variants (baseline.py)
-├── preprocess/       # load → clean → chunk → quality → dedup
-├── kg_build/         # extract entities → resolve → build graph
-├── kg_eval/          # quality metrics + structural audit
-├── kg_export/        # JSON, GraphML, Neo4j
-├── finetune/         # generate training data from KG
+├── pipelines/        # swappable variants — subclass Baseline, override stages
+├── preprocess/       # load/  clean/  chunk/  quality/  dedup/
+├── kg_build/         # extract/  resolve/  build/
+├── kg_eval/          # metrics/  structural/
+├── kg_export/        # json/  graphml/  neo4j/  rdf/
+├── finetune/         # dataset/
 └── _shared/          # config, identity, types
 ```
+
+Each stage folder holds one `.py` file per method. Add a file to add a method.
 
 
 ## Contributing

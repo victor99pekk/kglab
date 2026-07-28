@@ -1,4 +1,7 @@
-"""Heuristic-based quality filtering of documents."""
+"""Baseline quality filtering — heuristic, explainable, language-agnostic.
+
+Exports: QualityFilter, QualityProfiler, QualityProfile, QualityThresholds
+"""
 
 import logging
 import re
@@ -118,76 +121,57 @@ class QualityProfiler:
         ):
             review_flags.append("repeated_lines")
         if re.search(r"(.)\1{9,}", text, flags=re.DOTALL):
-            review_flags.append("repeated_characters")
-        # Short-token/gibberish heuristic for English.
-        if (
-            len(alphabetic_tokens) > 20
-            and short_token_ratio > self.thresholds.max_short_token_ratio
-        ):
-            review_flags.append("short_token_gibberish")
-        score = (
-            sum(
-                (
-                    min(char_count / 200, 1.0),
-                    min(word_count / 30, 1.0),
-                    max(0.0, 1 - symbol_ratio / max(self.thresholds.max_symbol_ratio, 0.001)),
-                    max(0.0, 1 - repeated_line_ratio),
-                )
-            )
-            / 4
+            review_flags.append("repeated_chars")
+        if short_token_ratio > self.thresholds.max_short_token_ratio:
+            review_flags.append("many_short_tokens")
+        score = min(
+            1.0,
+            (
+                (1.0 - symbol_ratio)
+                * (1.0 - repeated_line_ratio)
+                * (min(char_count, self.thresholds.min_chars) / self.thresholds.min_chars)
+            ),
         )
         return QualityProfile(
-            score,
-            char_count,
-            word_count,
-            symbol_ratio,
-            repeated_line_ratio,
-            short_token_ratio,
-            tuple(rejection_reasons),
-            tuple(review_flags),
+            score=round(score, 4),
+            char_count=char_count,
+            word_count=word_count,
+            symbol_ratio=round(symbol_ratio, 4),
+            repeated_line_ratio=round(repeated_line_ratio, 4),
+            short_token_ratio=round(short_token_ratio, 4) if alphabetic_tokens else None,
+            rejection_reasons=tuple(rejection_reasons),
+            review_flags=tuple(review_flags),
         )
 
 
 class QualityFilter:
-    """Filters out low-quality documents using heuristic rules."""
+    """Filters low-quality documents from a list."""
 
     def __init__(
         self,
         min_chars: int = MIN_CHAR_LENGTH,
         min_words: int = MIN_WORD_COUNT,
         max_symbol_ratio: float = MAX_SYMBOL_RATIO,
-        max_rep_ratio: float = MAX_REPETITION_RATIO,
-        language: str = "en",
+        max_repetition_ratio: float = MAX_REPETITION_RATIO,
     ) -> None:
-        self.min_chars = min_chars
-        self.min_words = min_words
-        self.max_symbol_ratio = max_symbol_ratio
-        self.max_rep_ratio = max_rep_ratio
-        self.language = language
-        self.profiler = QualityProfiler(
-            QualityThresholds(
-                min_chars=min_chars,
-                min_words=min_words,
-                max_symbol_ratio=max_symbol_ratio,
-                max_repeated_line_ratio=max_rep_ratio,
-            )
+        self.thresholds = QualityThresholds(
+            min_chars=min_chars,
+            min_words=min_words,
+            max_symbol_ratio=max_symbol_ratio,
+            max_repeated_line_ratio=max_repetition_ratio,
         )
+        self.profiler = QualityProfiler(self.thresholds)
 
     def filter(self, documents: list[Document]) -> list[Document]:
-        """Filter documents, keeping only those that pass all quality checks."""
+        """Return documents that pass quality thresholds."""
         kept: list[Document] = []
         for doc in documents:
-            if self._is_quality(doc.content):
+            profile = self.profiler.profile(doc.content)
+            if profile.accepted:
                 kept.append(doc)
-        removed = len(documents) - len(kept)
-        if removed:
-            logger.info(f"Quality filter: removed {removed} low-quality documents")
+        logger.info(f"Quality filter: kept {len(kept)}/{len(documents)} documents")
         return kept
 
-    def _is_quality(self, text: str) -> bool:
-        """Check if text passes all quality heuristics."""
-        return self.profiler.profile(text, language=self.language).accepted
-
     def score(self, text: str) -> float:
-        """Return a quality score between 0 and 1 (higher = better quality)."""
-        return self.profiler.profile(text, language=self.language).score
+        """Return a quality score between 0 and 1 for a single text."""
+        return self.profiler.profile(text).score

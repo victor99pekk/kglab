@@ -3,8 +3,8 @@
 import tempfile
 from pathlib import Path
 
-from polygraph._shared import Language
-from polygraph.preprocess.load import DataLoader, Document
+from polygraph._shared import Document, Language
+from polygraph.preprocess.load import DataLoader
 
 
 def test_load_txt():

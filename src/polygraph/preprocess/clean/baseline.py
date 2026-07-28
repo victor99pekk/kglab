@@ -1,4 +1,7 @@
-"""Text normalization and cleaning with language-specific backends."""
+"""Baseline text cleaning — English-specific normalization.
+
+Exports: TextCleaner, TextCleanerBackend, EnglishCleaner
+"""
 
 import logging
 import re

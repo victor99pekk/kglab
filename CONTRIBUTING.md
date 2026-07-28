@@ -1,66 +1,93 @@
 # Contributing
 
-Thanks for your interest in contributing to the Knowledge Graph Generator!
+Thanks for your interest in contributing to Polygraph!
 
 ## Setup
 
 ```bash
-# Clone and set up
-git clone https://github.com/your-org/kg-generator.git
-cd kg-generator
-
-# Using uv (recommended)
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev,curation,embeddings]"
-python -m spacy download en_core_web_sm
-
-# Run tests
-python -m pytest tests/ -v
+git clone https://github.com/your-org/polygraph.git
+cd polygraph
+uv sync
+uv run python -m spacy download en_core_web_sm
+uv run pytest tests/ -v
 ```
 
 ## Code Style
 
 - Python 3.10+ with type hints
-- Format with `ruff format src/ tests/`
-- Lint with `ruff check src/ tests/`
-- Type-check with `mypy src/`
-- Run pre-commit hooks: `pre-commit run --all-files`
-
-## Testing
-
-```bash
-# All tests
-python -m pytest tests/ -v
-
-# Specific test file
-python -m pytest tests/test_extract.py -v
-
-# With coverage
-python -m pytest tests/ -v --cov=src/kg_generator --cov-report=term
-```
+- Format: `ruff format src/ tests/`
+- Lint: `ruff check src/ tests/`
 
 ## Project Structure
 
-- `src/kg_generator/` — main package (pipeline, CLI, core modules)
-- `src/kg_generator/evaluate/` — evaluation suite (data_eval, model_eval, graphgen, plots)
-- `configs/` — YAML pipeline configuration presets
-- `docs/` — user-facing documentation
-- `data/` — sample inputs and curated outputs
-- `tests/` — pytest test suite
+```
+src/polygraph/
+├── pipelines/       # Swappable pipeline variants (subclass + override stages)
+├── preprocess/      # load/ clean/ chunk/ quality/ dedup/  — one folder per stage
+├── kg_build/        # extract/ resolve/ build/             — one folder per stage
+├── kg_eval/         # metrics/ structural/
+├── kg_export/       # json/ graphml/ neo4j/ rdf/
+├── finetune/        # dataset/
+└── _shared/         # types, config, identity
+```
+
+Every stage folder has one `.py` file per method. Add a file to add a method.
+
+## Adding a new `build_kg` method
+
+The KG pipeline is: **chunks → extract → resolve → build → graph**. Each stage is swappable.
+
+### 1. Add a backend (extraction, resolution, or graph construction)
+
+Drop a `.py` file in the right folder:
+
+```
+kg_build/extract/my_extractor.py     # (chunks, **kw) → (entities, triples)
+kg_build/resolve/my_resolver.py      # (entities, threshold, **kw) → resolved
+kg_build/build/my_builder.py         # (resolved, triples, **kw) → graph
+```
+
+Wire it in `kg_build/__init__.py` (2 lines):
+```python
+from polygraph.kg_build.extract.my_extractor import my_extractor
+extract.my_extractor = my_extractor
+```
+
+### 2. Create a pipeline variant
+
+```python
+# pipelines/my_variant.py
+from polygraph.pipelines import Baseline
+from polygraph.kg_build import extract, resolve, build
+
+class MyVariant(Baseline):
+    def build_kg(self, chunks):
+        entities, triples = extract.my_extractor(chunks)
+        resolved = resolve.by_string(entities, threshold=0.85)
+        graph = build.from_resolved(resolved, triples)
+        return {"graph": graph, "entities": resolved, "triples": triples}
+```
+
+Export it in `pipelines/__init__.py`:
+```python
+from polygraph.pipelines.my_variant import MyVariant
+```
+
+Run: `python main.py --variant myvariant`
+
+### Backend signatures
+
+| Stage | Signature | Returns |
+|---|---|---|
+| `extract` | `(chunks, **kwargs)` | `(list[dict], list[tuple])` |
+| `resolve` | `(entities, threshold, **kwargs)` | `list[dict]` |
+| `build` | `(resolved, triples, **kwargs)` | `nx.DiGraph` |
+
+Triples: `(subject_id, predicate, object_id, evidence_text, source_chunk_id)`
 
 ## Pull Requests
 
-1. Fork the repo and create a feature branch
-2. Add tests for new functionality
-3. Ensure all tests pass and linting is clean
-4. Update documentation if needed
-5. Submit a PR with a clear description
-
-## Adding Features
-
-- **New file format** → add loader in `src/kg_generator/ingest/loader.py`
-- **New language** → add backend in `src/kg_generator/extract/entities.py` and wire into `config.py`
-- **New export format** → add method in `src/kg_generator/export/exporter.py`
-- **New quality metric** → add method in `src/kg_generator/evaluate/data_eval/metrics.py`
-- **External KB linking** → implement `src/kg_generator/graph/enrich.py` stubs
+1. Create a feature branch
+2. Add tests
+3. Ensure `uv run pytest tests/ -v` passes
+4. Submit a PR with a clear description

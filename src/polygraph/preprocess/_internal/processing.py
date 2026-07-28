@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from polygraph.preprocess.dedup import DuplicateMatch
+from polygraph.preprocess.dedup.minhash import DuplicateMatch
 
 DEFAULT_BGE_MODEL = "BAAI/bge-m3"
 

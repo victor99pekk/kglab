@@ -9,13 +9,17 @@ import os
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
 
-from kg_generator.curate.manifest import SourceManifest
-from kg_generator.curate.pipeline import CurationConfig, DatasetCurationPipeline
-from kg_generator.curate.processing import CurationTextProcessor, SemanticReviewer, TextSpan, split_text_to_token_limit
-from kg_generator.dedup.near_dedup import GlobalDeduplicator, SemanticDeduplicator
-from kg_generator.dedup.quality import QualityProfiler, QualityThresholds
+from polygraph.preprocess._internal.manifest import SourceManifest
+from polygraph.preprocess._internal.processing import (
+    CurationTextProcessor,
+    SemanticReviewer,
+    TextSpan,
+    split_text_to_token_limit,
+)
+from polygraph.preprocess.curate.pipeline import CurationConfig, DatasetCurationPipeline
+from polygraph.preprocess.dedup import GlobalDeduplicator, SemanticDeduplicator
+from polygraph.preprocess.quality import QualityProfiler, QualityThresholds
 
 
 def word_counter(text: str) -> int:
@@ -49,7 +53,9 @@ def curation_config(tmp_path: Path, data: Path, **overrides: object) -> Curation
 
 def test_source_manifest_requires_legal_provenance_and_defaults_language(tmp_path):
     path = tmp_path / "manifest.yaml"
-    path.write_text("dataset_name: test\nversion: v1\nlicense: MIT\nsource: local\n", encoding="utf-8")
+    path.write_text(
+        "dataset_name: test\nversion: v1\nlicense: MIT\nsource: local\n", encoding="utf-8"
+    )
     assert SourceManifest.from_file(path).language == "en"
 
     path.write_text("dataset_name: test\nversion: v1\nsource: local\n", encoding="utf-8")
@@ -75,7 +81,9 @@ def test_quality_profile_flags_repeated_lines_without_rejecting_document():
 
 def test_vietnamese_profile_does_not_apply_english_short_token_heuristic():
     text = "và của là ở thì tôi bạn nó em anh chị này kia đó một hai ba bốn năm sáu bảy tám chín"
-    profile = QualityProfiler(QualityThresholds(min_chars=20, min_words=3)).profile(text, language="vi")
+    profile = QualityProfiler(QualityThresholds(min_chars=20, min_words=3)).profile(
+        text, language="vi"
+    )
 
     assert profile.accepted
     assert profile.short_token_ratio is None
@@ -99,7 +107,7 @@ def test_sentence_split_preserves_every_character_and_token_limit():
     text = "Alpha one. Beta two. Gamma three."
     pieces = split_text_to_token_limit(text, FakeProcessor(), word_counter, max_tokens=5)
 
-    assert "".join(text[span.start:span.end] for span, _ in pieces) == text
+    assert "".join(text[span.start : span.end] for span, _ in pieces) == text
     assert all(token_count <= 5 for _, token_count in pieces)
 
 
@@ -116,7 +124,11 @@ def test_global_dedup_selects_best_quality_then_stable_id():
 def test_semantic_dedup_logs_embedding_match_without_model_download():
     records = [
         {"doc_id": "first", "content": "Marie Curie discovered radium.", "quality_score": 0.8},
-        {"doc_id": "paraphrase", "content": "Radium was discovered by Marie Curie.", "quality_score": 0.7},
+        {
+            "doc_id": "paraphrase",
+            "content": "Radium was discovered by Marie Curie.",
+            "quality_score": 0.7,
+        },
         {"doc_id": "different", "content": "The weather is sunny today.", "quality_score": 0.9},
     ]
     embeddings = [[1.0, 0.0], [0.99, 0.01], [0.0, 1.0]]
@@ -132,24 +144,33 @@ def test_semantic_dedup_logs_embedding_match_without_model_download():
 def test_curation_generates_shards_and_reconcilable_artifacts(tmp_path):
     first = tmp_path / "first.jsonl"
     first.write_text(
-        "{\"id\": \"a\", \"text\": \"A reliable data pipeline records the origin and license of every training document for future audits.\", \"category\": \"guide\"}\n"
-        "{\"id\": \"vi\", \"text\": \"Dữ liệu tiếng Việt cần được xử lý bằng Unicode để giữ nguyên dấu câu và ký tự hợp lệ trong mọi báo cáo.\"}\n",
+        '{"id": "a", "text": "A reliable data pipeline records the origin and license of every training document for future audits.", "category": "guide"}\n'
+        '{"id": "vi", "text": "Dữ liệu tiếng Việt cần được xử lý bằng Unicode để giữ nguyên dấu câu và ký tự hợp lệ trong mọi báo cáo."}\n',
         encoding="utf-8",
     )
     second = tmp_path / "second.jsonl"
     second.write_text(
-        "{\"id\": \"b\", \"text\": \"A reliable data pipeline records the origin and license of every training document for future audits.\"}\n"
-        "{\"id\": \"short\", \"text\": \"Too short.\"}\n",
+        '{"id": "b", "text": "A reliable data pipeline records the origin and license of every training document for future audits."}\n'
+        '{"id": "short", "text": "Too short."}\n',
         encoding="utf-8",
     )
     config = curation_config(tmp_path, first, input_paths=(first, second))
     output_dir = DatasetCurationPipeline(config).execute()
 
     assert {path.name for path in output_dir.iterdir()} == {
-        "curated.jsonl", "audit.csv", "record_audit.csv", "duplicate_matches.csv",
-        "quality_report.json", "batch_manifest.json", "dataset_manifest.json", "shards",
+        "curated.jsonl",
+        "audit.csv",
+        "record_audit.csv",
+        "duplicate_matches.csv",
+        "quality_report.json",
+        "batch_manifest.json",
+        "dataset_manifest.json",
+        "shards",
     }
-    curated = [json.loads(line) for line in (output_dir / "curated.jsonl").read_text(encoding="utf-8").splitlines()]
+    curated = [
+        json.loads(line)
+        for line in (output_dir / "curated.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     assert len(curated) == 2
     assert any("Dữ liệu" in item["text"] for item in curated)
     assert all("parent_document_id" in item for item in curated)
@@ -170,8 +191,8 @@ def test_curation_generates_shards_and_reconcilable_artifacts(tmp_path):
 def test_semantic_candidates_are_review_only_and_oom_batches_retry(tmp_path):
     data = tmp_path / "records.jsonl"
     data.write_text(
-        "{\"id\": \"first\", \"text\": \"Marie Curie discovered radium and documented the scientific work for future researchers.\"}\n"
-        "{\"id\": \"second\", \"text\": \"Radium was discovered by Marie Curie and the research was documented for later scientists.\"}\n",
+        '{"id": "first", "text": "Marie Curie discovered radium and documented the scientific work for future researchers."}\n'
+        '{"id": "second", "text": "Radium was discovered by Marie Curie and the research was documented for later scientists."}\n',
         encoding="utf-8",
     )
     calls: list[int] = []
@@ -204,8 +225,8 @@ def test_semantic_candidates_are_review_only_and_oom_batches_retry(tmp_path):
 def test_resume_reuses_embedding_cache_after_interruption(tmp_path):
     data = tmp_path / "records.jsonl"
     data.write_text(
-        "{\"id\": \"one\", \"text\": \"First independently useful document contains enough words for the curation acceptance threshold.\"}\n"
-        "{\"id\": \"two\", \"text\": \"Second independently useful document contains enough words for the curation acceptance threshold.\"}\n",
+        '{"id": "one", "text": "First independently useful document contains enough words for the curation acceptance threshold."}\n'
+        '{"id": "two", "text": "Second independently useful document contains enough words for the curation acceptance threshold."}\n',
         encoding="utf-8",
     )
     attempts = 0
@@ -218,8 +239,13 @@ def test_resume_reuses_embedding_cache_after_interruption(tmp_path):
         return [[1.0, 0.0] for _ in texts]
 
     config = curation_config(
-        tmp_path, data, semantic_review_enabled=True, semantic_encoder=failing_encoder,
-        embedding_batch_token_budget=16, max_record_tokens=16, shard_token_budget=32,
+        tmp_path,
+        data,
+        semantic_review_enabled=True,
+        semantic_encoder=failing_encoder,
+        embedding_batch_token_budget=16,
+        max_record_tokens=16,
+        shard_token_budget=32,
     )
     with pytest.raises(RuntimeError, match="simulated interruption"):
         DatasetCurationPipeline(config).execute()
@@ -236,33 +262,6 @@ def test_resume_reuses_embedding_cache_after_interruption(tmp_path):
     output_dir = DatasetCurationPipeline(resumed).execute()
     assert output_dir.exists()
     assert len(resumed_calls) == 1
-
-
-def test_curate_cli_wires_requested_configuration(monkeypatch, tmp_path):
-    from kg_generator import cli
-
-    captured: dict[str, object] = {}
-
-    class FakePipeline:
-        def __init__(self, config):
-            captured["config"] = config
-
-        def execute(self):
-            return tmp_path / "out"
-
-    input_path = tmp_path / "input.txt"
-    input_path.write_text("text", encoding="utf-8")
-    manifest = write_manifest(tmp_path)
-    monkeypatch.setattr(cli, "DatasetCurationPipeline", FakePipeline)
-    result = CliRunner().invoke(
-        cli.main,
-        ["curate", "-i", str(input_path), "-m", str(manifest), "--no-semantic-review", "--device", "cpu"],
-    )
-
-    assert result.exit_code == 0, result.output
-    config = captured["config"]
-    assert config.semantic_review_enabled is False
-    assert config.device == "cpu"
 
 
 @pytest.mark.skipif(

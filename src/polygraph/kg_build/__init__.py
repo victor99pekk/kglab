@@ -1,5 +1,8 @@
 """KG generation: extract entities → resolve duplicates → build graph.
 
+Each stage is a folder under kg_build/.  Every .py file in a stage folder
+registers one method.  Drop a new file to add a method — auto-discovered.
+
 Function API:
     from polygraph.kg_build import extract, resolve, build
 
@@ -14,6 +17,7 @@ Class API — for advanced control:
 from types import SimpleNamespace
 
 from polygraph.kg_build.build import GraphBuilder
+from polygraph.kg_build.build.default import build_graph
 from polygraph.kg_build.extract.entities import (
     EnglishExtractor,
     Entity,
@@ -23,6 +27,8 @@ from polygraph.kg_build.extract.entities import (
 from polygraph.kg_build.extract.graphgen import GraphGenExtractor
 from polygraph.kg_build.extract.relations import RelationExtractor
 from polygraph.kg_build.resolve import EntityResolver
+from polygraph.kg_build.resolve.embedding import resolve_embedding
+from polygraph.kg_build.resolve.string import resolve_string
 
 # ── Function API ────────────────────────────────────────────────
 
@@ -57,15 +63,11 @@ extract.with_spacy = _extract_spacy
 extract.with_graphgen = _extract_graphgen
 
 resolve = SimpleNamespace()
-resolve.by_string = lambda entities, threshold=0.85: (
-    EntityResolver(method="string", threshold=threshold).resolve(entities)
-)
-resolve.by_embedding = lambda entities, threshold=0.85: (
-    EntityResolver(method="embedding", threshold=threshold).resolve(entities)
-)
+resolve.by_string = lambda entities, threshold=0.85: resolve_string(entities, threshold)
+resolve.by_embedding = lambda entities, threshold=0.85: resolve_embedding(entities, threshold)
 
 build = SimpleNamespace()
-build.from_resolved = lambda resolved, triples: (GraphBuilder().build(resolved, triples))
+build.from_resolved = lambda resolved, triples: build_graph(resolved, triples)
 
 __all__ = [
     "EnglishExtractor",

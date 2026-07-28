@@ -1,4 +1,7 @@
-"""Data loading from multiple sources."""
+"""Baseline data loading from files and directories.
+
+Exports: DataLoader
+"""
 
 import csv
 import json
@@ -76,11 +79,7 @@ class DataLoader:
             for i, line in enumerate(f):
                 if line.strip():
                     item = json.loads(line)
-                    # Prefer a stable canonical id (url, DOI, etc.) over
-                    # file-scoped numeric ids.  Falls back to file path + index.
                     doc_id = item.get("url") or item.get("id") or f"{path}#{i}"
-                    # Carry upload_date into metadata so the pipeline can
-                    # forward it to MongoDB without extra lookups.
                     metadata = {k: v for k, v in item.items() if k not in ("text", "content", "id")}
                     metadata.setdefault("upload_date", "")
                     docs.append(

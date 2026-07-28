@@ -12,22 +12,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from polygraph.preprocess._manifest import (
+from polygraph.preprocess._internal.manifest import (
     SourceManifest,
     sha256_file,
     sha256_text,
     stable_json_hash,
 )
-from polygraph.preprocess._processing import (
+from polygraph.preprocess._internal.processing import (
     DEFAULT_BGE_MODEL,
     BgeTokenCounter,
     CurationTextProcessor,
     SemanticReviewer,
     split_text_to_token_limit,
 )
-from polygraph.preprocess.dedup import DuplicateMatch, GlobalDeduplicator
-from polygraph.preprocess.load import DataLoader
-from polygraph.preprocess.quality import QualityProfiler, QualityThresholds
+from polygraph.preprocess.dedup.minhash import DuplicateMatch, GlobalDeduplicator
+from polygraph.preprocess.load.baseline import DataLoader
+from polygraph.preprocess.quality.baseline import QualityProfiler, QualityThresholds
 
 
 @dataclass(frozen=True)
