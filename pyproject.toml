@@ -1,12 +1,12 @@
 [project]
-name = "kg-generator"
-version = "0.1.0"
-description = "A tool for generating knowledge bases to support LLM training and Graph RAG workflows"
+name = "polygraph"
+version = "0.2.0"
+description = "Research toolkit for building high-quality knowledge graphs for LLM training"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
-    { name = "Vietnam AI Challenge" }
+    { name = "Polygraph Contributors" }
 ]
 
 dependencies = [
@@ -29,7 +29,6 @@ embeddings = [
 # Auditable, multilingual LLM corpus curation. faiss-cpu works everywhere;
 # cloud CUDA images may replace it with their matching FAISS GPU build.
 curation = [
-    "underthesea>=1.4",
     "sentence-transformers>=2.2",
     "transformers>=4.45",
     "ftfy>=6.2",
@@ -38,11 +37,6 @@ curation = [
 dev = [
     "pytest>=8.0",
 ]
-# Vietnamese NLP support (install when switching to vi)
-vi = [
-    "underthesea>=9.5,<10",
-]
-# Public dataset download and streaming
 data = [
     "datasets>=3.0",
 ]
@@ -64,7 +58,7 @@ llm = [
 ]
 # All extras
 all = [
-    "kg-generator[embeddings,curation,vi,data,scraper,neo4j,llm,dev,eval-data,eval-model]",
+    "polygraph[embeddings,curation,data,scraper,neo4j,llm,dev,eval-data,eval-model]",
 ]
 # Evaluation — data_eval: SFT data quality (lightweight, works everywhere)
 eval-data = [
@@ -73,7 +67,7 @@ eval-data = [
 ]
 # Evaluation — model_eval: fine-tuning ablation (Colab GPU only — NOT for Mac)
 eval-model = [
-    "kg-generator[eval-data]",
+    "polygraph[eval-data]",
     "transformers>=4.45",
     "peft>=0.12",
     "accelerate>=0.34",
@@ -82,7 +76,7 @@ eval-model = [
 ]
 
 [project.scripts]
-kg-gen = "kg_generator.cli:main"
+polygraph = "polygraph.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -100,7 +94,7 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
@@ -115,15 +109,18 @@ select = [
     "C4",  # flake8-comprehensions
 ]
 ignore = [
-    "E501",  # line-too-long (handled by formatter)
-    "B008",  # do-not-perform-function-calls-in-argument-defaults
+    "B904",   # raise-without-from-inside-except (click.Abort pattern)
+    "E501",   # line-too-long (handled by formatter)
+    "E741",   # ambiguous-variable-name (fine in list comprehensions)
+    "B008",   # do-not-perform-function-calls-in-argument-defaults
+    "N802",   # invalid-function-name (displayName is intentional)
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["kg_generator"]
+known-first-party = ["polygraph"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

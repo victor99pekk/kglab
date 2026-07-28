@@ -3,7 +3,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from kg_generator.evaluate.model_eval.dataset_gen import (
+from polygraph.evaluate.model_eval.dataset_gen import (
     QADatasetGenerator,
     balance_jsonl_token_volume,
     estimate_qa_tokens,
@@ -71,13 +71,15 @@ def test_grouped_split_keeps_fact_paraphrases_out_of_both_splits(tmp_path: Path)
         graph.add_node(subject, name=f"Người {index}", type="Person")
         graph.add_node(obj, name=f"Nơi {index}", type="Location")
         graph.add_edge(subject, obj, predicates=["born_in"])
-        entities.extend([
-            {"id": subject, "name": f"Người {index}", "type": "Person"},
-            {"id": obj, "name": f"Nơi {index}", "type": "Location"},
-        ])
+        entities.extend(
+            [
+                {"id": subject, "name": f"Người {index}", "type": "Person"},
+                {"id": obj, "name": f"Nơi {index}", "type": "Location"},
+            ]
+        )
         triples.append((subject, "born_in", obj, f"Bằng chứng {index}", f"chunk:{index}"))
 
-    generator = QADatasetGenerator(language="vi", seed=7, max_hops=1, test_split=0.2)
+    generator = QADatasetGenerator(language="en", seed=7, max_hops=1, test_split=0.2)
     train_path, test_path = generator.generate_from_kg(graph, entities, triples, tmp_path)
     raw_train_path, raw_test_path = generator.generate_from_raw_text(
         [
@@ -89,7 +91,9 @@ def test_grouped_split_keeps_fact_paraphrases_out_of_both_splits(tmp_path: Path)
 
     train = [json.loads(line) for line in train_path.read_text(encoding="utf-8").splitlines()]
     test = [json.loads(line) for line in test_path.read_text(encoding="utf-8").splitlines()]
-    raw_train = [json.loads(line) for line in raw_train_path.read_text(encoding="utf-8").splitlines()]
+    raw_train = [
+        json.loads(line) for line in raw_train_path.read_text(encoding="utf-8").splitlines()
+    ]
     raw_test = [json.loads(line) for line in raw_test_path.read_text(encoding="utf-8").splitlines()]
     train_evidence = {item["evidence"] for item in train if item.get("evidence")}
     test_evidence = {item["evidence"] for item in test if item.get("evidence")}
@@ -114,10 +118,7 @@ def test_raw_generator_rejects_pronoun_as_factual_subject():
 def test_training_files_are_balanced_by_estimated_tokens(tmp_path: Path):
     kg_path = tmp_path / "kg.jsonl"
     raw_path = tmp_path / "raw.jsonl"
-    kg_items = [
-        {"question": f"Question {index}", "answer": "short answer"}
-        for index in range(30)
-    ]
+    kg_items = [{"question": f"Question {index}", "answer": "short answer"} for index in range(30)]
     raw_items = [
         {"question": f"Raw {index}", "answer": "a somewhat longer source answer"}
         for index in range(8)

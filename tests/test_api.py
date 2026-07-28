@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 
-from kg_generator.api import DEMO_TEXT, app
-
+from polygraph.api import DEMO_TEXT, app
 
 client = TestClient(app)
 
@@ -25,7 +24,9 @@ def test_pipeline_run_returns_demo_contract(monkeypatch):
     # Keep the unit test independent of optional NLP/native dependencies;
     # production attempts the full pipeline by default.
     monkeypatch.setenv("KG_DEMO_USE_FULL_PIPELINE", "0")
-    response = client.post("/api/pipeline/run", json={"text": DEMO_TEXT, "language": "vi", "extraction": "offline"})
+    response = client.post(
+        "/api/pipeline/run", json={"text": DEMO_TEXT, "language": "en", "extraction": "offline"}
+    )
     assert response.status_code == 200
     payload = response.json()
     assert {"metadata", "graph", "entities", "triples", "stats", "metrics"} <= payload.keys()

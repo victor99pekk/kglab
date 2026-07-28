@@ -16,7 +16,7 @@ entity_types:
     example: "Machine Learning"
   EVENT:
     description: "An occurrence or happening"
-    example: "Vietnam AI Challenge 2026"
+    example: "World War II"
   PRODUCT:
     description: "A tangible or digital product"
     example: "iPhone"

@@ -1,9 +1,0 @@
-.git
-.venv
-__pycache__
-*.pyc
-tests
-*.egg-info
-
-# Keep sample data for demo
-!data/samples/

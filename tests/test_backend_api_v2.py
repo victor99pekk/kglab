@@ -1,16 +1,14 @@
-import threading
-
-import kg_generator.api as api_module
-from kg_generator.api import (
+import polygraph.api as api_module
+from polygraph.api import (
     RUN_LOCK,
     RunOptions,
     RunRequest,
     SourceRequest,
     _config_for_run,
+    _persist_interactive,
     create_run,
     global_graph,
     options,
-    _persist_interactive,
 )
 
 
@@ -21,7 +19,13 @@ def test_options_include_semantic_deduplication():
 
 
 def test_nested_options_map_to_pipeline_config(tmp_path):
-    options = RunOptions(language="en", extraction="graphgen", llm_model="deepseek-v4-pro", chunk_method="sentence", chunk_size=0)
+    options = RunOptions(
+        language="en",
+        extraction="graphgen",
+        llm_model="deepseek-v4-pro",
+        chunk_method="sentence",
+        chunk_size=0,
+    )
     config = _config_for_run(options, tmp_path / "source.json")
     assert config.language.value == "en"
     assert config.use_llm is True
@@ -66,9 +70,16 @@ def test_interactive_auth_failure_is_specific_and_closes_driver(monkeypatch):
             self.closed = True
 
     driver = Driver()
-    monkeypatch.setattr(api_module, "_neo4j_config", lambda _scope: {
-        "uri": "neo4j+s://example", "user": "writer", "password": "secret", "database": "interactive",
-    })
+    monkeypatch.setattr(
+        api_module,
+        "_neo4j_config",
+        lambda _scope: {
+            "uri": "neo4j+s://example",
+            "user": "writer",
+            "password": "secret",
+            "database": "interactive",
+        },
+    )
     monkeypatch.setattr(api_module, "_neo4j_driver", lambda _config: driver)
 
     result = _persist_interactive({"graph": {"nodes": [], "links": []}})

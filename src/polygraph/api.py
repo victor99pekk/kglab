@@ -1,0 +1,696 @@
+"""Small HTTP API used by the demo frontend.
+
+The API deliberately keeps the browser contract small.  Runs are isolated in a
+temporary directory and are exported as JSON by the existing pipeline.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import re
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any, Literal
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from polygraph._shared import Language, PipelineConfig, entity_id
+
+MAX_INPUT_CHARS = 20_000
+RUN_LOCK = threading.Lock()
+DEEPSEEK_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
+LOGGER = logging.getLogger(__name__)
+
+# ``uvicorn kg_generator.api:app`` does not execute the CLI's dotenv loader.
+# Load the project-local file explicitly, while preserving environment variables
+# injected by Docker/Cloud Run/another process.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env", override=False)
+
+
+def _neo4j_config(scope: Literal["global", "interactive"]) -> dict[str, str]:
+    """Resolve one Neo4j target without exposing credentials to the browser."""
+    prefix = f"NEO4J_{scope.upper()}"
+
+    def first(*names: str, default: str = "") -> str:
+        for name in names:
+            value = os.getenv(name)
+            if value:
+                return value
+        return default
+
+    # The generic names keep the existing CLI compatible. The split names let
+    # the demo use the read-only global Aura instance and writable lab instance
+    # at the same time.
+    return {
+        "uri": first(f"{prefix}_URI", "NEO4J_URI"),
+        "user": first(f"{prefix}_USER", f"{prefix}_USERNAME", "NEO4J_USER", "NEO4J_USERNAME"),
+        "password": first(f"{prefix}_PASSWORD", "NEO4J_PASSWORD"),
+        "database": first(f"{prefix}_DATABASE", "NEO4J_DATABASE", default="neo4j"),
+    }
+
+
+def _neo4j_driver(config: dict[str, str]):
+    """Build an Aura driver, with an explicit opt-in for intercepted TLS."""
+    from neo4j import GraphDatabase
+
+    options: dict[str, Any] = {"connection_timeout": 8}
+    uri = config["uri"]
+    if os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "").lower() in {"1", "true", "yes"}:
+        uri = uri.replace("neo4j+s://", "neo4j+ssc://").replace("bolt+s://", "bolt+ssc://")
+        LOGGER.warning(
+            "NEO4J_TRUST_ALL_CERTIFICATES is enabled; use only on a trusted local network"
+        )
+    return GraphDatabase.driver(uri, auth=(config["user"], config["password"]), **options)
+
+
+DEMO_TEXT = (
+    "Alan Turing was born in 1912 in London. He worked at Bletchley Park during "
+    "World War II and is considered the father of theoretical computer science. "
+    "He developed the Turing machine concept and the Turing test for artificial intelligence."
+)
+
+app = FastAPI(title="Knowledge Graph Demo", version="0.1.0")
+_SOURCE_DEMO_DIR = Path(__file__).resolve().parents[2] / "demo"
+DEMO_DIR = Path(os.getenv("KG_DEMO_DIR", "/app/demo"))
+if not DEMO_DIR.exists():
+    DEMO_DIR = _SOURCE_DEMO_DIR
+
+
+class PipelineRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
+    language: Literal["en"] = "en"
+    extraction: Literal["offline"] = "offline"
+
+    @field_validator("text")
+    @classmethod
+    def non_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("text must not be blank")
+        return value
+
+
+class SourceRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    text: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
+    title: str = "Demo source"
+    url: str = ""
+    license: str = "Demo"
+
+    @field_validator("text")
+    @classmethod
+    def non_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("source.text must not be blank")
+        return value
+
+
+class RunOptions(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    language: Literal["en"] = "en"
+    extraction: Literal["offline", "graphgen"] = "offline"
+    llm_model: Literal["deepseek-v4-flash", "deepseek-v4-pro"] = "deepseek-v4-flash"
+    chunk_method: Literal["none", "fixed", "sentence", "semantic"] = "sentence"
+    chunk_size: int = Field(500, ge=0, le=10_000)
+    chunk_overlap: int = Field(100, ge=0, le=5_000)
+    chunk_target_tokens: int = Field(450, ge=1, le=4_000)
+    chunk_overlap_tokens: int = Field(60, ge=0, le=3_999)
+    semantic_chunk_threshold: float = Field(0.55, ge=0, le=1)
+    semantic_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    quality_method: Literal["none", "heuristic"] = "heuristic"
+    dedup_method: Literal["none", "exact", "minhash", "simhash", "ngram", "semantic", "layered"] = (
+        "minhash"
+    )
+    resolve_method: Literal["string", "embedding"] = "string"
+    document_dedup_method: Literal[
+        "none", "exact", "minhash", "simhash", "ngram", "semantic", "layered"
+    ] = "minhash"
+    document_dedup_threshold: float = Field(0.85, ge=0, le=1)
+    dedup_threshold: float = Field(0.85, ge=0, le=1)
+    semantic_dedup_threshold: float = Field(0.92, ge=0, le=1)
+    semantic_dedup_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    semantic_dedup_max_records: int = Field(5_000, ge=1, le=20_000)
+    resolve_threshold: float = Field(0.85, ge=0, le=1)
+    resolve_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    graphgen_max_gleanings: int = Field(3, ge=0, le=5)
+
+    @model_validator(mode="after")
+    def validate_relationships(self):
+        if (
+            self.chunk_method == "fixed"
+            and self.chunk_size > 0
+            and self.chunk_overlap >= self.chunk_size
+        ):
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
+        if (
+            self.chunk_method in {"sentence", "semantic"}
+            and self.chunk_overlap_tokens >= self.chunk_target_tokens
+        ):
+            raise ValueError("chunk_overlap_tokens must be smaller than chunk_target_tokens")
+        return self
+
+
+class RunRequest(BaseModel):
+    source: SourceRequest | None = None
+    options: RunOptions = Field(default_factory=RunOptions)
+
+    @model_validator(mode="before")
+    @classmethod
+    def compatibility_shape(cls, values):
+        if isinstance(values, dict) and values.get("source") is None and values.get("text"):
+            values = dict(values)
+            values["source"] = {"text": values.pop("text"), **(values.pop("config", {}) or {})}
+        return values
+
+    @field_validator("source")
+    @classmethod
+    def require_source(cls, value):
+        if value is None:
+            raise ValueError("source is required")
+        return value
+
+
+def _logical_source(source: SourceRequest) -> dict[str, Any]:
+    digest = hashlib.sha256(source.text.encode("utf-8")).hexdigest()[:16]
+    return {
+        "id": f"source-{digest}",
+        "title": source.title,
+        "url": source.url,
+        "license": source.license,
+    }
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/healthz")
+def api_healthz() -> dict[str, str]:
+    """Public health route; /healthz may be reserved by hosting infrastructure."""
+    return {"status": "ok"}
+
+
+@app.get("/api/demo/sample")
+def demo_sample() -> dict[str, str]:
+    return {"text": DEMO_TEXT, "language": "en", "extraction": "offline"}
+
+
+@app.get("/api/options")
+def options() -> dict[str, Any]:
+    try:
+        import importlib.util
+
+        embeddings_available = importlib.util.find_spec("sentence_transformers") is not None
+    except (ImportError, ValueError):
+        embeddings_available = False
+    interactive_config = _neo4j_config("interactive")
+    global_config = _neo4j_config("global")
+    interactive_configured = all(interactive_config.values())
+    global_configured = all(global_config.values())
+    return {
+        "languages": ["en"],
+        "extraction": ["offline", "graphgen"],
+        "llm_models": list(DEEPSEEK_MODELS),
+        "chunk_methods": ["none", "fixed", "sentence", "semantic"],
+        "quality_methods": ["none", "heuristic"],
+        "resolve_methods": ["string", "embedding"],
+        "document_dedup_methods": [
+            "none",
+            "exact",
+            "minhash",
+            "simhash",
+            "ngram",
+            "semantic",
+            "layered",
+        ],
+        "dedup_methods": ["none", "exact", "minhash", "simhash", "ngram", "semantic", "layered"],
+        "parameters": {
+            "chunk_target_tokens": {"min": 1, "max": 4000},
+            "chunk_overlap_tokens": {"min": 0, "max": 3999},
+            "threshold": {"min": 0, "max": 1},
+        },
+        "availability": {
+            "neo4j": interactive_configured,
+            "interactive_neo4j": interactive_configured,
+            "global_neo4j": global_configured,
+            "graphgen": bool(os.getenv("DEEPSEEK_API_KEY")),
+            "embeddings": embeddings_available,
+        },
+    }
+
+
+def _fallback_graph(text: str, language: str) -> dict[str, Any]:
+    """Dependency-free extraction fallback for minimal Cloud Run images."""
+    candidates = re.findall(r"[A-Z][\w]*(?:\s+[A-Z][\w]*)+", text)
+    names: list[str] = []
+    for name in candidates:
+        name = name.strip(" ,.;:()")
+        if len(name) > 2 and name.casefold() not in {n.casefold() for n in names}:
+            names.append(name)
+    entities = [
+        {
+            "id": entity_id("CONCEPT", name),
+            "name": name,
+            "type": "CONCEPT",
+            "aliases": [name.casefold()],
+            "description": text[:180],
+            "confidenceScore": 0.55,
+            "importanceScore": 0.0,
+            "source": ["demo-input"],
+        }
+        for name in names
+    ]
+    triples: list[dict[str, str]] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        present = [
+            entity for entity in entities if entity["name"].casefold() in sentence.casefold()
+        ]
+        for left, right in zip(present, present[1:], strict=False):
+            triples.append(
+                {
+                    "subject": left["id"],
+                    "predicate": "associated_with",
+                    "object": right["id"],
+                    "evidence_sentence": sentence.strip(),
+                    "source_chunk_id": "",
+                }
+            )
+    nodes = [
+        {"id": entity["id"], "name": entity["name"], "type": entity["type"]} for entity in entities
+    ]
+    return {
+        "metadata": {
+            "language": language,
+            "extraction": {"method": "offline-fallback", "backend": "regex"},
+        },
+        "graph": {
+            "directed": True,
+            "multigraph": False,
+            "graph": {},
+            "nodes": nodes,
+            "links": [
+                {"source": t["subject"], "target": t["object"], "predicates": [t["predicate"]]}
+                for t in triples
+            ],
+        },
+        "entities": entities,
+        "triples": triples,
+        "stats": {"num_nodes": len(nodes), "num_edges": len(triples), "num_triples": len(triples)},
+        "metrics": {"overall_score": 0.0, "extraction": {"method": "offline-fallback"}},
+    }
+
+
+def _run_pipeline(request: PipelineRequest) -> dict[str, Any]:
+    # Exercise the repository pipeline by default.  Set this to ``0`` for a
+    # minimal image (or while optional numerical dependencies are unavailable).
+    if os.getenv("KG_DEMO_USE_FULL_PIPELINE") == "0":
+        return _fallback_graph(request.text, request.language)
+
+    # Import lazily: the full evaluation stack can load optional numerical
+    # libraries, while health/sample endpoints should remain lightweight.
+    from polygraph.pipeline import Pipeline
+
+    with tempfile.TemporaryDirectory(prefix="kg-demo-") as temp_dir:
+        root = Path(temp_dir)
+        source = root / "input.txt"
+        source.write_text(request.text, encoding="utf-8")
+        config = PipelineConfig(
+            language=Language(request.language),
+            input_paths=[source],
+            file_formats=["txt"],
+            chunk_method="none",
+            chunk_size=0,
+            quality_method="none",
+            dedup_method="none",
+            document_dedup_method="none",
+            resolve_method="string",
+            export_formats=["json"],
+            use_llm=False,
+        )
+        Pipeline(config, root / "output").execute()
+        output = root / "output" / "knowledge_graph.json"
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        metrics_path = root / "output" / "metrics.json"
+        payload["metrics"] = (
+            json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists() else {}
+        )
+        return payload
+
+
+def _run_nested(request: RunRequest) -> dict[str, Any]:
+    source = request.source
+    options = request.options
+    logical = _logical_source(source)
+    if os.getenv("KG_DEMO_USE_FULL_PIPELINE") == "0":
+        payload = _fallback_graph(source.text, options.language)
+    else:
+        from polygraph.pipeline import Pipeline
+
+        with tempfile.TemporaryDirectory(prefix="kg-run-") as temp_dir:
+            root = Path(temp_dir)
+            input_path = root / "source.json"
+            input_path.write_text(
+                json.dumps(
+                    {
+                        "id": logical["id"],
+                        "title": source.title,
+                        "url": source.url,
+                        "license": source.license,
+                        "text": source.text,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = _config_for_run(options, input_path)
+            Pipeline(config, root / "output").execute()
+            payload = json.loads(
+                (root / "output" / "knowledge_graph.json").read_text(encoding="utf-8")
+            )
+            metrics_path = root / "output" / "metrics.json"
+            payload["metrics"] = (
+                json.loads(metrics_path.read_text(encoding="utf-8"))
+                if metrics_path.exists()
+                else {}
+            )
+    payload.setdefault("metadata", {})["logical_source"] = logical
+    return payload
+
+
+def _config_for_run(options: RunOptions, input_path: Path) -> PipelineConfig:
+    """Translate validated public options to the internal pipeline config."""
+    return PipelineConfig(
+        language=Language(options.language),
+        input_paths=[input_path],
+        file_formats=["json"],
+        chunk_method=options.chunk_method,
+        chunk_size=options.chunk_size,
+        chunk_overlap=options.chunk_overlap,
+        chunk_target_tokens=options.chunk_target_tokens,
+        chunk_overlap_tokens=options.chunk_overlap_tokens,
+        semantic_chunk_threshold=options.semantic_chunk_threshold,
+        semantic_model=options.semantic_model,
+        quality_method=options.quality_method,
+        dedup_method=options.dedup_method,
+        document_dedup_method=options.document_dedup_method,
+        document_dedup_threshold=options.document_dedup_threshold,
+        dedup_threshold=options.dedup_threshold,
+        semantic_dedup_threshold=options.semantic_dedup_threshold,
+        semantic_dedup_model=options.semantic_dedup_model,
+        semantic_dedup_max_records=options.semantic_dedup_max_records,
+        resolve_method=options.resolve_method,
+        resolve_threshold=options.resolve_threshold,
+        resolve_model=options.resolve_model,
+        graphgen_max_gleanings=options.graphgen_max_gleanings,
+        use_llm=options.extraction == "graphgen",
+        llm_model=options.llm_model,
+        export_formats=["json"],
+    )
+
+
+@app.post("/api/runs")
+def create_run(request: RunRequest) -> dict[str, Any]:
+    if not RUN_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="another pipeline run is in progress")
+    started = time.perf_counter()
+    try:
+        try:
+            result = _run_nested(request)
+        except Exception as error:
+            LOGGER.exception("Pipeline run failed: %s: %s", type(error).__name__, error)
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "pipeline_failed",
+                    "message": f"Pipeline run failed: {type(error).__name__}: {error}",
+                },
+            ) from error
+        result["persistence"] = _persist_interactive(result)
+        result.setdefault("metadata", {})["elapsed_seconds"] = round(
+            time.perf_counter() - started, 3
+        )
+        return result
+    finally:
+        RUN_LOCK.release()
+
+
+def _persist_interactive(payload: dict[str, Any]) -> dict[str, Any]:
+    """Atomically replace the interactive graph when Neo4j is configured."""
+    config = _neo4j_config("interactive")
+    if not all(config.values()):
+        return {"status": "skipped", "reason": "interactive Neo4j is not configured"}
+    driver = None
+    try:
+        from polygraph.export.neo4j_upload import replace_documents_atomic
+
+        graph = payload.get("graph", {})
+        nodes, edges = graph.get("nodes", []), graph.get("links", graph.get("edges", []))
+        document_ids = [n.get("id", "") for n in nodes if n.get("type") == "Document"]
+        driver = _neo4j_driver(config)
+        # Fail before opening the replacement transaction when Aura rejects the
+        # secret version or target. This makes authentication/configuration
+        # failures distinguishable from an atomic graph-write rollback.
+        driver.verify_connectivity()
+        with driver.session(database=config["database"]) as session:
+
+            def writer(tx):
+                for node in nodes:
+                    label = (
+                        "Document"
+                        if node.get("type") == "Document"
+                        else ("Chunk" if node.get("type") == "Chunk" else "Entity")
+                    )
+                    tx.run(
+                        f"MERGE (n:{label} {{id:$id}}) SET n.name=$name, n.type=$type, n.description=$description",
+                        id=node.get("id", ""),
+                        name=node.get("name", ""),
+                        type=node.get("type", "Entity"),
+                        description=node.get("description", ""),
+                    )
+                for edge in edges:
+                    predicates = edge.get("predicates", [edge.get("label", "related_to")])
+                    relations = edge.get("relations", [])
+                    for index, predicate in enumerate(predicates):
+                        relation = (
+                            relations[index]
+                            if index < len(relations)
+                            else (relations[0] if relations else {})
+                        )
+                        evidence = (
+                            relation.get("evidence_sentence")
+                            or edge.get("evidence_sentence")
+                            or edge.get("evidence")
+                            or edge.get("description")
+                            or ""
+                        )
+                        source_chunk_id = (
+                            relation.get("source_chunk_id") or edge.get("source_chunk_id") or ""
+                        )
+                        tx.run(
+                            "MATCH (a {id:$source}), (b {id:$target}) "
+                            "MERGE (a)-[r:RELATION {predicate:$predicate}]->(b) "
+                            "SET r.evidenceSentence=$evidence, r.sourceChunkId=$source_chunk_id",
+                            source=edge.get("source"),
+                            target=edge.get("target"),
+                            predicate=predicate,
+                            evidence=evidence,
+                            source_chunk_id=source_chunk_id,
+                        )
+
+            replace_documents_atomic(session, document_ids, writer, clear_all=True)
+        return {"status": "persisted", "database": config["database"]}
+    except Exception as error:
+        error_name = type(error).__name__
+        error_code = str(getattr(error, "code", ""))
+        LOGGER.warning(
+            "Interactive Neo4j persistence failed: %s code=%s database=%s",
+            error_name,
+            error_code or "none",
+            config["database"],
+        )
+        if error_name == "AuthError" or "Unauthorized" in error_code:
+            return {
+                "status": "failed",
+                "code": "neo4j_auth_failed",
+                "reason": "Neo4j rejected the interactive credential version; the previous graph was preserved",
+            }
+        if error_name in {"DatabaseNotFound", "ClientError"}:
+            return {
+                "status": "failed",
+                "code": "neo4j_database_failed",
+                "reason": "Neo4j could not access the configured interactive database; the previous graph was preserved",
+            }
+        return {
+            "status": "failed",
+            "code": "neo4j_write_failed",
+            "reason": "Neo4j replacement rolled back; the previous graph was preserved",
+        }
+    finally:
+        if driver is not None:
+            driver.close()
+
+
+@app.post("/api/pipeline/run")
+def run_pipeline(request: PipelineRequest) -> dict[str, Any]:
+    try:
+        return _run_pipeline(request)
+    except Exception as error:  # stable public error; details remain server-side
+        raise HTTPException(status_code=500, detail="pipeline run failed") from error
+
+
+def _sample_global_graph() -> dict[str, Any]:
+    """Return a bundled, read-only graph when the live database is unavailable."""
+    candidates = (
+        Path("/app/data/global_sample.json"),
+        Path(__file__).resolve().parents[2] / "generated_KGs/output_small/knowledge_graph.json",
+    )
+    for path in candidates:
+        try:
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                payload.setdefault("metadata", {})
+                payload["metadata"].update(
+                    {"source": "sample", "read_only": True, "scope": "global"}
+                )
+                return payload
+        except (OSError, json.JSONDecodeError):
+            continue
+    return {
+        "metadata": {"source": "sample", "read_only": True, "scope": "global"},
+        "graph": {
+            "nodes": [
+                {"id": "hcm", "name": "Hồ Chí Minh", "type": "PERSON"},
+                {"id": "vietnam", "name": "Việt Nam", "type": "PLACE"},
+            ],
+            "links": [{"source": "hcm", "target": "vietnam", "predicates": ["lãnh đạo"]}],
+        },
+        "stats": {"num_nodes": 2, "num_edges": 1, "num_triples": 1},
+    }
+
+
+def _neo4j_graph(
+    *,
+    scope: Literal["global", "interactive"],
+    node_id: str | None = None,
+    query: str = "",
+    limit: int = 150,
+) -> dict[str, Any] | None:
+    config = _neo4j_config(scope)
+    if not all(config.values()):
+        return None
+    driver = None
+    try:
+        driver = _neo4j_driver(config)
+        with driver.session(database=config["database"]) as session:
+            if node_id:
+                record = session.run(
+                    "MATCH (n {id:$id}) OPTIONAL MATCH (n)-[r]-(m) "
+                    "RETURN collect(DISTINCT n) AS nodes, collect(DISTINCT m) AS neighbors, "
+                    "collect(DISTINCT {source:startNode(r).id,target:endNode(r).id,"
+                    "predicates:[coalesce(r.predicate,type(r))],"
+                    "evidence_sentence:coalesce(r.evidenceSentence,r.description,''),"
+                    "source_chunk_id:coalesce(r.sourceChunkId,'')}) AS links",
+                    id=node_id,
+                ).single()
+                nodes = (
+                    (list(record["nodes"] or []) + list(record["neighbors"] or []))
+                    if record
+                    else []
+                )
+                links = list(record["links"] or []) if record else []
+            else:
+                nodes = [
+                    row["node"]
+                    for row in session.run(
+                        "MATCH (n) WHERE $search_query='' OR toLower(coalesce(n.name,n.id,'')) CONTAINS toLower($search_query) "
+                        "OPTIONAL MATCH (n)-[r]-() "
+                        "RETURN n AS node, count(r) AS degree "
+                        "ORDER BY degree DESC LIMIT $limit",
+                        search_query=query,
+                        limit=limit,
+                    )
+                ]
+                ids = [str(dict(node).get("id", "")) for node in nodes]
+                links = [
+                    dict(row)
+                    for row in session.run(
+                        "MATCH (a)-[r]->(b) WHERE a.id IN $ids AND b.id IN $ids "
+                        "RETURN a.id AS source,b.id AS target,[coalesce(r.predicate,type(r))] AS predicates,"
+                        "coalesce(r.evidenceSentence,r.description,'') AS evidence_sentence,"
+                        "coalesce(r.sourceChunkId,'') AS source_chunk_id",
+                        ids=ids,
+                    )
+                ]
+        unique_nodes = {str(dict(node).get("id", "")): dict(node) for node in nodes if node}
+        serial_nodes = list(unique_nodes.values())
+        return {
+            "metadata": {"source": "live", "read_only": scope == "global", "scope": scope},
+            "graph": {"nodes": serial_nodes, "links": links},
+            "stats": {
+                "num_nodes": len(serial_nodes),
+                "num_edges": len(links),
+                "num_triples": len(links),
+            },
+        }
+    except Exception as error:
+        LOGGER.warning("%s Neo4j graph read failed: %s", scope, type(error).__name__)
+        return None
+    finally:
+        if driver is not None:
+            driver.close()
+
+
+@app.get("/api/graph/global")
+def global_graph(
+    q: str = Query(default="", max_length=120), limit: int = Query(default=150, ge=1, le=5000)
+) -> dict[str, Any]:
+    live = _neo4j_graph(scope="global", query=q, limit=limit)
+    # An Aura instance can be reachable but empty (for example immediately
+    # after creation). Keep the visual surface useful until data is uploaded.
+    if live and live.get("graph", {}).get("nodes"):
+        return live
+    return _sample_global_graph()
+
+
+@app.get("/api/graphs/global")
+def graphs_global(
+    q: str = Query(default="", max_length=120), limit: int = Query(default=150, ge=1, le=5000)
+) -> dict[str, Any]:
+    return global_graph(q=q, limit=limit)
+
+
+@app.get("/api/graph")
+def graph_read() -> dict[str, Any]:
+    return global_graph()
+
+
+@app.get("/api/graph/{node_id}")
+def graph_node(node_id: str) -> dict[str, Any]:
+    return _neo4j_graph(scope="global", node_id=node_id) or {
+        "graph": {"nodes": [], "links": []},
+        "metadata": {"read_only": True, "scope": "global"},
+    }
+
+
+@app.get("/api/graphs/interactive")
+def graphs_interactive(
+    q: str = Query(default="", max_length=120), limit: int = Query(default=150, ge=1, le=5000)
+) -> dict[str, Any]:
+    return _neo4j_graph(scope="interactive", query=q, limit=limit) or {
+        "metadata": {"source": "empty", "read_only": False, "scope": "interactive"},
+        "graph": {"nodes": [], "links": []},
+        "stats": {"num_nodes": 0, "num_edges": 0, "num_triples": 0},
+    }
+
+
+# Keep legacy Html/ untouched. The new presentation is the service homepage.
+app.mount("/", StaticFiles(directory=DEMO_DIR, html=True), name="demo")

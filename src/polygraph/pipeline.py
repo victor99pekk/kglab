@@ -1,0 +1,889 @@
+"""Pipeline orchestrator — ties together all stages of KG generation."""
+
+import json
+import logging
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import Any
+
+from polygraph._shared import GraphBackend, PipelineConfig
+from polygraph._shared import chunk_id as stable_chunk_id
+from polygraph._shared import document_id as stable_document_id
+from polygraph.kg_build import (
+    EnglishExtractor,
+    Entity,
+    EntityExtractor,
+    EntityResolver,
+    GraphBuilder,
+    GraphGenExtractor,
+    RelationExtractor,
+)
+from polygraph.kg_build.enrich import GraphEnricher
+from polygraph.kg_build.extract.relations import SYMMETRIC_PREDICATES
+from polygraph.kg_eval.metrics import QualityEvaluator
+from polygraph.kg_eval.structural import StructuralAuditor
+from polygraph.kg_export.exporter import GraphExporter
+from polygraph.preprocess import (
+    DataLoader,
+    Deduplicator,
+    QualityFilter,
+    SemanticChunker,
+    SentenceChunker,
+    TextChunker,
+    TextCleaner,
+)
+from polygraph.preprocess.mongo import MongoDocumentStore
+
+logger = logging.getLogger(__name__)
+
+PROVENANCE_FIELDS = (
+    "title",
+    "url",
+    "license",
+    "source_domain",
+    "scraped_at",
+    "crawler",
+    "content_hash",
+    "inferred_type",
+)
+
+
+class Pipeline:
+    """Orchestrates the full knowledge graph generation pipeline."""
+
+    def __init__(self, config: PipelineConfig, output_dir: Path) -> None:
+        self.config = config
+        self.output_dir = output_dir
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._embedding_models: dict[str, Any] = {}
+
+        # --- Stage 1: Ingest ---
+        self.loader = DataLoader(config.file_formats)
+        self.cleaner = TextCleaner(language=config.language)
+        self.chunker = self._build_chunker()
+
+        # --- Dedup & Quality ---
+        if config.quality_method not in {"none", "heuristic"}:
+            raise ValueError("quality_method must be one of: none, heuristic")
+        self.document_deduplicator = Deduplicator(
+            threshold=config.document_dedup_threshold,
+            method=config.document_dedup_method,
+            semantic_threshold=config.semantic_dedup_threshold,
+            semantic_model=config.semantic_dedup_model,
+            semantic_max_records=config.semantic_dedup_max_records,
+            semantic_encoder=self._shared_encoder(config.semantic_dedup_model),
+        )
+        self.chunk_deduplicator = Deduplicator(
+            threshold=config.dedup_threshold,
+            method=config.dedup_method,
+            semantic_threshold=config.semantic_dedup_threshold,
+            semantic_model=config.semantic_dedup_model,
+            semantic_max_records=config.semantic_dedup_max_records,
+            semantic_encoder=self._shared_encoder(config.semantic_dedup_model),
+        )
+        # Backward-compatible attribute for callers that inspected the old pipeline.
+        self.deduplicator = self.chunk_deduplicator
+        self.quality_filter = QualityFilter(language=config.language.value)
+
+        # --- Stage 2: Extract ---
+        # GraphGen performs joint extraction via LLM.
+        self.entity_extractor = None if config.use_llm else self._build_entity_extractor()
+        self.graphgen_extractor = (
+            GraphGenExtractor(
+                language=config.language,
+                model_name=config.llm_model,
+                entity_types=tuple(config.graphgen_entity_types),
+                max_gleanings=config.graphgen_max_gleanings,
+            )
+            if config.use_llm
+            else None
+        )
+        self.relation_extractor = RelationExtractor(
+            language=config.language,
+            use_llm=False,
+            model_name=config.llm_model,
+        )
+
+        # --- Stage 3: Resolve ---
+        self.resolver = EntityResolver(
+            threshold=config.resolve_threshold,
+            method=config.resolve_method,
+            model_name=config.resolve_model,
+            encoder=(
+                self._shared_encoder(config.resolve_model)
+                if config.resolve_method == "embedding"
+                else None
+            ),
+        )
+
+        # --- Stage 4: Graph ---
+        self.graph_builder = GraphBuilder(
+            ontology=config.ontology,
+            backend=config.graph_backend,
+        )
+        self.enricher = GraphEnricher()
+
+        # --- Stage 5: Evaluate & Export ---
+        self.evaluator = QualityEvaluator()
+        self.structural_auditor = StructuralAuditor(
+            entity_dedup_threshold=config.resolve_threshold,
+        )
+        self.exporter = GraphExporter()
+
+        # --- MongoDB document archive (optional) ---
+        self.mongo_store: MongoDocumentStore | None = None
+        if config.mongo_uri:
+            self.mongo_store = MongoDocumentStore(
+                uri=config.mongo_uri,
+                database=config.mongo_database,
+            )
+
+    def _build_entity_extractor(self) -> EntityExtractor:
+        return EnglishExtractor(model_name=self.config.spacy_model)
+
+    def _build_chunker(self) -> TextChunker:
+        method = self.config.chunk_method
+        if method in {"none", "fixed"}:
+            return TextChunker(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        if method == "sentence":
+            return SentenceChunker(
+                target_tokens=self.config.chunk_target_tokens,
+                overlap_tokens=self.config.chunk_overlap_tokens,
+                language=self.config.language,
+            )
+        if method == "semantic":
+            return SemanticChunker(
+                target_tokens=self.config.chunk_target_tokens,
+                overlap_tokens=self.config.chunk_overlap_tokens,
+                language=self.config.language,
+                similarity_threshold=self.config.semantic_chunk_threshold,
+                model_name=self.config.semantic_model,
+                encoder=self._shared_encoder(self.config.semantic_model),
+            )
+        raise ValueError("chunk_method must be one of: none, fixed, sentence, semantic")
+
+    def _shared_encoder(self, model_name: str):
+        """Return a lazy encoder shared by chunking, dedup, and resolution."""
+
+        def encode(texts: list[str]):
+            if model_name not in self._embedding_models:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                except ImportError as error:
+                    raise RuntimeError(
+                        "Semantic strategies require sentence-transformers. "
+                        "Install it with: uv sync --extra embeddings"
+                    ) from error
+                self._embedding_models[model_name] = SentenceTransformer(model_name)
+            return self._embedding_models[model_name].encode(
+                texts,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+
+        return encode
+
+    @staticmethod
+    def _snip_description(text: str, entity_name: str, context_chars: int = 120) -> str:
+        """Extract a brief snippet from text around an entity name for auto-description."""
+        idx = text.lower().find(entity_name.lower())
+        if idx == -1:
+            return ""
+        start = max(0, idx - context_chars // 2)
+        end = min(len(text), idx + len(entity_name) + context_chars // 2)
+        snippet = text[start:end].strip()
+        return snippet
+
+    @staticmethod
+    def _source_metadata(document: Any) -> dict[str, Any]:
+        """Keep scalar scraper/Wikipedia provenance on graph source nodes."""
+        return {
+            key: document.metadata[key]
+            for key in PROVENANCE_FIELDS
+            if document.metadata.get(key) not in (None, "")
+        }
+
+    def _remove_old_chunks_from_neo4j(
+        self,
+        queue: list[tuple[str, str]],
+    ) -> None:
+        """Remove old Chunk nodes from Neo4j for replaced documents."""
+        from polygraph._shared import document_id as _doc_id
+        from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
+
+        try:
+            from neo4j import GraphDatabase
+        except ImportError:
+            logger.warning("neo4j driver not installed — cannot remove old chunks")
+            return
+
+        uri = self.config.neo4j_uri or "bolt://localhost:7687"
+        user = self.config.neo4j_user or "neo4j"
+        password = self.config.neo4j_password or ""
+        driver = GraphDatabase.driver(uri, auth=(user, password))
+
+        try:
+            with driver.session() as session:
+                builder = Neo4jGraphBuilder(session, ontology=self.config.ontology)
+                for canonical_id, old_version in queue:
+                    doc_node_id = _doc_id(canonical_id, canonical_id)
+                    removed = builder.remove_document_chunks(doc_node_id)
+                    if removed and self.mongo_store:
+                        # We don't have the old chunk data at this point,
+                        # but we record a lightweight archive entry.
+                        self.mongo_store.archived_chunks.insert_one(
+                            {
+                                "canonical_id": canonical_id,
+                                "replaced_version": old_version,
+                                "chunks_removed": removed,
+                                "archived_at": datetime.now(UTC).isoformat(),
+                                "note": "Chunks removed during replacement; "
+                                "full chunk data was not captured.",
+                            }
+                        )
+        finally:
+            driver.close()
+
+    def execute(self) -> None:
+        """Run all stages in sequence."""
+        logger.info("Starting KG generation pipeline...")
+
+        # ── Stage 1: Ingest & Clean ──
+        logger.info("[1/5] Ingesting & cleaning data...")
+        documents = self.loader.load(self.config.input_paths)
+        processing = {"loaded_documents": len(documents)}
+        documents = self.cleaner.clean_batch(documents)
+        processing["cleaned_documents"] = len(documents)
+        logger.info(f"  Loaded & cleaned {len(documents)} documents")
+
+        # ── MongoDB archival (always-first, before any KG mutation) ──
+        mongo_run_id: str | None = None
+        mongo_stats = {"new": 0, "replaced": 0, "unchanged": 0}
+        neo4j_remove_queue: list[tuple[str, str]] = []  # (canonical_id, old_version)
+
+        if self.mongo_store is not None:
+            mongo_run_id = f"run-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            self.mongo_store.start_run(
+                mongo_run_id,
+                config={"input_paths": [str(p) for p in self.config.input_paths]},
+            )
+            for doc in documents:
+                # Use URL as canonical_id when available (Wikipedia, scraped, etc.)
+                canonical_id = doc.metadata.get("url") or doc.metadata.get("id") or doc.doc_id
+                upload_date = doc.metadata.get("upload_date", "")
+
+                existed_before = self.mongo_store.document_exists(canonical_id)
+                content_hash = self.mongo_store.store_document(
+                    doc,
+                    canonical_id,
+                    upload_date=upload_date,
+                )
+
+                if not existed_before:
+                    mongo_stats["new"] += 1
+                else:
+                    latest = self.mongo_store.get_latest_version(canonical_id)
+                    if latest and latest["content_hash"] != content_hash:
+                        # Content changed — old KG chunks need removal
+                        mongo_stats["replaced"] += 1
+                        neo4j_remove_queue.append((canonical_id, str(latest["version"])))
+                    else:
+                        mongo_stats["unchanged"] += 1
+
+            logger.info(
+                "  MongoDB: %d new, %d replaced, %d unchanged",
+                mongo_stats["new"],
+                mongo_stats["replaced"],
+                mongo_stats["unchanged"],
+            )
+
+            # Remove old chunks from Neo4j for replaced documents
+            if neo4j_remove_queue and self.config.graph_backend == GraphBackend.NEO4J:
+                self._remove_old_chunks_from_neo4j(neo4j_remove_queue)
+
+        # Quality and surface deduplication happen at document scope before
+        # chunking, then again at chunk scope after boundaries are created.
+        if self.config.quality_method == "heuristic":
+            documents = self.quality_filter.filter(documents)
+        processing["documents_after_quality"] = len(documents)
+        documents = self.document_deduplicator.deduplicate(documents)
+        processing["documents_after_dedup"] = len(documents)
+
+        # ── Chunk ──
+        # Sentence/semantic chunkers do not use the fixed-size field. A zero
+        # fixed size remains the backwards-compatible signal to keep a
+        # document intact.
+        chunking_enabled = self.config.chunk_method != "none" and (
+            self.config.chunk_method != "fixed" or self.config.chunk_size > 0
+        )
+        if chunking_enabled:
+            documents = self.chunker.chunk(documents)
+            logger.info(f"  Chunked into {len(documents)} pieces")
+        processing["chunks_created"] = len(documents)
+
+        # ── Dedup ──
+        logger.info("[2/5] Deduplication & quality filtering...")
+        if chunking_enabled and self.config.quality_method == "heuristic":
+            documents = self.quality_filter.filter(documents)
+        processing["chunks_after_quality"] = len(documents)
+        documents = self.chunk_deduplicator.deduplicate(documents)
+        processing["chunks_after_dedup"] = len(documents)
+        logger.info(f"  {len(documents)} documents after dedup")
+
+        # ── Stage 2: Extract Entities & Relations ──
+        logger.info("[3/5] Extracting entities & relations...")
+        all_triples: list[tuple[str, ...]] = []
+        structural_entities: list[dict[str, Any]] = []
+        extracted_entities: list[dict[str, Any]] = []
+
+        # Create Chunk entities for all documents upfront (needed for :NEXT edges
+        # that reference future chunks)
+        chunk_contexts: list[tuple[Any, str, str]] = []
+        for doc in documents:
+            parent_source = doc.metadata.get("parent_source", doc.source)
+            source_document_id = doc.metadata.get("parent_doc_id", doc.doc_id)
+            parent_id = stable_document_id(parent_source, source_document_id)
+            index = doc.metadata.get("chunk_index", 0)
+            chunk_id = stable_chunk_id(parent_id, index, doc.content)
+            chunk_contexts.append((doc, parent_id, chunk_id))
+            parent_name = (
+                Path(parent_source).name if parent_source else source_document_id or "unknown"
+            )
+            doc_entity = Entity(
+                name=f"{parent_name} chunk {index}",
+                label="Chunk",
+                mentions=[],
+                source=doc.source,
+                node_id=chunk_id,
+                description=doc.content[:200],
+                attributes={
+                    "text": doc.content,
+                    "tokenCount": doc.metadata.get("token_count", len(doc.content.split())),
+                    "index": doc.metadata.get("chunk_index", 0),
+                    "embedding": None,
+                    "source": doc.source,
+                    "char_length": len(doc.content),
+                    "parent_source": doc.metadata.get("parent_source", doc.source),
+                },
+            )
+            d = doc_entity.to_dict()
+            # Inject chunk-specific properties that aren't in the generic entity dict
+            d["text"] = doc.content
+            d["tokenCount"] = doc.metadata.get("token_count", len(doc.content.split()))
+            d["index"] = doc.metadata.get("chunk_index", 0)
+            d.update(self._source_metadata(doc))
+            structural_entities.append(d)
+
+        # :NEXT edges between consecutive chunks of the same document
+        for i in range(len(chunk_contexts) - 1):
+            _, parent_id, current_chunk_id = chunk_contexts[i]
+            _, next_parent_id, next_chunk_id = chunk_contexts[i + 1]
+            if parent_id == next_parent_id:
+                all_triples.append((current_chunk_id, "NEXT", next_chunk_id, "", current_chunk_id))
+
+        # Create Document nodes (one per source file) and :PART_OF edges
+        seen_docs: set[str] = set()
+        for doc, parent_id, _ in chunk_contexts:
+            parent = doc.metadata.get("parent_source", doc.source)
+            parent_name = doc.metadata.get("title") or (Path(parent).name if parent else "unknown")
+            if parent_id not in seen_docs:
+                seen_docs.add(parent_id)
+                doc_node = Entity(
+                    name=parent_name,
+                    label="Document",
+                    mentions=[parent_name],
+                    source=parent,
+                    node_id=parent_id,
+                    description=f"Source document: {parent}",
+                    attributes={
+                        "source": parent,
+                        "chunk_count": sum(
+                            1
+                            for d in documents
+                            if stable_document_id(
+                                d.metadata.get("parent_source", d.source),
+                                d.metadata.get("parent_doc_id", d.doc_id),
+                            )
+                            == parent_id
+                        ),
+                    },
+                )
+                d = doc_node.to_dict()
+                d["chunk_count"] = sum(
+                    1
+                    for doc in documents
+                    if stable_document_id(
+                        doc.metadata.get("parent_source", doc.source),
+                        doc.metadata.get("parent_doc_id", doc.doc_id),
+                    )
+                    == parent_id
+                )
+                d.update(self._source_metadata(doc))
+                structural_entities.append(d)
+
+        for _, parent_id, chunk_id in chunk_contexts:
+            all_triples.append((chunk_id, "PART_OF", parent_id, "", chunk_id))
+
+        # Now extract entities and :MENTIONS edges from each chunk
+        for doc, _, chunk_id in chunk_contexts:
+            if self.graphgen_extractor is not None:
+                entities, triples = self.graphgen_extractor.extract(
+                    doc.content, source_chunk_id=chunk_id
+                )
+            else:
+                if self.entity_extractor is None:
+                    raise RuntimeError("Baseline entity extractor is not configured")
+                entities = self.entity_extractor.extract(doc.content)
+                triples = self.relation_extractor.extract(
+                    doc.content, entities, source_chunk_id=chunk_id
+                )
+
+            for e in entities:
+                # Enrich entity with GraphRAG provenance and description
+                e.source = chunk_id
+                if not e.description:
+                    # Auto-generate a brief description from surrounding text
+                    e.description = self._snip_description(doc.content, e.name)
+                evidence = self.relation_extractor._find_evidence(doc.content, e.name, e.name)
+                triples.append((chunk_id, "MENTIONS", e.id, evidence, chunk_id))
+
+            extracted_entities.extend(e.to_dict() for e in entities)
+            all_triples.extend(triples)
+
+        logger.info(
+            f"  Extracted {len(structural_entities) + len(extracted_entities)} entities "
+            f"(incl. {len(documents)} chunks), {len(all_triples)} triples"
+        )
+
+        # ── Stage 3: Resolve Entities ──
+        logger.info("[4/5] Resolving entities...")
+        resolved_extracted, entity_id_map = self.resolver.resolve_with_mapping(extracted_entities)
+        resolved_entities = structural_entities + resolved_extracted
+        all_triples = [
+            (
+                entity_id_map.get(triple[0], triple[0]),
+                triple[1],
+                entity_id_map.get(triple[2], triple[2]),
+                triple[3] if len(triple) > 3 else "",
+                triple[4] if len(triple) > 4 else "",
+                *triple[5:],
+            )
+            for triple in all_triples
+        ]
+        all_triples = self._normalize_resolved_triples(all_triples)
+        if self.graphgen_extractor is not None:
+            resolved_extracted, all_triples = self.graphgen_extractor.aggregate_descriptions(
+                resolved_extracted,
+                extracted_entities,
+                entity_id_map,
+                all_triples,
+            )
+            resolved_entities = structural_entities + resolved_extracted
+        logger.info(f"  {len(resolved_entities)} unique entities after resolution")
+
+        # ── Stage 4: Build Graph ──
+        logger.info("[5/5] Building graph...")
+        graph = self.graph_builder.build(resolved_entities, all_triples)
+        try:
+            graph = self.enricher.enrich(graph)
+        except NotImplementedError:
+            logger.info("Graph enrichment not yet implemented — skipping")
+        extraction_metadata = self._extraction_metadata()
+        graph.graph["language"] = self.config.language.value
+        graph.graph["extraction_method"] = extraction_metadata["method"]
+
+        # ── Evaluate ──
+        logger.info("Evaluating quality...")
+        metrics = self.evaluator.evaluate_graph(graph, resolved_entities, all_triples)
+        # Method 1's intrinsic structural audit is useful beyond the evaluation
+        # CLI: every pipeline consumer should be able to judge whether a graph
+        # is structurally suitable for downstream SFT data generation.
+        metrics["structural_audit"] = self.structural_auditor.audit(
+            graph, resolved_entities, all_triples
+        )
+        metrics["extraction"] = {
+            **extraction_metadata,
+            "max_gleanings": (
+                self.config.graphgen_max_gleanings if self.graphgen_extractor is not None else 0
+            ),
+        }
+        strategy_metadata = self._strategy_metadata()
+        metrics["pipeline"] = strategy_metadata
+        metrics["processing"] = processing
+        self._log_metrics(metrics)
+
+        # ── Export ──
+        logger.info("Exporting...")
+        self.exporter.export(
+            graph=graph,
+            entities=resolved_entities,
+            triples=all_triples,
+            output_dir=self.output_dir,
+            formats=self.config.export_formats,
+            metadata={
+                "language": self.config.language.value,
+                "extraction": extraction_metadata,
+                "pipeline": strategy_metadata,
+                "processing": processing,
+            },
+        )
+
+        # Save metrics
+        with open(self.output_dir / "metrics.json", "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=2, ensure_ascii=False)
+
+        # ── MongoDB KG linkage & run completion ──
+        if self.mongo_store is not None and mongo_run_id:
+            # Link chunk IDs back to their canonical documents in MongoDB
+            for doc, _parent_id, _ in chunk_contexts:
+                canonical_id = doc.metadata.get("url") or doc.metadata.get("id") or doc.doc_id
+                # Count triples involving this document's chunks
+                chunk_ids_for_doc = {
+                    cid
+                    for _, _, cid in chunk_contexts
+                    if doc.metadata.get("url") == canonical_id or doc.doc_id == canonical_id
+                }
+                doc_triple_count = sum(
+                    1
+                    for t in all_triples
+                    if t[0] in chunk_ids_for_doc or t[4] in chunk_ids_for_doc
+                    if len(t) > 4
+                )
+                self.mongo_store.link_kg_chunks(
+                    canonical_id,
+                    list(chunk_ids_for_doc),
+                    doc_triple_count,
+                )
+
+            # Build final stats
+            final_stats = {
+                "documents_processed": len(documents),
+                "documents_new": mongo_stats["new"],
+                "documents_replaced": mongo_stats["replaced"],
+                "documents_unchanged": mongo_stats["unchanged"],
+                "chunks_created": processing.get("chunks_created", len(documents)),
+                "entities_extracted": len(resolved_entities),
+                "triples_extracted": len(all_triples),
+            }
+            self.mongo_store.complete_run(mongo_run_id, final_stats)
+
+        logger.info("Pipeline complete!")
+
+    def _extraction_metadata(self) -> dict[str, Any]:
+        if self.graphgen_extractor is not None:
+            return {
+                "language": self.config.language.value,
+                "method": "graphgen",
+                "backend": "deepseek",
+                "model": self.config.llm_model,
+                "backend_version": None,
+                "prompt_version": self.graphgen_extractor.prompt_version,
+            }
+
+        backend = "spacy"
+        try:
+            backend_version = version(backend)
+        except PackageNotFoundError:
+            backend_version = None
+        return {
+            "language": self.config.language.value,
+            "method": "baseline",
+            "backend": backend,
+            "model": None,
+            "backend_version": backend_version,
+            "prompt_version": None,
+        }
+
+    def _strategy_metadata(self) -> dict[str, Any]:
+        """Describe the selected strategies for reproducible demo runs."""
+        return {
+            "chunking": {
+                "method": self.config.chunk_method,
+                "size_chars": self.config.chunk_size
+                if self.config.chunk_method == "fixed"
+                else None,
+                "overlap_chars": self.config.chunk_overlap
+                if self.config.chunk_method == "fixed"
+                else None,
+                "target_tokens": (
+                    self.config.chunk_target_tokens
+                    if self.config.chunk_method in {"sentence", "semantic"}
+                    else None
+                ),
+                "overlap_tokens": (
+                    self.config.chunk_overlap_tokens
+                    if self.config.chunk_method in {"sentence", "semantic"}
+                    else None
+                ),
+                "semantic_threshold": (
+                    self.config.semantic_chunk_threshold
+                    if self.config.chunk_method == "semantic"
+                    else None
+                ),
+                "embedding_model": (
+                    self.config.semantic_model if self.config.chunk_method == "semantic" else None
+                ),
+            },
+            "quality": {"method": self.config.quality_method},
+            "deduplication": {
+                "document_method": self.config.document_dedup_method,
+                "document_threshold": self.config.document_dedup_threshold,
+                "chunk_method": self.config.dedup_method,
+                "chunk_threshold": self.config.dedup_threshold,
+                "semantic_threshold": self.config.semantic_dedup_threshold,
+                "embedding_model": self.config.semantic_dedup_model,
+            },
+            "extraction": {
+                "method": "graphgen" if self.config.use_llm else "offline",
+            },
+            "resolution": {
+                "method": self.config.resolve_method,
+                "threshold": self.config.resolve_threshold,
+                "embedding_model": (
+                    self.config.resolve_model if self.config.resolve_method == "embedding" else None
+                ),
+            },
+        }
+
+    @staticmethod
+    def _normalize_resolved_triples(
+        triples: list[tuple[str, ...]],
+    ) -> list[tuple[str, ...]]:
+        """Drop resolution-created self loops and stabilize symmetric edges."""
+        normalized: list[tuple[str, ...]] = []
+        seen: set[tuple[str, ...]] = set()
+        for triple in triples:
+            subject, predicate, object_ = triple[:3]
+            if subject == object_ and predicate not in {"MENTIONS", "PART_OF", "NEXT"}:
+                continue
+            if predicate in SYMMETRIC_PREDICATES and object_ < subject:
+                triple = (object_, predicate, subject, *triple[3:])
+            key = (triple[0], triple[1], triple[2], *triple[4:])
+            if key not in seen:
+                seen.add(key)
+                normalized.append(triple)
+        return normalized
+
+    def execute_neo4j(self, session: Any, *, clear: bool = False) -> dict[str, Any]:
+        """Run all stages, writing directly to Neo4j per-chunk.
+
+        Unlike ``execute()``, this method never builds a full in-memory graph.
+        Entities are resolved against the existing Neo4j database, and every
+        node / edge is written via ``MERGE`` as each chunk is processed.
+
+        Parameters
+        ----------
+        session:
+            An active Neo4j ``Session`` (from ``neo4j.Driver.session()``).
+        clear:
+            If ``True``, delete all existing nodes and relationships first.
+
+        Returns
+        -------
+        dict
+            Graph statistics queried from Neo4j after completion.
+        """
+        if self.config.resolve_method != "string":
+            raise ValueError(
+                "The direct Neo4j backend currently supports string entity resolution only. "
+                "Use the networkx backend plus neo4j-upload for embedding resolution."
+            )
+
+        from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
+        from polygraph.kg_export.neo4j.resolver import Neo4jEntityResolver
+        from polygraph.kg_export.neo4j.upload import replace_documents
+
+        builder = Neo4jGraphBuilder(session, ontology=self.config.ontology)
+        resolver = Neo4jEntityResolver(session, threshold=self.config.resolve_threshold)
+
+        if clear:
+            builder.clear_database()
+
+        # ── Stage 1: Ingest & Clean ──
+        logger.info("[1/4] Ingesting & cleaning data...")
+        documents = self.loader.load(self.config.input_paths)
+        processing = {"loaded_documents": len(documents)}
+        documents = self.cleaner.clean_batch(documents)
+        processing["cleaned_documents"] = len(documents)
+        logger.info(f"  Loaded & cleaned {len(documents)} documents")
+
+        if self.config.quality_method == "heuristic":
+            documents = self.quality_filter.filter(documents)
+        processing["documents_after_quality"] = len(documents)
+        documents = self.document_deduplicator.deduplicate(documents)
+        processing["documents_after_dedup"] = len(documents)
+
+        chunking_enabled = self.config.chunk_method != "none" and (
+            self.config.chunk_method != "fixed" or self.config.chunk_size > 0
+        )
+        if chunking_enabled:
+            documents = self.chunker.chunk(documents)
+            logger.info(f"  Chunked into {len(documents)} pieces")
+        processing["chunks_created"] = len(documents)
+
+        # ── Dedup ──
+        logger.info("[2/4] Deduplication & quality filtering...")
+        if chunking_enabled and self.config.quality_method == "heuristic":
+            documents = self.quality_filter.filter(documents)
+        processing["chunks_after_quality"] = len(documents)
+        documents = self.chunk_deduplicator.deduplicate(documents)
+        processing["chunks_after_dedup"] = len(documents)
+        logger.info(f"  {len(documents)} documents after dedup")
+
+        # ── Build chunk contexts (same logic as execute()) ──
+        chunk_contexts: list[tuple[Any, str, str]] = []
+        for doc in documents:
+            parent_source = doc.metadata.get("parent_source", doc.source)
+            source_document_id = doc.metadata.get("parent_doc_id", doc.doc_id)
+            parent_id = stable_document_id(parent_source, source_document_id)
+            index = doc.metadata.get("chunk_index", 0)
+            chunk_id = stable_chunk_id(parent_id, index, doc.content)
+            chunk_contexts.append((doc, parent_id, chunk_id))
+
+        # ── Replace any documents being re-uploaded ──
+        all_doc_ids = sorted({pid for _, pid, _ in chunk_contexts})
+        if all_doc_ids and not clear:
+            replace_documents(session, all_doc_ids)
+
+        # ── Stage 3: Extract & write per-chunk ──
+        logger.info("[3/4] Extracting entities & relations → Neo4j...")
+        seen_docs: set[str] = set()
+        chunk_count_by_doc: dict[str, int] = {}
+
+        # First pass: count chunks per document
+        for _, parent_id, _ in chunk_contexts:
+            chunk_count_by_doc[parent_id] = chunk_count_by_doc.get(parent_id, 0) + 1
+
+        # Write structural nodes & edges
+        for doc, parent_id, chunk_id in chunk_contexts:
+            # MERGE Chunk node
+            builder.merge_chunk(
+                chunk_id,
+                source=doc.source,
+                text=doc.content,
+                token_count=doc.metadata.get("token_count", len(doc.content.split())),
+                index=doc.metadata.get("chunk_index", 0),
+                properties=self._source_metadata(doc),
+            )
+
+            # MERGE Document node (once per document)
+            if parent_id not in seen_docs:
+                seen_docs.add(parent_id)
+                parent_source = doc.metadata.get("parent_source", doc.source)
+                parent_name = doc.metadata.get("title") or (
+                    Path(parent_source).name if parent_source else "unknown"
+                )
+                builder.merge_document(
+                    parent_id,
+                    name=parent_name,
+                    description=f"Source document: {parent_source}",
+                    source=parent_source,
+                    chunk_count=chunk_count_by_doc.get(parent_id, 0),
+                    properties=self._source_metadata(doc),
+                )
+
+            # MERGE PART_OF edge
+            builder.merge_structural_edge(chunk_id, parent_id, "PART_OF")
+
+        # Write NEXT edges
+        for i in range(len(chunk_contexts) - 1):
+            _, p1, c1 = chunk_contexts[i]
+            _, p2, c2 = chunk_contexts[i + 1]
+            if p1 == p2:
+                builder.merge_structural_edge(c1, c2, "NEXT")
+
+        # Second pass: extract entities & relations per chunk
+        total_extracted = 0
+        total_triples = 0
+        for doc, _, chunk_id in chunk_contexts:
+            if self.graphgen_extractor is not None:
+                entities, triples = self.graphgen_extractor.extract(
+                    doc.content, source_chunk_id=chunk_id
+                )
+            else:
+                if self.entity_extractor is None:
+                    raise RuntimeError("Baseline entity extractor is not configured")
+                entities = self.entity_extractor.extract(doc.content)
+                triples = self.relation_extractor.extract(
+                    doc.content, entities, source_chunk_id=chunk_id
+                )
+
+            # Enrich entities
+            for e in entities:
+                e.source = chunk_id
+                if not e.description:
+                    e.description = self._snip_description(doc.content, e.name)
+
+            # Resolve entities against Neo4j
+            entity_dicts = [e.to_dict() for e in entities]
+            resolved_dicts, id_map = resolver.resolve_with_mapping(entity_dicts)
+
+            # Write MENTIONS edges (chunk → resolved entity)
+            for entity_dict in resolved_dicts:
+                eid = entity_dict.get("id", "")
+                evidence = self.relation_extractor._find_evidence(
+                    doc.content, entity_dict.get("name", ""), entity_dict.get("name", "")
+                )
+                builder.merge_structural_edge(chunk_id, eid, "MENTIONS")
+
+            # Write extracted relation edges (entity → entity)
+            for triple in triples:
+                subj = id_map.get(triple[0], triple[0])
+                pred = triple[1]
+                obj = id_map.get(triple[2], triple[2])
+                if subj == obj:
+                    continue
+                if pred in SYMMETRIC_PREDICATES and obj < subj:
+                    subj, obj = obj, subj
+                evidence = triple[3] if len(triple) > 3 else ""
+                desc = triple[5] if len(triple) > 5 else ""
+                builder.merge_edge(
+                    subj,
+                    obj,
+                    pred,
+                    evidence_sentence=evidence,
+                    source_chunk_id=chunk_id,
+                    description=desc,
+                )
+
+            total_extracted += len(resolved_dicts)
+            total_triples += len(triples)
+
+        logger.info(
+            f"  Processed {len(chunk_contexts)} chunks: "
+            f"{total_extracted} entities, {total_triples} triples"
+        )
+
+        # ── Stage 4: Post-processing ──
+        logger.info("[4/4] Post-processing...")
+        builder.compute_pagerank()
+        stats = builder.compute_stats()
+
+        # Save metrics
+        metrics: dict[str, Any] = {
+            **stats,
+            "extraction": {
+                "method": "graphgen" if self.graphgen_extractor is not None else "baseline",
+                "model": self.config.llm_model if self.graphgen_extractor is not None else None,
+            },
+            "pipeline": self._strategy_metadata(),
+            "processing": processing,
+        }
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.output_dir / "metrics.json", "w") as f:
+            json.dump(metrics, f, indent=2)
+
+        logger.info("Neo4j pipeline complete!  Stats: %s", stats)
+        return metrics
+
+    def _log_metrics(self, metrics: dict[str, Any]) -> None:
+        logger.info("  Quality Metrics:")
+        for key, value in metrics.items():
+            if isinstance(value, float):
+                logger.info(f"    {key}: {value:.4f}")
+            else:
+                logger.info(f"    {key}: {value}")

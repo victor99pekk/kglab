@@ -2,8 +2,8 @@
 
 import json
 
-from kg_generator.evaluate.graphgen.qa_generator import GraphGenQAGenerator
-from kg_generator.evaluate.graphgen.subgraphs import (
+from polygraph.evaluate.graphgen.qa_generator import GraphGenQAGenerator
+from polygraph.evaluate.graphgen.subgraphs import (
     GraphGenSubgraphSampler,
     KnowledgeEdge,
     load_graphgen_kg,
@@ -110,9 +110,7 @@ def test_sampler_records_missing_loss_fallback():
 
     result = sampler.sample(_nodes(), edges, max_subgraphs=1)
 
-    assert result.subgraphs[0]["selection_basis"] == (
-        "stable_id_fallback_no_comprehension_loss"
-    )
+    assert result.subgraphs[0]["selection_basis"] == ("stable_id_fallback_no_comprehension_loss")
     assert any(event["reason"] == "stable_id_fallback" for event in result.audit)
 
 
