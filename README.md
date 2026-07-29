@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="100%"/>
+<img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="50%"/>
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
 
