@@ -96,6 +96,8 @@ cd polygraph
 make install         # syncs all deps + downloads spaCy model
 ```
 
+Run `make help` to see all available targets.
+
 ### Build a Knowledge Graph
 
 ```python
@@ -111,8 +113,12 @@ pipeline.execute()
 The KG is written to `output/my_experiment/` as `knowledge_graph.json` and
 `knowledge_graph.graphml`, plus a `metrics.json` with quality scores.
 
+The pipeline uses a default ontology (`configs/default_ontology.yaml`) that defines
+which entity types and relations to extract. Swap it out to target a different domain.
+
 ### Create new KG-generation pipelines
-Subclass a pipeline, override stages, and compare against the baseline (e.g., new extraction and resolution methods in the KG build stage):
+Subclass a pipeline and override any stage — preprocessing (chunk, clean, dedup),
+extraction, resolution, or graph construction:
 
 Custom methods like `with_new_extraction_method` and `with_new_resolve_method` are wired in `kg_build/__init__.py` — add your extraction and resolution backends there so they're callable as `extract.with_new_method` and `resolve.with_new_method`. Register it in `src/polygraph/pipelines/__init__.py`:
 
