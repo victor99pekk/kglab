@@ -7,7 +7,7 @@
   <img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="30%"/>
 </p>
 
-<sub><p align="right">Image adapted from [Holten & van Wijk (2009)](https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275).</p></sub>
+<p align="right"><sub><small>Image adapted from [Holten & van Wijk (2009)](https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275).</small></sub></p>
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
 
