@@ -1,11 +1,13 @@
 # Polygraph: KG-Grounded SFT Data for LLMs
 
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-🌐 Find raw documents → 🧠 Build knowledge graph → 💬 Generate QA pairs → 🎯 Fine-tune LLM
+🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
 
 Research toolkit for building high-quality knowledge graphs and using them to ground LLM training data.
+
+Research toolkot for building highly customizable Knowledge-Graph generation pipelines. This repo provides support to use built KG-generation pipelines, and to customize them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc...), as well as knowledge building stages like extraction- or resolvation- of entities. The pipelines are implemented as classes that can be easily benchmakred with pre-defined code. The hope is that this will make it easy for people to use existing pipelines (defined in this repo), modifying them, and benchmarking the change with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
 
 <details>
 <summary><strong>📑 Contents</strong></summary>
@@ -13,9 +15,12 @@ Research toolkit for building high-quality knowledge graphs and using them to gr
 - [Polygraph: KG-Grounded SFT Data for LLMs](#polygraph-kg-grounded-sft-data-for-llms)
   - [About the Project](#about-the-project)
   - [Creating a Pipeline Variant](#creating-a-pipeline-variant)
+  - [Benchmarking \& Experiments](#benchmarking--experiments)
+    - [Neo4j export](#neo4j-export)
+  - [ML Model Training](#ml-model-training)
   - [Quick Start](#quick-start)
     - [Hackathon Results](#hackathon-results)
-  - [Adding a new build_kg method](#adding-a-new-build_kg-method)
+  - [Adding a new build\_kg method](#adding-a-new-build_kg-method)
   - [Architecture](#architecture)
   - [Contributing](#contributing)
   - [License](#license)
@@ -41,7 +46,11 @@ class MyVariant(Baseline):
     """Same as Baseline but with custom build_kg."""
 
     def build_kg(self, chunks):
-        entities, triples = extract.with_llm(chunks, model="gpt-4o")
+        entities, triples = extract.with_methods(
+            chunks, self.ontology,
+            entity_method="spacy",
+            relation_method="structured_llm",
+        )
         resolved = resolve.by_embedding(entities, threshold=0.85)
         graph = build.from_resolved(resolved, triples)
         return {"graph": graph, "entities": resolved, "triples": triples}
@@ -60,7 +69,7 @@ All pipelines can be run and compared via experiment YAML configs:
 
 ```bash
 # Run a pipeline experiment — produces results_summary.json with all metrics
-make run-experiment EXP=experiments/kg/001_baseline/config.yaml
+make experiment EXP=kg/001_baseline
 ```
 
 ```yaml
@@ -164,23 +173,20 @@ These early results suggested that KG-structured training data could eliminate h
 
 ## Adding a new build_kg method
 
-The KG pipeline is three swappable stages: **extract → resolve → build**. Each lives in a folder under `kg_build/` with one `.py` file per method.
+The KG pipeline is three swappable stages: **extract → resolve → build**.
+Each uses a lazy registry (`registry.py`) mapping names to implementations.
 
-**1. Drop a backend file** — e.g. `kg_build/extract/my_method.py`:
+**1. Drop a backend** — subclass `EntityExtractor`, `RelationExtractorMethod`,
+or follow the resolve/build signatures in CONTRIBUTING.md.
+
+**2. Register it** in the corresponding `registry.py`:
 ```python
-def my_method(chunks, **kwargs):
-    entities = [...]   # your custom extraction logic
-    triples = [...]    # (subject_id, predicate, object_id, evidence, chunk_id)
-    return entities, triples
+ENTITY_METHODS["my_extractor"] = (
+    "polygraph.kg_build.extract.entity.my_extractor:MyExtractor"
+)
 ```
 
-**2. Wire it** in `kg_build/__init__.py` (2 lines):
-```python
-from polygraph.kg_build.extract.my_method import my_method
-extract.my_method = my_method
-```
-
-**3. Use it** in a pipeline variant — then run `python main.py --variant myvariant`.
+**3. Use it** by name in a pipeline variant or experiment config.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for backend signatures and a full walkthrough.
 
@@ -202,10 +208,12 @@ src/
 └── ml/                  # ML training (parallel to polygraph)
     ├── base_trainer.py  #   BaseTrainer ABC
     ├── training_utils.py #  EarlyStopping, MetricTracker, SaveBest
-    ├── entity_resolution/  # binary classifier for merging entities
-    │   └── models/      #   MODEL_REGISTRY — mlp, attention, ...
-    └── node_classification/  # GNN for entity type prediction
-        └── models/      #   MODEL_REGISTRY — gcn, gat (PyTorch Geometric)
+    ├── entity_resolution/   # binary classifier for merging entities
+    │   └── models/
+    ├── node_classification/  # GNN for entity type prediction
+    │   └── models/
+    └── topic_classification/ # GNN for document topic prediction
+        └── models/
 
 experiments/
 ├── kg/                  # pipeline experiments (config.yaml → BenchmarkRunner)
