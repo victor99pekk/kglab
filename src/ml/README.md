@@ -6,6 +6,21 @@ inference tools from `polygraph.models/`; it never touches training code.
 
 ---
 
+## Quick reference
+
+| Concept | Location |
+|---|---|
+| Training code (models, datasets, loops) | `src/ml/<task>/` |
+| Inference tools (what pipelines import) | `src/polygraph/models/<task>.py` |
+| Saved checkpoints | `experiments/ML_models/<NNN>_<name>/models/` |
+| Experiment configs | `experiments/ML_models/<NNN>_<name>/config.yaml` |
+| Shared training utilities | `src/ml/training_utils.py` |
+| GNN dependencies | `uv sync --extra gnn` |
+| KG pipeline experiments | `experiments/kg/` |
+| Benchmark & Neo4j upload | `BenchmarkRunner` in `src/polygraph/benchmark_pipeline/` |
+
+---
+
 ## Directory layout
 
 ```
@@ -19,17 +34,17 @@ src/ml/
 │   ├── train.py                  #   EntityResolutionTrainer
 │   └── models/                   #   architecture variants
 │       ├── __init__.py           #     MODEL_REGISTRY + get_model()
-│       ├── mlp.py                #     MLPEntityResolver
-│       └── attention.py          #     AttentionEntityResolver
+│       ├── mlp.py                #     MLPEntityResolver (skeleton)
+│       └── attention.py          #     AttentionEntityResolver (skeleton)
 │
 └── node_classification/          # Task: GNN for predicting entity categories
     ├── config.py                 #   NodeClassificationConfig dataclass
     ├── dataset.py                #   NodeClassificationDataset — labels from entity.type
     ├── train.py                  #   NodeClassificationTrainer
-    └── models/                   #   architecture variants
+    └── models/                   #   architecture variants (lazy imports)
         ├── __init__.py           #     MODEL_REGISTRY + get_model()
-        ├── gcn.py                #     GCNNodeClassifier (PyTorch Geometric)
-        └── gat.py                #     GATNodeClassifier (PyTorch Geometric)
+        ├── gcn.py                #     GCNNodeClassifier (PyTorch Geometric, real)
+        └── gat.py                #     GATNodeClassifier (PyTorch Geometric, real)
 ```
 
 ---
@@ -67,6 +82,34 @@ Raw text → Pipeline → knowledge_graph.json → ML dataset → Model training
 The `knowledge_graph.json` contains entities, triples, and graph structure.
 Each task's `dataset.py` reads this file and generates task-specific
 training samples with labels.
+
+### Pipeline benchmarking & Neo4j export
+
+Pipeline variants in `src/polygraph/pipelines/` can all be run and compared
+via `BenchmarkRunner`:
+
+```python
+from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+
+config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
+runner = BenchmarkRunner(config)
+result = runner.run()   # preprocess → build KG → evaluate → export → results_summary.json
+```
+
+Each run produces a `results_summary.json` with all metrics, timestamps, and
+config — making experiments reproducible and comparable across pipeline
+variants.
+
+Generated KGs can be uploaded to Neo4j by setting `neo4j.upload: true` in
+the experiment YAML (requires `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD`
+env vars).
+
+```yaml
+# experiments/kg/001_baseline/config.yaml
+neo4j:
+  upload: true
+  clear: false   # set true to wipe the DB first
+```
 
 ---
 
