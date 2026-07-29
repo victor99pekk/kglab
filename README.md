@@ -1,7 +1,9 @@
-# Polygraph: KG-Grounded SFT Data for LLMs
+# Polygraph: Customizable Knowledge Graph Pipelines
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+<img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="100%"/>
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
 
@@ -10,7 +12,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
 <details>
 <summary><strong>📑 Contents</strong></summary>
 
-- [Polygraph: KG-Grounded SFT Data for LLMs](#polygraph-kg-grounded-sft-data-for-llms)
+- [Polygraph: Customizable Knowledge Graph Pipelines](#polygraph-customizable-knowledge-graph-pipelines)
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
     - [Installation](#installation)
