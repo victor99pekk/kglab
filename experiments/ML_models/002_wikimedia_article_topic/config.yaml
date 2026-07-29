@@ -1,0 +1,91 @@
+name: "002 — Wikimedia Article Topic Classification"
+task: "article_topic_classification"
+status: "data_prepared"
+
+taxonomy:
+  name: "wikimedia_original_64"
+  path: "wikimedia_topics_64.yaml"
+  label_count: 64
+  output_unit: "article"
+
+data:
+  manifest_path: "dataset_manifest.yaml"
+  source_file: "labels_en"
+  raw_path: "artifacts/raw/labeled_enwiki_with_topics_metadata.json.bz2"
+  prepared_path: "artifacts/prepared/article_topic_labels.jsonl"
+  summary_path: "artifacts/prepared/summary.json"
+  language: "en"
+  label_source: "wikiproject_page_assessments"
+  license: "CC0"
+
+split:
+  group_by: "wikidata_qid"
+  seed: 42
+  train: 0.90
+  validation: 0.02
+  test: 0.08
+
+prediction:
+  target_node_type: "article"
+  output_shape: ["article_count", 64]
+  multilabel: true
+  chunks_are_targets: false
+  entities_are_targets: false
+
+tracks:
+  - id: "E0"
+    path: "tracks/E0_outlink_qid_linear"
+    graph: "wikimedia_outlink_bag"
+    feature_vector: "mean_pooled_outlink_qid_embedding"
+    model: "pooled_qid_embeddings_linear"
+    role: "wikimedia_reproduction_baseline"
+    status: "planned"
+  - id: "E1"
+    path: "tracks/E1_modernbert_text"
+    graph: "none"
+    feature_vector: "hierarchical_modernbert_article_embedding"
+    model: "bert_hierarchical_multilabel"
+    role: "embedding_baseline"
+    status: "planned"
+  - id: "E2"
+    path: "tracks/E2_article_link_graphsage"
+    graph: "article_hyperlink"
+    feature_vector: "graphsage_contextualized_modernbert_article_embedding"
+    model: "graphsage"
+    role: "inductive_graph_baseline"
+    status: "planned"
+  - id: "E3"
+    path: "tracks/E3_factual_hetero_graphsage"
+    graph: "article_entity_type"
+    feature_vector: "hetero_graphsage_contextualized_modernbert_embeddings"
+    model: "heterogeneous_graphsage"
+    role: "factual_kg"
+    status: "planned"
+  - id: "E4"
+    path: "tracks/E4_topic_label_gcn"
+    graph: "topic_hierarchy_and_cooccurrence"
+    feature_vector: "label_gcn_contextualized_modernbert_topic_embedding"
+    model: "label_gcn"
+    role: "label_dependencies"
+    status: "planned"
+  - id: "E5"
+    path: "tracks/E5_combined_hgt"
+    graph: "combined_heterogeneous"
+    feature_vector: "hgt_contextualized_typed_modernbert_embeddings"
+    model: "hgt"
+    role: "final_candidate"
+    status: "planned"
+
+evaluation:
+  primary_track: "inductive_new_article"
+  secondary_track: "transductive_embedding_refinement"
+  primary_metric: "macro_f1"
+  metrics:
+    - "macro_f1"
+    - "micro_f1"
+    - "mean_average_precision"
+    - "lrap"
+    - "precision_at_k"
+    - "recall_at_k"
+  threshold_selection: "per_topic_on_validation"
+  seeds: [42, 43, 44]

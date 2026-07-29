@@ -1,0 +1,45 @@
+source:
+  name: "Wikipedia Articles and Associated WikiProject Templates"
+  provider: "Wikimedia researchers via Figshare"
+  article_id: 10248344
+  version: 4
+  doi: "10.6084/m9.figshare.10248344.v4"
+  published_at: "2020-06-08T16:48:39Z"
+  license: "CC0"
+  page_url: "https://figshare.com/articles/dataset/Wikipedia_Articles_and_Associated_WikiProject_Templates/10248344"
+  api_url: "https://api.figshare.com/v2/articles/10248344"
+
+files:
+  taxonomy_mapping:
+    id: 20205654
+    name: "wikiproject_taxonomy.halfak_20191202.yaml"
+    url: "https://ndownloader.figshare.com/files/20205654"
+    size: 41766
+    md5: "fe799451381e64aaf833f169ba10432f"
+  template_mapping:
+    id: 20205702
+    name: "wikiproject_to_template.halfak_20191202.yaml"
+    url: "https://ndownloader.figshare.com/files/20205702"
+    size: 126633
+    md5: "101a9a87f658b33de4b69526b22dab0e"
+  labels_en:
+    id: 22969217
+    name: "labeled_enwiki_with_topics_metadata.json.bz2"
+    url: "https://ndownloader.figshare.com/files/22969217"
+    size: 316930407
+    md5: "3dd89dd7d5ab645731841c996aec4e0b"
+
+record_contract:
+  required:
+    - "title"
+    - "article_revid"
+    - "talk_pid"
+    - "talk_revid"
+    - "wp_templates"
+    - "qid"
+    - "sitelinks"
+    - "topics"
+  target_field: "topics"
+  target_unit: "article"
+  grouping_field: "qid"
+

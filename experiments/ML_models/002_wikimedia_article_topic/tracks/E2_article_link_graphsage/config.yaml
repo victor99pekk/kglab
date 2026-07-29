@@ -1,0 +1,14 @@
+id: "E2"
+name: "Article-Link GraphSAGE"
+status: "planned"
+graph: "article_hyperlink"
+feature_vector:
+  name: "graphsage_contextualized_modernbert_article_embedding"
+  type: "dense_neural_graph"
+  input_source: "../E1_modernbert_text"
+  input_dimension: 768
+  graph_hidden_dimension: 256
+model: "graphsage"
+blocked_by:
+  - "E1_features"
+  - "revision_matched_outlinks"

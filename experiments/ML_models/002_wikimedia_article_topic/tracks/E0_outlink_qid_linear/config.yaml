@@ -1,0 +1,14 @@
+id: "E0"
+name: "Wikimedia Outlink-QID Linear Baseline"
+status: "planned"
+graph: "wikimedia_outlink_bag"
+feature_vector:
+  name: "mean_pooled_outlink_qid_embedding"
+  type: "dense_neural"
+  embedding_source: null
+  dimension: null
+  aggregation: "mean"
+model: "multilabel_linear"
+blocked_by:
+  - "revision_matched_outlinks"
+  - "pinned_qid_embedding_source"

@@ -18,7 +18,17 @@ WIKI_SEED     ?=
 
 GRAPH         ?= kg/001_baseline
 
-.PHONY: help install clean test build-kg experiment neo4j-upload download-wikipedia
+WIKIMEDIA_TOPIC_EXP       ?= experiments/ML_models/002_wikimedia_article_topic
+WIKIMEDIA_TOPIC_TOOL      := tools/data_retrieval/prepare_wikimedia_topic_labels.py
+WIKIMEDIA_TOPIC_MANIFEST  := $(WIKIMEDIA_TOPIC_EXP)/dataset_manifest.yaml
+WIKIMEDIA_TOPIC_TAXONOMY  := $(WIKIMEDIA_TOPIC_EXP)/wikimedia_topics_64.yaml
+WIKIMEDIA_TOPIC_ARTIFACTS := $(WIKIMEDIA_TOPIC_EXP)/artifacts
+WIKIMEDIA_TOPIC_LABELS    := $(WIKIMEDIA_TOPIC_ARTIFACTS)/prepared/article_topic_labels.jsonl
+WIKIMEDIA_TOPIC_SUMMARY   := $(WIKIMEDIA_TOPIC_ARTIFACTS)/prepared/summary.json
+
+.PHONY: help install clean test build-kg experiment neo4j-upload download-wikipedia \
+	wikimedia-topic-labels wikimedia-topic-labels-validate \
+	wikimedia-topic-labels-download wikimedia-topic-labels-prepare
 
 help:
 	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=baseline] [EXP=...] [WIKI_COUNT=20]"
@@ -29,6 +39,10 @@ help:
 	@echo ""
 	@echo "── Data ─────────────────────────────────────────────"
 	@echo "   download-wikipedia  Download random Wikipedia articles as JSONL"
+	@echo "   wikimedia-topic-labels           Prepare pinned Wikimedia topic labels"
+	@echo "   wikimedia-topic-labels-validate  Validate label manifest and taxonomy"
+	@echo "   wikimedia-topic-labels-download  Download and verify English labels"
+	@echo "   wikimedia-topic-labels-prepare   Normalize labels and create QID splits"
 	@echo ""
 	@echo "── Pipeline ─────────────────────────────────────────"
 	@echo "   build-kg          Run the full pipeline (preprocess → build KG → evaluate → export)"
@@ -46,6 +60,7 @@ help:
 	@echo "   make experiment EXP=kg/002_llm"
 	@echo "   make neo4j-upload GRAPH=kg/002_llm"
 	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
+	@echo "   make wikimedia-topic-labels                    # Experiment 002 labels"
 
 # ═══════════════════════════════════════════════════════════
 # Setup
@@ -94,3 +109,34 @@ download-wikipedia:
 		--max-scan $(WIKI_MAX_SCAN) \
 		$(if $(WIKI_SEED),--seed $(WIKI_SEED),) \
 		--verbose || true
+
+## wikimedia-topic-labels-validate: Validate pinned Wikimedia manifest and taxonomy
+wikimedia-topic-labels-validate:
+	uv run $(WIKIMEDIA_TOPIC_TOOL) \
+		--manifest $(WIKIMEDIA_TOPIC_MANIFEST) \
+		--taxonomy $(WIKIMEDIA_TOPIC_TAXONOMY) \
+		--artifacts-dir $(WIKIMEDIA_TOPIC_ARTIFACTS) \
+		validate
+
+## wikimedia-topic-labels-download: Download and verify pinned English topic labels
+wikimedia-topic-labels-download: wikimedia-topic-labels-validate
+	uv run $(WIKIMEDIA_TOPIC_TOOL) \
+		--manifest $(WIKIMEDIA_TOPIC_MANIFEST) \
+		--taxonomy $(WIKIMEDIA_TOPIC_TAXONOMY) \
+		--artifacts-dir $(WIKIMEDIA_TOPIC_ARTIFACTS) \
+		download labels_en
+
+## wikimedia-topic-labels-prepare: Normalize labels and create deterministic QID splits
+wikimedia-topic-labels-prepare: wikimedia-topic-labels-download
+	@if test -s $(WIKIMEDIA_TOPIC_LABELS) && test -s $(WIKIMEDIA_TOPIC_SUMMARY); then \
+		echo "Wikimedia topic labels already prepared: $(WIKIMEDIA_TOPIC_LABELS)"; \
+	else \
+		uv run $(WIKIMEDIA_TOPIC_TOOL) \
+			--manifest $(WIKIMEDIA_TOPIC_MANIFEST) \
+			--taxonomy $(WIKIMEDIA_TOPIC_TAXONOMY) \
+			--artifacts-dir $(WIKIMEDIA_TOPIC_ARTIFACTS) \
+			prepare; \
+	fi
+
+## wikimedia-topic-labels: Complete Experiment 002 label preparation workflow
+wikimedia-topic-labels: wikimedia-topic-labels-prepare

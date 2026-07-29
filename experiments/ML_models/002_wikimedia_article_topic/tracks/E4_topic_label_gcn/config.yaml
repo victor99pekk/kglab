@@ -1,0 +1,15 @@
+id: "E4"
+name: "Topic-Label GCN"
+status: "planned"
+graph: "topic_hierarchy_and_train_cooccurrence"
+feature_vector:
+  name: "label_gcn_contextualized_modernbert_topic_embedding"
+  type: "dense_neural_graph"
+  encoder: "answerdotai/ModernBERT-base"
+  input_dimension: 768
+  graph_hidden_dimension: 256
+  node_types: ["topic", "domain"]
+model: "label_gcn"
+blocked_by:
+  - "topic_descriptions"
+  - "E1_features"
