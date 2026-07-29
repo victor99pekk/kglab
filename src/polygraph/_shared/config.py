@@ -17,31 +17,51 @@ class GraphBackend(StrEnum):
     NEO4J = "neo4j"
 
 
-DEFAULT_GRAPHGEN_ENTITY_TYPES = [
-    "concept",
-    "date",
-    "location",
-    "keyword",
-    "organization",
-    "person",
-    "event",
-    "work",
-    "nature",
-    "artificial",
-    "science",
-    "technology",
-    "mission",
-    "gene",
-]
-
-
 @dataclass
 class Ontology:
-    """Defines the schema for a knowledge graph: entity types, relations, attributes."""
+    """Defines the schema for a knowledge graph: entity types, relations, attributes.
+
+    Load from a YAML file via ``Ontology.from_yaml(path)``.  The YAML must
+    contain top-level keys ``entity_types``, ``relationship_types``, and
+    optionally ``attributes``.
+
+    Entity types map a label (e.g. ``PERSON``) to a dict with at least a
+    ``description`` key.
+
+    Relationship types map a predicate (e.g. ``works_at``) to a dict with
+    optional ``domain``, ``range``, and ``symmetric`` keys.
+    """
 
     entity_types: dict[str, dict[str, str]] = field(default_factory=dict)
     relationship_types: dict[str, dict[str, str]] = field(default_factory=dict)
     attributes: dict[str, list[str]] = field(default_factory=dict)
+
+    # ── helpers ─────────────────────────────────────────────────
+
+    def get_entity_type_names(self) -> list[str]:
+        """Return the canonical (upper-case) entity type labels."""
+        return list(self.entity_types.keys())
+
+    def get_relation_patterns(self) -> list[tuple[str, str, str, bool]]:
+        """Return (domain, range, predicate, symmetric) patterns for rule-based extraction.
+
+        Relations that define both *domain* and *range* produce a typed
+        pattern.  Relations with neither (or with ``symmetric: true``) are
+        treated as symmetric and applicable to any entity-type pair.
+        """
+        patterns: list[tuple[str, str, str, bool]] = []
+        for predicate, info in self.relationship_types.items():
+            domain = str(info.get("domain", "")).strip()
+            range_ = str(info.get("range", "")).strip()
+            symmetric = bool(info.get("symmetric", False))
+
+            if domain and range_:
+                patterns.append((domain, range_, predicate, symmetric))
+            else:
+                # Generic / untyped — use empty strings so the extractor
+                # falls back to all-pairs matching.
+                patterns.append(("", "", predicate, True))
+        return patterns
 
     @classmethod
     def from_yaml(cls, path: Path) -> "Ontology":
@@ -90,10 +110,12 @@ class PipelineConfig:
     llm_model: str = "deepseek-v4-flash"
     use_llm: bool = False
     spacy_model: str = "en_core_web_sm"
-    graphgen_entity_types: list[str] = field(
-        default_factory=lambda: list(DEFAULT_GRAPHGEN_ENTITY_TYPES)
-    )
     graphgen_max_gleanings: int = 3
+
+    # Ontology — path to a YAML file defining entity types, relations, and attributes.
+    # When set, the ontology is loaded and passed to extractors so no entity
+    # types or relation patterns are ever hardcoded.
+    ontology_path: str = ""
 
     # Resolve (string matching is safer than embedding-based for short/ID-like names)
     resolve_threshold: float = 0.85
@@ -181,13 +203,10 @@ class PipelineConfig:
             spacy_model=extraction.get(
                 "spacy_model", pipeline.get("spacy_model", "en_core_web_sm")
             ),
-            graphgen_entity_types=extraction.get(
-                "entity_types",
-                pipeline.get("graphgen_entity_types", list(DEFAULT_GRAPHGEN_ENTITY_TYPES)),
-            ),
             graphgen_max_gleanings=extraction.get(
                 "max_gleanings", pipeline.get("graphgen_max_gleanings", 3)
             ),
+            ontology_path=pipeline.get("ontology_path", ""),
             resolve_threshold=resolution.get("threshold", pipeline.get("resolve_threshold", 0.85)),
             resolve_method=resolve_method,
             resolve_model=resolution.get(

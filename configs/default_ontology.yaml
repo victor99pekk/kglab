@@ -1,16 +1,22 @@
 # Default Ontology Configuration
 # Defines the entity types, relationship types, and attributes for the knowledge graph.
+#
+# Entity-type labels use spaCy-compatible short names (PERSON, ORG, GPE, …)
+# so they work seamlessly with both spaCy-based and LLM-based extraction.
 
 entity_types:
   PERSON:
     description: "A human individual"
     example: "Marie Curie"
-  ORGANIZATION:
+  ORG:
     description: "A company, institution, or organized group"
     example: "Google"
-  LOCATION:
-    description: "A physical or geographic place"
+  GPE:
+    description: "A geopolitical entity (country, city, state)"
     example: "Hanoi"
+  LOC:
+    description: "A physical or geographic place (non-GPE)"
+    example: "Mount Everest"
   CONCEPT:
     description: "An abstract idea, topic, or theme"
     example: "Machine Learning"
@@ -23,67 +29,182 @@ entity_types:
   WORK_OF_ART:
     description: "A creative work (book, film, paper, etc.)"
     example: "Attention Is All You Need"
+  DATE:
+    description: "A calendar date or time expression"
+    example: "2024-01-15"
 
+# Relationship types optionally specify domain/range entity types.
+# Predicates without domain/range (or with symmetric: true) are treated as
+# symmetric and applicable to any entity-type pair.
 relationship_types:
+  # Person ↔ Org
   works_at:
     description: "Employment relationship"
     domain: "PERSON"
-    range: "ORGANIZATION"
+    range: "ORG"
+  founded:
+    description: "Founder relationship"
+    domain: "PERSON"
+    range: "ORG"
+  studied_at:
+    description: "Educational relationship"
+    domain: "PERSON"
+    range: "ORG"
+  # Person ↔ Location
+  lives_in:
+    description: "Residence"
+    domain: "PERSON"
+    range: "GPE"
+  born_in:
+    description: "Place of birth"
+    domain: "PERSON"
+    range: "GPE"
+  died_in:
+    description: "Place of death"
+    domain: "PERSON"
+    range: "GPE"
+  # Person ↔ Person
+  knows:
+    description: "Acquaintance"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  collaborated_with:
+    description: "Collaboration"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  # Person ↔ Other
+  created:
+    description: "Creator relationship"
+    domain: "PERSON"
+    range: "PRODUCT"
+  participated_in:
+    description: "Event participation"
+    domain: "PERSON"
+    range: "EVENT"
+  authored:
+    description: "Authorship"
+    domain: "PERSON"
+    range: "WORK_OF_ART"
+  born_on:
+    description: "Date of birth"
+    domain: "PERSON"
+    range: "DATE"
+  # Org ↔ Location
   located_in:
     description: "Physical containment"
-    domain: "ORGANIZATION"
-    range: "LOCATION"
+    domain: "ORG"
+    range: "GPE"
+  headquartered_in:
+    description: "Headquarters location"
+    domain: "ORG"
+    range: "GPE"
+  # Org ↔ Org
+  subsidiary_of:
+    description: "Corporate hierarchy"
+    domain: "ORG"
+    range: "ORG"
+  partnered_with:
+    description: "Business partnership"
+    domain: "ORG"
+    range: "ORG"
+    symmetric: true
+  # Org ↔ Other
+  produces:
+    description: "Product manufacturing"
+    domain: "ORG"
+    range: "PRODUCT"
+  organized:
+    description: "Event organization"
+    domain: "ORG"
+    range: "EVENT"
+  published:
+    description: "Publication"
+    domain: "ORG"
+    range: "WORK_OF_ART"
   founded_by:
-    description: "Founder relationship"
-    domain: "ORGANIZATION"
+    description: "Founder relationship (inverse)"
+    domain: "ORG"
     range: "PERSON"
+  # Event ↔ Location / Date
+  took_place_in:
+    description: "Event location"
+    domain: "EVENT"
+    range: "GPE"
+  occurred_on:
+    description: "Event date"
+    domain: "EVENT"
+    range: "DATE"
+  involved:
+    description: "Event involvement"
+    domain: "EVENT"
+    range: "ORG"
+  # Work ↔ Person / Date
   authored_by:
-    description: "Authorship"
+    description: "Authorship (inverse)"
     domain: "WORK_OF_ART"
     range: "PERSON"
+  published_on:
+    description: "Publication date"
+    domain: "WORK_OF_ART"
+    range: "DATE"
   cites:
     description: "Citation between works"
     domain: "WORK_OF_ART"
     range: "WORK_OF_ART"
-  studied_at:
-    description: "Educational relationship"
-    domain: "PERSON"
-    range: "ORGANIZATION"
-  lives_in:
-    description: "Residence"
-    domain: "PERSON"
-    range: "LOCATION"
-  part_of:
-    description: "Part-whole relationship"
-    domain: "ORGANIZATION"
-    range: "ORGANIZATION"
-  related_to:
-    description: "Generic association"
+  # Generic / fallback (no domain/range → any pair, symmetric)
   associated_with:
+    description: "Generic association"
+    symmetric: true
+  related_to:
     description: "Loose association"
+    symmetric: true
 
 attributes:
   PERSON:
-    - name
-    - birth_date
-    - nationality
-    - occupation
-  ORGANIZATION:
-    - name
-    - founded_date
-    - industry
-    - headquarters
-  LOCATION:
-    - name
-    - country
-    - coordinates
+    name:
+      functional: true
+    birth_date:
+      functional: true
+    nationality:
+      functional: true
+    occupation: {}
+  ORG:
+    name:
+      functional: true
+    founded_date:
+      functional: true
+    industry: {}
+    headquarters:
+      functional: true
+  GPE:
+    name:
+      functional: true
+    country:
+      functional: true
+    coordinates:
+      functional: true
+  LOC:
+    name:
+      functional: true
+    country:
+      functional: true
+    coordinates:
+      functional: true
   WORK_OF_ART:
-    - title
-    - publish_date
-    - authors
-    - url
+    title:
+      functional: true
+    publish_date:
+      functional: true
+    authors: {}
+    url:
+      functional: true
   EVENT:
-    - name
-    - date
-    - location
-    - participants
+    name:
+      functional: true
+    date:
+      functional: true
+    location:
+      functional: true
+    participants: {}

@@ -1,7 +1,6 @@
 """Shared foundation — zero internal dependencies, everything depends on this."""
 
 from polygraph._shared.config import (
-    DEFAULT_GRAPHGEN_ENTITY_TYPES,
     GraphBackend,
     Language,
     Ontology,
@@ -12,7 +11,6 @@ from polygraph._shared.identity import chunk_id, document_id, entity_id, stable_
 from polygraph._shared.types import Document
 
 __all__ = [
-    "DEFAULT_GRAPHGEN_ENTITY_TYPES",
     "Document",
     "GraphBackend",
     "Language",

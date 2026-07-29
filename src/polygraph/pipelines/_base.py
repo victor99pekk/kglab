@@ -55,14 +55,28 @@ class Pipeline(ABC):
 
     # ── Default stages (override optional) ──────────────────────
 
-    def evaluate(self, kg: dict[str, Any]) -> dict[str, Any]:
-        """Evaluate KG quality. Default: basic metrics + structural audit."""
+    def evaluate(self, kg: dict[str, Any], llm_client: Any = None) -> dict[str, Any]:
+        """Evaluate KG quality. Default: basic metrics + structural audit.
+
+        Args:
+            kg: Dict with ``graph``, ``entities``, ``triples`` keys.
+            llm_client: Optional LLM callable for accuracy evaluation.
+                When provided, also runs semantic accuracy and triple
+                classification checks. Provider-agnostic — any
+                ``(prompt: str) -> str`` callable works.
+        """
         from polygraph.kg_eval import metrics, structural
+        from polygraph.kg_eval.metrics import AccuracyEvaluator
 
         report = metrics.evaluate(kg["graph"], kg["entities"], kg["triples"])
         report["structural_audit"] = structural.run(kg["graph"], kg["entities"], kg["triples"])
+
+        if llm_client is not None:
+            accuracy_eval = AccuracyEvaluator(llm_client=llm_client)
+            report["accuracy"] = accuracy_eval.evaluate(kg["graph"], kg["entities"], kg["triples"])
+
         path = self.output_dir / "metrics.json"
-        path.write_text(json.dumps(report, indent=2))
+        path.write_text(json.dumps(report, indent=2, default=str))
         print(f"[evaluate] overall_score={report.get('overall_score', 0):.2f} → {path}")
         return report
 

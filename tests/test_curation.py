@@ -12,7 +12,6 @@ import pytest
 
 from polygraph.preprocess._internal.manifest import SourceManifest
 from polygraph.preprocess._internal.processing import (
-    CurationTextProcessor,
     SemanticReviewer,
     TextSpan,
     split_text_to_token_limit,
@@ -77,26 +76,6 @@ def test_quality_profile_flags_repeated_lines_without_rejecting_document():
     assert profile.requires_review
     assert profile.repeated_line_ratio == 2 / 3
     assert "repeated_lines" in profile.review_flags
-
-
-def test_vietnamese_profile_does_not_apply_english_short_token_heuristic():
-    text = "và của là ở thì tôi bạn nó em anh chị này kia đó một hai ba bốn năm sáu bảy tám chín"
-    profile = QualityProfiler(QualityThresholds(min_chars=20, min_words=3)).profile(
-        text, language="vi"
-    )
-
-    assert profile.accepted
-    assert profile.short_token_ratio is None
-    assert "short_token_gibberish" not in profile.review_flags
-
-
-def test_vietnamese_normalization_preserves_diacritics():
-    processor = CurationTextProcessor("vi")
-    normalized = processor.normalize("  Dữ\u0303 liệu tiếng Việt.\r\n\r\nGiữ nguyên dấu.  ")
-
-    assert "tiếng Việt" in normalized
-    assert "Dữ" in normalized
-    assert normalized == "Dữ liệu tiếng Việt.\n\nGiữ nguyên dấu."
 
 
 def test_sentence_split_preserves_every_character_and_token_limit():

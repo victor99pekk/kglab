@@ -3,74 +3,45 @@
 import logging
 import re
 
-from polygraph._shared import Language
+from polygraph._shared import Language, Ontology
 from polygraph.kg_build.extract.entities import Entity
 
 logger = logging.getLogger(__name__)
 
-# Common English relation patterns (subject_label, object_label, predicate)
-RELATION_PATTERNS = [
-    # Person ↔ Org
-    ("PERSON", "ORG", "works_at"),
-    ("PERSON", "ORG", "founded"),
-    ("PERSON", "ORG", "studied_at"),
-    # Person ↔ Location
-    ("PERSON", "GPE", "lives_in"),
-    ("PERSON", "GPE", "born_in"),
-    ("PERSON", "GPE", "died_in"),
-    # Person ↔ Person
-    ("PERSON", "PERSON", "knows"),
-    ("PERSON", "PERSON", "collaborated_with"),
-    # Person ↔ Other
-    ("PERSON", "PRODUCT", "created"),
-    ("PERSON", "EVENT", "participated_in"),
-    ("PERSON", "WORK_OF_ART", "authored"),
-    ("PERSON", "DATE", "born_on"),
-    # Org ↔ Location
-    ("ORG", "GPE", "located_in"),
-    ("ORG", "GPE", "headquartered_in"),
-    # Org ↔ Org
-    ("ORG", "ORG", "subsidiary_of"),
-    ("ORG", "ORG", "partnered_with"),
-    # Org ↔ Other
-    ("ORG", "PRODUCT", "produces"),
-    ("ORG", "EVENT", "organized"),
-    ("ORG", "WORK_OF_ART", "published"),
-    # Event ↔ Location / Date
-    ("EVENT", "GPE", "took_place_in"),
-    ("EVENT", "DATE", "occurred_on"),
-    ("EVENT", "ORG", "involved"),
-    # Work ↔ Person / Date
-    ("WORK_OF_ART", "PERSON", "authored_by"),
-    ("WORK_OF_ART", "DATE", "published_on"),
-    # Concept ↔ Any
-    ("CONCEPT", "PERSON", "associated_with"),
-    ("CONCEPT", "ORG", "related_to"),
-    ("CONCEPT", "GPE", "related_to"),
-    ("CONCEPT", "CONCEPT", "related_to"),
-]
-
-SYMMETRIC_PREDICATES = {
-    "knows",
-    "collaborated_with",
-    "partnered_with",
-    "related_to",
-    "associated_with",
-}
-
 
 class RelationExtractor:
-    """Extracts (subject, predicate, object) triples from text."""
+    """Extracts (subject, predicate, object) triples from text.
+
+    Requires an ``Ontology`` that defines entity types and relationship
+    types (with optional domain/range and symmetric flags).  The ontology
+    is loaded from a YAML file via ``Ontology.from_yaml(path)``.
+    """
 
     def __init__(
         self,
+        ontology: Ontology,
         language: Language = Language.ENGLISH,
         use_llm: bool = False,
         model_name: str = "deepseek-v4-flash",
     ) -> None:
+        self.ontology = ontology
         self.language = language
         self.use_llm = use_llm
         self.model_name = model_name
+
+        # Derive typed and generic patterns from the ontology.
+        raw = ontology.get_relation_patterns()
+        self._typed_patterns: list[tuple[str, str, str]] = []
+        self._generic_predicates: list[str] = []
+        self._symmetric_predicates: set[str] = set()
+
+        for domain, range_, predicate, symmetric in raw:
+            if domain and range_:
+                self._typed_patterns.append((domain, range_, predicate))
+            else:
+                self._generic_predicates.append(predicate)
+            if symmetric:
+                self._symmetric_predicates.add(predicate)
 
     def extract(
         self,
@@ -127,30 +98,42 @@ class RelationExtractor:
         relation = self._infer_relation(e1, e2)
         return relation[1] if relation else None
 
-    @staticmethod
     def _infer_relation(
+        self,
         e1: Entity,
         e2: Entity,
     ) -> tuple[Entity, str, Entity] | None:
-        """Infer one correctly oriented relation for an unordered entity pair."""
-        for head_label, dep_label, predicate in RELATION_PATTERNS:
+        """Infer one correctly oriented relation for an unordered entity pair.
+
+        Patterns are derived from the ontology passed at construction time.
+        """
+        # 1. Try typed patterns (domain / range match).
+        for head_label, dep_label, predicate in self._typed_patterns:
             if e1.label == head_label and e2.label == dep_label:
-                return RelationExtractor._canonicalize_symmetric(e1, predicate, e2)
+                return self._canonicalize_symmetric(e1, predicate, e2)
             if e1.label == dep_label and e2.label == head_label:
-                return RelationExtractor._canonicalize_symmetric(e2, predicate, e1)
+                return self._canonicalize_symmetric(e2, predicate, e1)
 
-        # Generic fallback based on labels
-        if e1.label == e2.label:
-            return RelationExtractor._canonicalize_symmetric(e1, "related_to", e2)
-        return RelationExtractor._canonicalize_symmetric(e1, "associated_with", e2)
+        # 2. Try generic predicates (no domain/range constraints).
+        for predicate in self._generic_predicates:
+            return self._canonicalize_symmetric(e1, predicate, e2)
 
-    @staticmethod
+        # 3. Fallback: same-label pairs get "related_to"-style treatment.
+        if e1.label == e2.label and self._generic_predicates:
+            return self._canonicalize_symmetric(e1, self._generic_predicates[0], e2)
+        if self._generic_predicates:
+            return self._canonicalize_symmetric(e1, self._generic_predicates[-1], e2)
+
+        return None
+
     def _canonicalize_symmetric(
+        self,
         subject: Entity,
         predicate: str,
         object_: Entity,
     ) -> tuple[Entity, str, Entity]:
-        if predicate in SYMMETRIC_PREDICATES and object_.id < subject.id:
+        """Ensure canonical orientation for symmetric predicates."""
+        if predicate in self._symmetric_predicates and object_.id < subject.id:
             return object_, predicate, subject
         return subject, predicate, object_
 

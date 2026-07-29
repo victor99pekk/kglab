@@ -16,6 +16,7 @@ Class API — for advanced control:
 
 from types import SimpleNamespace
 
+from polygraph._shared import Ontology
 from polygraph.kg_build.build import GraphBuilder
 from polygraph.kg_build.build.default import build_graph
 from polygraph.kg_build.extract.entities import (
@@ -35,9 +36,9 @@ from polygraph.kg_build.resolve.string import resolve_string
 extract = SimpleNamespace()
 
 
-def _extract_spacy(chunks, model="en_core_web_sm"):
+def _extract_spacy(chunks, ontology: Ontology, model="en_core_web_sm"):
     eng = EnglishExtractor(model_name=model)
-    rel = RelationExtractor()
+    rel = RelationExtractor(ontology=ontology)
     all_entities = []
     all_triples = []
     for c in chunks:
@@ -48,8 +49,8 @@ def _extract_spacy(chunks, model="en_core_web_sm"):
     return all_entities, all_triples
 
 
-def _extract_graphgen(chunks, model="deepseek-v4-pro", max_gleanings=3):
-    gen = GraphGenExtractor(model_name=model, max_gleanings=max_gleanings)
+def _extract_graphgen(chunks, ontology: Ontology, model="deepseek-v4-pro", max_gleanings=3):
+    gen = GraphGenExtractor(ontology=ontology, model_name=model, max_gleanings=max_gleanings)
     all_entities = []
     all_triples = []
     for c in chunks:

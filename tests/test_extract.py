@@ -1,10 +1,18 @@
 """Tests for entity and relation extraction."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
+from polygraph._shared import Ontology
 from polygraph.kg_build.extract.entities import Entity, SimpleExtractor
 from polygraph.kg_build.extract.graphgen import GraphGenExtractor
 from polygraph.kg_build.extract.relations import RelationExtractor
+
+_ONTOLOGY_PATH = Path(__file__).parents[1] / "configs" / "default_ontology.yaml"
+
+
+def _load_test_ontology() -> Ontology:
+    return Ontology.from_yaml(_ONTOLOGY_PATH)
 
 
 def test_simple_extractor_captures_capitalized():
@@ -22,10 +30,11 @@ def test_simple_extractor_captures_capitalized():
 
 
 def test_relation_preserves_stable_ids_evidence_and_source_chunk():
+    ontology = _load_test_ontology()
     alice = Entity(name="Alice", label="PERSON")
     acme = Entity(name="Acme Corp", label="ORG")
 
-    relations = RelationExtractor().extract(
+    relations = RelationExtractor(ontology=ontology).extract(
         "Alice works at Acme Corp. Another sentence.",
         [alice, acme],
         source_chunk_id="chunk:123",
@@ -53,22 +62,23 @@ class _FakeDeepSeekClient:
 
 
 def test_graphgen_jointly_extracts_entities_and_descriptive_relationships():
+    ontology = _load_test_ontology()
     text = "Alice founded Acme Corp in Hanoi."
     extraction = """("entity"<|>"Alice"<|>"person"<|>"A founder.")##
-("entity"<|>"Acme Corp"<|>"organization"<|>"A company.")##
-("entity"<|>"Hanoi"<|>"location"<|>"A city.")##
+("entity"<|>"Acme Corp"<|>"org"<|>"A company.")##
+("entity"<|>"Hanoi"<|>"gpe"<|>"A city.")##
 ("relationship"<|>"Alice"<|>"Acme Corp"<|>"Alice founded Acme Corp.")##
 ("content_keywords"<|>"company founding")<|COMPLETE|>"""
     client = _FakeDeepSeekClient([extraction, "NO"])
 
-    entities, relationships = GraphGenExtractor(client=client).extract(
+    entities, relationships = GraphGenExtractor(ontology=ontology, client=client).extract(
         text, source_chunk_id="chunk:123"
     )
 
     assert [(entity.name, entity.label) for entity in entities] == [
         ("Alice", "PERSON"),
-        ("Acme Corp", "ORGANIZATION"),
-        ("Hanoi", "LOCATION"),
+        ("Acme Corp", "ORG"),
+        ("Hanoi", "GPE"),
     ]
     assert len(relationships) == 1
     relation = relationships[0]
@@ -82,12 +92,15 @@ def test_graphgen_jointly_extracts_entities_and_descriptive_relationships():
 
 
 def test_graphgen_iteratively_gleans_missed_records():
+    ontology = _load_test_ontology()
     initial = """("entity"<|>"Alice"<|>"person"<|>"A person.")<|COMPLETE|>"""
-    glean = """("entity"<|>"Acme Corp"<|>"organization"<|>"A company.")##
+    glean = """("entity"<|>"Acme Corp"<|>"org"<|>"A company.")##
 ("relationship"<|>"Alice"<|>"Acme Corp"<|>"Alice founded Acme Corp.")<|COMPLETE|>"""
     client = _FakeDeepSeekClient([initial, "YES", glean, "NO"])
 
-    entities, relationships = GraphGenExtractor(client=client).extract("Source text.")
+    entities, relationships = GraphGenExtractor(ontology=ontology, client=client).extract(
+        "Source text."
+    )
 
     assert {entity.name for entity in entities} == {"Alice", "Acme Corp"}
     assert len(relationships) == 1
@@ -95,10 +108,13 @@ def test_graphgen_iteratively_gleans_missed_records():
 
 
 def test_graphgen_retries_empty_response():
+    ontology = _load_test_ontology()
     extraction = """("entity"<|>"Alice"<|>"person"<|>"A person.")<|COMPLETE|>"""
     client = _FakeDeepSeekClient(["", extraction, "NO"])
 
-    entities, relationships = GraphGenExtractor(client=client).extract("Some source text.")
+    entities, relationships = GraphGenExtractor(ontology=ontology, client=client).extract(
+        "Some source text."
+    )
 
     assert [entity.name for entity in entities] == ["Alice"]
     assert relationships == []
@@ -106,13 +122,14 @@ def test_graphgen_retries_empty_response():
 
 
 def test_graphgen_aggregates_repeated_descriptions_with_figure_9():
+    ontology = _load_test_ontology()
     client = _FakeDeepSeekClient(
         [
             "Alice is a scientist and Nobel Prize winner.",
             "Alice founded Acme Corp and later led it.",
         ]
     )
-    extractor = GraphGenExtractor(client=client, max_gleanings=0)
+    extractor = GraphGenExtractor(ontology=ontology, client=client, max_gleanings=0)
     resolved = [{"id": "entity:alice", "name": "Alice", "description": "first"}]
     originals = [
         {"id": "entity:alice", "description": "Alice is a scientist."},

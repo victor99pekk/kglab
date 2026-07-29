@@ -15,16 +15,22 @@ Checks:
 
 import json
 import logging
+import math
+import random
+import statistics
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import networkx as nx
 import yaml
 
+from polygraph.kg_eval._base import BaseEvaluator
+
 logger = logging.getLogger(__name__)
 
 
-class StructuralAuditor:
+class StructuralAuditor(BaseEvaluator):
     """Audits a knowledge graph for structural issues that would degrade SFT quality."""
 
     def __init__(
@@ -43,7 +49,9 @@ class StructuralAuditor:
                 self._ontology = yaml.safe_load(f)
         return self._ontology or {}
 
-    def audit(
+    # ── BaseEvaluator contract ──
+
+    def evaluate(
         self,
         graph: nx.DiGraph,
         entities: list[dict[str, Any]],
@@ -52,9 +60,12 @@ class StructuralAuditor:
         """Run full structural audit and return a report dict."""
         report: dict[str, Any] = {
             "graph_stats": self._basic_stats(graph, triples),
+            "degree_distribution": self._degree_distribution(graph),
+            "connectivity_stats": self._connectivity_stats(graph),
             "orphan_analysis": self._orphan_analysis(graph, entities),
             "density_analysis": self._density_analysis(graph),
             "schema_compliance": self._schema_compliance(graph, triples),
+            "constraint_audit": self._constraint_audit(entities, triples),
             "entity_duplication": self._entity_duplication(entities),
             "multi_hop_connectivity": self._multi_hop_connectivity(graph),
             "overall_health_score": 0.0,  # computed below
@@ -65,6 +76,7 @@ class StructuralAuditor:
             report["orphan_analysis"]["health_score"],
             report["density_analysis"]["health_score"],
             report["schema_compliance"]["health_score"],
+            report["constraint_audit"]["health_score"],
             report["entity_duplication"]["health_score"],
             report["multi_hop_connectivity"]["health_score"],
         ]
@@ -84,6 +96,122 @@ class StructuralAuditor:
             "num_triples": len(triples),
             "is_directed": graph.is_directed(),
             "is_connected": nx.is_weakly_connected(graph) if graph.number_of_nodes() > 0 else False,
+        }
+
+    @staticmethod
+    def _degree_distribution(graph: nx.DiGraph) -> dict[str, Any]:
+        """Compute in-degree and out-degree distribution statistics.
+
+        Returns summary stats (mean, median, min, max, stdev) plus a
+        binned histogram for external visualization. Pure Python — no
+        numpy dependency.
+        """
+        n = graph.number_of_nodes()
+        if n == 0:
+            return {
+                "in_degree": {"mean": 0, "median": 0, "min": 0, "max": 0, "stdev": 0},
+                "out_degree": {"mean": 0, "median": 0, "min": 0, "max": 0, "stdev": 0},
+                "histogram": {"bin_edges": [], "in_counts": [], "out_counts": []},
+            }
+
+        in_degrees = [d for _, d in graph.in_degree()]
+        out_degrees = [d for _, d in graph.out_degree()]
+
+        def _summary(values: list[int]) -> dict[str, float]:
+            return {
+                "mean": round(statistics.mean(values), 2),
+                "median": statistics.median(values),
+                "min": min(values),
+                "max": max(values),
+                "stdev": round(statistics.stdev(values), 2) if len(values) > 1 else 0.0,
+            }
+
+        # Build histogram bins (log-spaced for power-law distributions)
+        all_vals = in_degrees + out_degrees
+        max_deg = max(all_vals) if all_vals else 0
+        if max_deg <= 1:
+            bin_edges = [0, 1]
+            in_counts = [in_degrees.count(0), in_degrees.count(1)]
+            out_counts = [out_degrees.count(0), out_degrees.count(1)]
+        else:
+            # 10 log-spaced bins from 1 to max_deg, plus a [0] bin
+            num_bins = min(10, max_deg)
+            bin_edges = [0] + [
+                round(math.exp(math.log(max_deg) * i / num_bins)) for i in range(1, num_bins + 1)
+            ]
+            # Deduplicate and ensure monotonic
+            seen: set[int] = set()
+            deduped: list[int] = []
+            for b in bin_edges:
+                if b not in seen:
+                    seen.add(b)
+                    deduped.append(b)
+            bin_edges = deduped
+
+            in_counts = []
+            out_counts = []
+            for i in range(len(bin_edges) - 1):
+                lo, hi = bin_edges[i], bin_edges[i + 1]
+                in_counts.append(sum(1 for d in in_degrees if lo <= d < hi))
+                out_counts.append(sum(1 for d in out_degrees if lo <= d < hi))
+            # Last bin is inclusive
+            in_counts.append(sum(1 for d in in_degrees if d >= bin_edges[-1]))
+            out_counts.append(sum(1 for d in out_degrees if d >= bin_edges[-1]))
+
+        return {
+            "in_degree": _summary(in_degrees),
+            "out_degree": _summary(out_degrees),
+            "histogram": {
+                "bin_edges": bin_edges,
+                "in_counts": in_counts,
+                "out_counts": out_counts,
+            },
+        }
+
+    @staticmethod
+    def _connectivity_stats(graph: nx.DiGraph) -> dict[str, Any]:
+        """Additional connectivity metrics beyond basic stats.
+
+        Computes strongly connected components, average clustering
+        coefficient, and estimated diameter (via sampling for large graphs).
+        """
+        n = graph.number_of_nodes()
+        if n == 0:
+            return {
+                "num_scc": 0,
+                "largest_scc_size": 0,
+                "scc_size_gt1": 0,
+                "avg_clustering": 0.0,
+                "estimated_diameter": 0,
+            }
+
+        # Strongly connected components
+        sccs = list(nx.strongly_connected_components(graph))
+        scc_sizes = sorted((len(c) for c in sccs), reverse=True)
+
+        # Average clustering coefficient (on undirected view for directed graphs)
+        try:
+            avg_clustering = nx.average_clustering(graph)
+        except Exception:
+            avg_clustering = 0.0
+
+        # Diameter estimate: sample up to 100 random nodes, compute max shortest
+        # path length among reachable pairs. Exact diameter is O(n²) — too expensive.
+        sample = random.sample(list(graph.nodes()), min(100, n))
+        max_dist = 0
+        reachable_pairs = 0
+        for src in sample:
+            lengths = nx.single_source_shortest_path_length(graph, src)
+            if lengths:
+                max_dist = max(max_dist, max(lengths.values()))
+                reachable_pairs += len(lengths) - 1  # exclude self
+
+        return {
+            "num_scc": len(sccs),
+            "largest_scc_size": scc_sizes[0] if scc_sizes else 0,
+            "scc_size_gt1": sum(1 for s in scc_sizes if s > 1),
+            "avg_clustering": round(avg_clustering, 6),
+            "estimated_diameter": max_dist,
         }
 
     def _orphan_analysis(self, graph: nx.DiGraph, entities: list[dict[str, Any]]) -> dict[str, Any]:
@@ -215,6 +343,122 @@ class StructuralAuditor:
             else ("yellow" if compliance_rate < 0.95 else "green"),
             "recommendation": (
                 f"{len(violations)} schema violations found — check ontology rules."
+                if violations
+                else ""
+            ),
+        }
+
+    def _constraint_audit(
+        self,
+        entities: list[dict[str, Any]],
+        triples: list[tuple[str, str, str, str]],
+    ) -> dict[str, Any]:
+        """Check functional property violations on attributes.
+
+        Reads the ontology's ``attributes`` section for any property marked
+        ``functional: true`` (at most one value per entity). Flags entities
+        that have multiple distinct values for the same functional attribute.
+
+        Also detects contradictory facts: when two triples assert different
+        values for the same entity's functional attribute.
+        """
+        if not self.ontology:
+            return {
+                "functional_violations": [],
+                "violation_count": 0,
+                "contradictory_facts": 0,
+                "health_score": 100,
+                "flag": "green",
+                "recommendation": "",
+            }
+
+        # Collect functional attribute names by entity type
+        attr_schema = self.ontology.get("attributes", {})
+        functional_attrs: dict[str, set[str]] = {}  # entity_type -> {attr_name, ...}
+        for etype, attrs in attr_schema.items():
+            funcs: set[str] = set()
+            if isinstance(attrs, dict):
+                for attr_name, meta in attrs.items():
+                    if isinstance(meta, dict) and meta.get("functional"):
+                        funcs.add(attr_name)
+            elif isinstance(attrs, list):
+                # Old format: flat list, no functional markers
+                pass
+            if funcs:
+                functional_attrs[etype] = funcs
+
+        if not functional_attrs:
+            return {
+                "functional_violations": [],
+                "violation_count": 0,
+                "contradictory_facts": 0,
+                "health_score": 100,
+                "flag": "green",
+                "recommendation": "",
+            }
+
+        violations: list[dict[str, Any]] = []
+
+        # 1. Check entity dicts for list-valued functional attributes
+        for e in entities:
+            etype = e.get("type", "")
+            funcs = functional_attrs.get(etype, set())
+            if not funcs:
+                continue
+            for attr in funcs:
+                val = e.get(attr)
+                if isinstance(val, list) and len(val) > 1:
+                    violations.append(
+                        {
+                            "entity": e.get("name", "?"),
+                            "type": etype,
+                            "attribute": attr,
+                            "values": val,
+                            "issue": f"Functional attribute '{attr}' has {len(val)} values",
+                        }
+                    )
+
+        # 2. Check triples for contradictory facts (same subj+pred, different obj)
+        # Build a map of (subject, predicate) -> set of objects
+        triple_map: dict[tuple[str, str], set[str]] = defaultdict(set)
+        for subj, pred, obj, _ in triples:
+            triple_map[(subj, pred)].add(obj)
+
+        contradictory_count = 0
+        for (subj, pred), objects in triple_map.items():
+            if len(objects) > 1:
+                # Check if this predicate corresponds to a functional attribute
+                # (attributes can appear as triples too, e.g., has_birth_date)
+                for __, funcs in functional_attrs.items():
+                    if pred in funcs or pred.startswith("has_") and pred[4:] in funcs:
+                        contradictory_count += 1
+                        violations.append(
+                            {
+                                "entity": subj,
+                                "attribute": pred,
+                                "values": sorted(objects),
+                                "issue": f"Contradictory values for functional predicate '{pred}'",
+                            }
+                        )
+                        break
+
+        violation_count = len(violations)
+        # Health: each violation costs 10 points, floor at 0
+        health = max(0, 100 - violation_count * 10)
+        violation_rate = violation_count / max(len(entities), 1)
+
+        return {
+            "functional_violations": violations[:20],
+            "violation_count": violation_count,
+            "contradictory_facts": contradictory_count,
+            "violation_rate": round(violation_rate, 4),
+            "health_score": round(health, 1),
+            "flag": "red"
+            if violation_rate > 0.1
+            else ("yellow" if violation_count > 0 else "green"),
+            "recommendation": (
+                f"{violation_count} functional property violations — "
+                f"{contradictory_count} contradictory facts found."
                 if violations
                 else ""
             ),

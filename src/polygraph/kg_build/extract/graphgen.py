@@ -9,7 +9,7 @@ import re
 from collections import defaultdict
 from typing import Any
 
-from polygraph._shared import DEFAULT_GRAPHGEN_ENTITY_TYPES, Language
+from polygraph._shared import Language, Ontology
 from polygraph.kg_build.extract.entities import Entity
 from polygraph.kg_build.extract.prompts import (
     COMPLETION_DELIMITER,
@@ -36,16 +36,23 @@ class GraphGenExtractor:
 
     def __init__(
         self,
+        ontology: Ontology,
         language: Language = Language.ENGLISH,
         model_name: str = "deepseek-v4-flash",
-        entity_types: tuple[str, ...] = tuple(DEFAULT_GRAPHGEN_ENTITY_TYPES),
         client: Any | None = None,
         max_retries: int = 3,
         max_gleanings: int = 3,
     ) -> None:
+        self.ontology = ontology
         self.language = language
         self.model_name = model_name
-        self.entity_types = tuple(entity_type.upper() for entity_type in entity_types)
+        entity_names = ontology.get_entity_type_names()
+        if not entity_names:
+            raise ValueError(
+                "GraphGenExtractor requires an ontology with at least one entity type. "
+                "Load one via Ontology.from_yaml(path)."
+            )
+        self.entity_types = tuple(name.upper() for name in entity_names)
         self._provided_client = client
         self.max_retries = max_retries
         self.max_gleanings = max_gleanings
