@@ -7,30 +7,37 @@ SHELL   := /bin/bash
 INPUT      ?= data/wikipedia/
 OUTPUT     ?= output/baseline
 VARIANT    ?= baseline
+EXP        ?= experiments/001_baseline/config.yaml
 
 WIKI_COUNT    ?= 20
 WIKI_LANGUAGE ?= en
 
-.PHONY: help install clean test build-kg download-wikipedia
+.PHONY: help install clean test build-kg run-experiment download-wikipedia
 
 help:
-	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=baseline]"
+	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=baseline] [EXP=...] [WIKI_COUNT=20]"
 	@echo ""
 	@echo "── Setup ────────────────────────────────────────────"
-	@echo "   install          Sync dependencies with uv + download spaCy model"
-	@echo "   clean            Remove generated output folders"
+	@echo "   install           Sync dependencies with uv + download spaCy model"
+	@echo "   clean             Remove generated output folders"
+	@echo ""
+	@echo "── Data ─────────────────────────────────────────────"
+	@echo "   download-wikipedia  Download random Wikipedia articles as JSONL"
 	@echo ""
 	@echo "── Pipeline ─────────────────────────────────────────"
-	@echo "   build-kg         Run the full pipeline (preprocess → build KG → evaluate → export)"
+	@echo "   build-kg          Run the full pipeline (preprocess → build KG → evaluate → export)"
+	@echo "   run-experiment    Run an experiment from a YAML config (set EXP= path)"
 	@echo ""
 	@echo "── Dev ──────────────────────────────────────────────"
-	@echo "   test             Run the test suite"
+	@echo "   test              Run the test suite"
 	@echo ""
 	@echo "── Quick Start ──────────────────────────────────────"
-	@echo "   make install                                  # one-time setup"
-	@echo "   make test                                     # verify everything works"
-	@echo "   make build-kg                                 # baseline pipeline"
-	@echo "   make build-kg INPUT=data/my_corpus/ OUTPUT=output/exp1/"
+	@echo "   make install                                   # one-time setup"
+	@echo "   make test                                      # verify everything works"
+	@echo "   make build-kg                                  # baseline pipeline (direct)"
+	@echo "   make run-experiment                            # baseline experiment (001)"
+	@echo "   make run-experiment EXP=experiments/002_llm/config.yaml"
+	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
 
 # ═══════════════════════════════════════════════════════════
 # Setup
@@ -52,6 +59,10 @@ clean:
 ## build-kg: Run the full pipeline (preprocess → build KG → evaluate → export)
 build-kg:
 	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT)
+
+## run-experiment: Run an experiment from a YAML config file
+run-experiment:
+	uv run python main.py --experiment $(EXP)
 
 # ═══════════════════════════════════════════════════════════
 # Dev

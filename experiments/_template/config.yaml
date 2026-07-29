@@ -1,0 +1,54 @@
+# ── Experiment Configuration ────────────────────────────────────────────────
+# Copy this file to start a new experiment:
+#   cp -r experiments/_template/ experiments/NNN_my_experiment/
+#
+# All fields are documented below. Only ``name``, ``description``, and
+# ``input.paths`` are required — everything else has sensible defaults.
+
+name: "My Experiment"
+description: >
+  A brief description of what this experiment tests, the hypothesis,
+  and what you expect to learn.
+
+# ── Pipeline ────────────────────────────────────────────────────────────────
+
+pipeline:
+  # Which pipeline variant to run. Must match a key in the pipeline registry
+  # (src/polygraph/pipelines/__init__.py). Available: baseline
+  variant: "baseline"
+
+# ── Input ───────────────────────────────────────────────────────────────────
+
+input:
+  # One or more paths to input data (directories of text files, or single files).
+  paths:
+    - "data/wikipedia/"
+
+# ── Output ──────────────────────────────────────────────────────────────────
+
+output:
+  # Where to write generated artifacts (KG JSON, GraphML, metrics, etc.).
+  # If omitted, defaults to ``<experiment_dir>/outputs/``.
+  dir: "outputs/"
+
+# ── Ontology (optional) ─────────────────────────────────────────────────────
+
+# Path to an ontology YAML file defining entity types, relationship types,
+# and attributes. If omitted, falls back to configs/default_ontology.yaml.
+ontology: "configs/default_ontology.yaml"
+
+# ── Neo4j (optional) ────────────────────────────────────────────────────────
+
+neo4j:
+  # Whether to upload the generated KG to Neo4j after the pipeline completes.
+  # Requires NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD environment variables.
+  upload: false
+  # Whether to wipe the Neo4j database before uploading.
+  clear: false
+
+# ── Evaluation (optional) ───────────────────────────────────────────────────
+
+evaluation:
+  # Whether to run LLM-based accuracy evaluation (requires an LLM client /
+  # OPENAI_API_KEY). Adds semantic accuracy and triple classification to metrics.
+  llm_judge: false

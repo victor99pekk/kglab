@@ -1,0 +1,27 @@
+# Experiment 001 — Baseline (spaCy extraction + string resolution)
+
+name: "001 — Baseline pipeline"
+description: >
+  Establish baseline knowledge graph quality metrics using the default
+  spaCy-based entity extraction and string-similarity resolution pipeline.
+  This serves as a reference point for comparing LLM-based extraction,
+  embedding-based resolution, and other improvements.
+
+pipeline:
+  variant: "baseline"
+
+input:
+  paths:
+    - "data/wikipedia/"
+
+output:
+  dir: "outputs/"
+
+ontology: "configs/default_ontology.yaml"
+
+neo4j:
+  upload: false
+  clear: false
+
+evaluation:
+  llm_judge: false

@@ -27,6 +27,9 @@ data/external/
 data/wikipedia/*.jsonl
 data/wikipedia/*.jsonl.tmp
 
+# Experiment outputs (generated KGs, metrics, reports)
+experiments/*/outputs/
+
 # deepeval cache
 .deepeval/
 
