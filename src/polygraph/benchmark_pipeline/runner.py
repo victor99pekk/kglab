@@ -80,6 +80,13 @@ class BenchmarkRunner:
             structural_audit = loaded.pop("structural_audit", {})
             metrics = loaded
 
+        # Write full entity duplicate pairs to a separate file (summary caps at 20)
+        all_dupes = structural_audit.get("entity_duplication", {}).pop("all_duplicate_pairs", None)
+        if all_dupes:
+            dupes_path = output_dir / "entity_duplicates.json"
+            dupes_path.write_text(json.dumps(all_dupes, indent=2, default=str))
+            print(f"[benchmark] entity duplicates → {dupes_path}")
+
         metrics["wall_time_s"] = round(elapsed_s, 2)
 
         # 6. Discover generated artifacts

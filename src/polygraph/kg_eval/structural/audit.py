@@ -498,6 +498,7 @@ class StructuralAuditor(BaseEvaluator):
 
         return {
             "duplicate_pairs": duplicates[:20],
+            "all_duplicate_pairs": duplicates,
             "duplicate_pair_count": len(duplicates),
             "duplicate_entity_count": len(
                 {d["entity_a"] for d in duplicates} | {d["entity_b"] for d in duplicates}
