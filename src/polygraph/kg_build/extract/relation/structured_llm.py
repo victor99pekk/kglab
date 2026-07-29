@@ -8,9 +8,6 @@ from typing import Any
 from polygraph._shared import Language, Ontology
 from polygraph.kg_build.extract._base import Entity, RelationExtractorMethod, Triple
 from polygraph.kg_build.extract.relation._helpers import find_evidence
-from polygraph.kg_build.extract.relation.ontology_rules import (
-    OntologyRuleRelationExtractor,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +26,6 @@ class StructuredLLMRelationExtractor(RelationExtractorMethod):
         self.language = language
         self.model_name = model_name
         self._provided_client = client
-        self._fallback = OntologyRuleRelationExtractor(ontology, language)
 
     def extract(
         self,
@@ -37,11 +33,7 @@ class StructuredLLMRelationExtractor(RelationExtractorMethod):
         entities: list[Entity],
         source_chunk_id: str = "",
     ) -> list[Triple]:
-        try:
-            client = self._client()
-        except ImportError:
-            logger.warning("openai not installed; falling back to ontology rules")
-            return self._fallback.extract(text, entities, source_chunk_id)
+        client = self._client()
 
         entity_list = "\n".join(f"- {entity.name} ({entity.label})" for entity in entities)
         prompt = (
