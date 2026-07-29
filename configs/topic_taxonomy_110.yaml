@@ -1,0 +1,187 @@
+# Polygraph starter topic taxonomy
+#
+# Purpose: fixed multilabel vocabulary for Level 1/Level 2 experiments.
+# This is a human-curated, stable 110-label subset inspired by Wikipedia
+# Vital Articles, DBpedia Ontology, and Wikidata top-level classes.
+# Keep labels broad enough for article-level classification. Add new concepts
+# through unknown_topic rather than silently changing existing IDs.
+#
+# Labeling policy:
+# - Assign every applicable topic; multilabel output is expected.
+# - Prefer the most specific listed topic, plus a parent only when the model
+#   explicitly trains hierarchical labels.
+# - Use unknown_topic when no listed topic is defensible; retain the generated
+#   candidate and review it before adding a new fixed label.
+
+version: "1.0"
+label_count: 110
+unknown_label: unknown_topic
+
+source_basis:
+  - name: Wikimedia Vital Articles / Expanded list
+    url: https://meta.wikimedia.org/wiki/10000_articles
+    use: article coverage and seed sampling
+  - name: DBpedia Ontology
+    url: https://www.dbpedia.org/resources/ontology/
+    use: Wikipedia-derived class and property vocabulary
+  - name: Wikidata top-level ontology
+    url: https://www.wikidata.org/wiki/Wikidata:WikiProject_Ontology/Top-level_ontology_list
+    use: broad cross-domain superclass structure
+  - name: Wikimedia dump licensing
+    url: https://dumps.wikimedia.org/legal.html
+    use: reuse and attribution review
+
+domains:
+  - id: physical_sciences
+    name: Physical sciences
+    topics:
+      - {id: physics, name: Physics}
+      - {id: chemistry, name: Chemistry}
+      - {id: astronomy, name: Astronomy}
+      - {id: materials_science, name: Materials science}
+      - {id: optics, name: Optics}
+      - {id: thermodynamics, name: Thermodynamics}
+      - {id: quantum_mechanics, name: Quantum mechanics}
+      - {id: nuclear_science, name: Nuclear science}
+      - {id: particle_physics, name: Particle physics}
+      - {id: geophysics, name: Geophysics}
+
+  - id: life_sciences_and_medicine
+    name: Life sciences and medicine
+    topics:
+      - {id: biology, name: Biology}
+      - {id: ecology, name: Ecology}
+      - {id: genetics, name: Genetics}
+      - {id: evolution, name: Evolution}
+      - {id: microbiology, name: Microbiology}
+      - {id: neuroscience, name: Neuroscience}
+      - {id: anatomy_and_physiology, name: Anatomy and physiology}
+      - {id: medicine, name: Medicine}
+      - {id: pharmacology, name: Pharmacology}
+      - {id: public_health, name: Public health}
+
+  - id: mathematics_and_computing
+    name: Mathematics and computing
+    topics:
+      - {id: mathematics, name: Mathematics}
+      - {id: statistics, name: Statistics}
+      - {id: logic_and_foundations, name: Logic and foundations}
+      - {id: theoretical_computer_science, name: Theoretical computer science}
+      - {id: algorithms_and_data_structures, name: Algorithms and data structures}
+      - {id: artificial_intelligence_and_machine_learning, name: Artificial intelligence and machine learning}
+      - {id: data_science, name: Data science}
+      - {id: software_engineering, name: Software engineering}
+      - {id: cybersecurity, name: Cybersecurity}
+      - {id: information_theory, name: Information theory}
+
+  - id: engineering_and_technology
+    name: Engineering and technology
+    topics:
+      - {id: electrical_engineering, name: Electrical engineering}
+      - {id: electronics, name: Electronics}
+      - {id: mechanical_engineering, name: Mechanical engineering}
+      - {id: civil_engineering, name: Civil engineering}
+      - {id: chemical_engineering, name: Chemical engineering}
+      - {id: aerospace_engineering, name: Aerospace engineering}
+      - {id: robotics, name: Robotics}
+      - {id: telecommunications, name: Telecommunications}
+      - {id: manufacturing, name: Manufacturing}
+      - {id: energy_technology, name: Energy technology}
+
+  - id: earth_environment_and_agriculture
+    name: Earth, environment and agriculture
+    topics:
+      - {id: geology, name: Geology}
+      - {id: physical_geography, name: Physical geography}
+      - {id: meteorology, name: Meteorology}
+      - {id: climatology, name: Climatology}
+      - {id: oceanography, name: Oceanography}
+      - {id: hydrology, name: Hydrology}
+      - {id: environmental_science, name: Environmental science}
+      - {id: conservation_and_biodiversity, name: Conservation and biodiversity}
+      - {id: natural_disasters, name: Natural disasters}
+      - {id: agriculture_and_food_systems, name: Agriculture and food systems}
+
+  - id: society_politics_and_law
+    name: Society, politics and law
+    topics:
+      - {id: sociology, name: Sociology}
+      - {id: psychology, name: Psychology}
+      - {id: anthropology, name: Anthropology}
+      - {id: political_science, name: Political science}
+      - {id: government_and_public_administration, name: Government and public administration}
+      - {id: law_and_legal_systems, name: Law and legal systems}
+      - {id: human_rights, name: Human rights}
+      - {id: education, name: Education}
+      - {id: demography_and_population, name: Demography and population}
+      - {id: social_movements, name: Social movements}
+
+  - id: economics_and_business
+    name: Economics and business
+    topics:
+      - {id: economics, name: Economics}
+      - {id: finance_and_banking, name: Finance and banking}
+      - {id: accounting, name: Accounting}
+      - {id: business_management, name: Business management}
+      - {id: entrepreneurship, name: Entrepreneurship}
+      - {id: international_trade, name: International trade}
+      - {id: industry_and_manufacturing, name: Industry and manufacturing}
+      - {id: labor_and_employment, name: Labor and employment}
+      - {id: marketing_and_advertising, name: Marketing and advertising}
+      - {id: real_estate_and_housing, name: Real estate and housing}
+
+  - id: history_geography_and_places
+    name: History, geography and places
+    topics:
+      - {id: world_history, name: World history}
+      - {id: ancient_history, name: Ancient history}
+      - {id: medieval_history, name: Medieval history}
+      - {id: modern_history, name: Modern history}
+      - {id: military_history, name: Military history}
+      - {id: vietnamese_history, name: Vietnamese history}
+      - {id: regional_and_area_studies, name: Regional and area studies}
+      - {id: urban_studies, name: Urban studies}
+      - {id: cartography_and_geospatial_data, name: Cartography and geospatial data}
+      - {id: archaeology, name: Archaeology}
+
+  - id: arts_media_and_entertainment
+    name: Arts, media and entertainment
+    topics:
+      - {id: visual_arts, name: Visual arts}
+      - {id: architecture, name: Architecture}
+      - {id: music, name: Music}
+      - {id: film, name: Film}
+      - {id: television_and_broadcasting, name: Television and broadcasting}
+      - {id: theatre_and_performance, name: Theatre and performance}
+      - {id: dance, name: Dance}
+      - {id: photography, name: Photography}
+      - {id: design, name: Design}
+      - {id: video_games, name: Video games}
+
+  - id: language_literature_and_information
+    name: Language, literature and information
+    topics:
+      - {id: linguistics, name: Linguistics}
+      - {id: language_families, name: Language families}
+      - {id: writing_systems, name: Writing systems}
+      - {id: translation_and_interpreting, name: Translation and interpreting}
+      - {id: literature, name: Literature}
+      - {id: poetry, name: Poetry}
+      - {id: novels_and_fiction, name: Novels and fiction}
+      - {id: folklore, name: Folklore}
+      - {id: journalism_and_news_media, name: Journalism and news media}
+      - {id: publishing_and_books, name: Publishing and books}
+
+  - id: philosophy_religion_and_life
+    name: Philosophy, religion and life
+    topics:
+      - {id: philosophy, name: Philosophy}
+      - {id: ethics, name: Ethics}
+      - {id: religion, name: Religion}
+      - {id: christianity, name: Christianity}
+      - {id: buddhism, name: Buddhism}
+      - {id: islam, name: Islam}
+      - {id: hinduism, name: Hinduism}
+      - {id: judaism, name: Judaism}
+      - {id: sports, name: Sports}
+      - {id: food_drink_and_cuisine, name: Food, drink and cuisine}

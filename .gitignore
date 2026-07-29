@@ -24,6 +24,8 @@ output/
 output_eval/
 generated_KGs/
 data/external/
+data/wikipedia/*.jsonl
+data/wikipedia/*.jsonl.tmp
 
 # deepeval cache
 .deepeval/
