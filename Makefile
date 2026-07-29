@@ -8,7 +8,10 @@ INPUT      ?= data/wikipedia/
 OUTPUT     ?= output/baseline
 VARIANT    ?= baseline
 
-.PHONY: help install clean test build-kg
+WIKI_COUNT    ?= 20
+WIKI_LANGUAGE ?= en
+
+.PHONY: help install clean test build-kg download-wikipedia
 
 help:
 	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=baseline]"
@@ -57,3 +60,9 @@ build-kg:
 ## test: Run the test suite
 test:
 	uv run pytest tests/ -v
+
+## download-wikipedia: Download random Wikipedia articles as Polygraph JSONL
+download-wikipedia:
+	uv run python tools/data_retrieval/download_wikipedia.py \
+		--count $(WIKI_COUNT) \
+		--language $(WIKI_LANGUAGE)
