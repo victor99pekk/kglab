@@ -7,6 +7,8 @@
   <img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="30%"/>
 </p>
 
+<sub>Image adapted from [Holten & van Wijk (2009)](https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275).</sub>
+
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
 
 A research toolkit for building highly customizable Knowledge-Graph generation pipelines. This repo provides support for using pre-built KG-generation pipelines and for customizing them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc.), as well as knowledge-building stages like entity extraction and resolution. The pipelines are implemented as classes that can be easily benchmarked with pre-defined code. The hope is that this will make it easy for people to use the existing pipelines defined in this repo, modify them, and benchmark the changes with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
