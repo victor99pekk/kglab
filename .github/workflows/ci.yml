@@ -19,9 +19,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v5
-      - run: uv pip install --system -e ".[dev]"
-      - run: python -m spacy download en_core_web_sm
-      - run: python -m pytest tests/ -v
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --extra gnn
+      - run: uv run python -m spacy download en_core_web_sm
+      - run: uv run pytest tests/ -v
 
   # ── Lint ──────────────────────────────────────────────────────────────
   lint:
@@ -42,6 +44,7 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v5
-      - run: uv pip install --system -e ".[dev]"
-      - run: pip install mypy
-      - run: mypy src/ --ignore-missing-imports
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev
+      - run: uv run mypy src/ --ignore-missing-imports

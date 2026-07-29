@@ -38,10 +38,6 @@ experiments/**/models/
 # deepeval cache
 .deepeval/
 
-# Presentation PDFs (keep only the fitted slides)
-*.pdf
-!presentation/presentation_slides_fitted.pdf
-
 # OS
 .DS_Store
 Thumbs.db

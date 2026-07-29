@@ -36,6 +36,7 @@ curation = [
     "faiss-cpu>=1.8",
 ]
 dev = [
+    "mypy>=1.0",
     "pytest>=8.0",
 ]
 # Vietnamese NLP support (install when switching to vi)
