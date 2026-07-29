@@ -93,7 +93,7 @@ class ExperimentConfig:
         output_block = raw.get("output", {})
         config_dir = Path(path).resolve().parent
         output_dir_raw = output_block.get("dir")
-        output_dir = Path(output_dir_raw) if output_dir_raw else config_dir / "outputs"
+        output_dir = Path(output_dir_raw) if output_dir_raw else config_dir / "results"
 
         ontology_path = None
         ontology_raw = raw.get("ontology")
@@ -108,9 +108,7 @@ class ExperimentConfig:
         llm_judge = eval_block.get("llm_judge", False)
 
         # Pipeline stage selectors are passed to the selected Pipeline class.
-        pipeline_options = {
-            key: value for key, value in pipeline_block.items() if key != "variant"
-        }
+        pipeline_options = {key: value for key, value in pipeline_block.items() if key != "variant"}
 
         # Collect any unrecognized top-level keys as extras for pipeline kwargs.
         known_keys = {

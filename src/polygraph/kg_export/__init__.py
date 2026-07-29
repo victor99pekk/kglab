@@ -13,7 +13,7 @@ Class API:
 
 from types import SimpleNamespace
 
-from polygraph.kg_export.exporter import GraphExporter
+from polygraph.kg_export.json.exporter import GraphExporter
 
 # ── Function API ────────────────────────────────────────────────
 

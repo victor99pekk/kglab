@@ -1,0 +1,257 @@
+{
+  "num_nodes": 1768,
+  "num_edges": 17428,
+  "num_triples": 21280,
+  "completeness": 1.0,
+  "completeness_breakdown": {
+    "has_name": 1.0,
+    "has_aliases": 1.0,
+    "has_type": 1.0
+  },
+  "consistency": 1.0,
+  "duplication_level": 0.10296504994082034,
+  "entity_duplication_rate": 0.02491506228765572,
+  "triple_duplication_rate": 0.18101503759398496,
+  "missing_information": 0.0,
+  "format_errors": 0.0,
+  "labeling_quality": 0.37315968289920726,
+  "reusability": 0.793212669683258,
+  "syntactic_accuracy": 0.949,
+  "syntactic_error_rate": 0.051,
+  "syntactic_error_breakdown": {
+    "bad_id_format": 1356,
+    "bad_date_format": 0,
+    "bad_numeric_format": 0,
+    "bad_predicate_naming": 0
+  },
+  "syntactic_error_examples": {
+    "bad_id_format": [
+      "John Rimington",
+      "2004 to 2006",
+      "the House of Keys between 2000 and 2006 for Rushen",
+      "Castle Rushen High School",
+      "Local Government"
+    ]
+  },
+  "overall_score": 0.8662010432345207,
+  "structural_audit": {
+    "graph_stats": {
+      "num_nodes": 1768,
+      "num_edges": 17428,
+      "num_triples": 21280,
+      "is_directed": true,
+      "is_connected": false
+    },
+    "degree_distribution": {
+      "in_degree": {
+        "mean": 9.86,
+        "median": 5.0,
+        "min": 0,
+        "max": 726,
+        "stdev": 26.34
+      },
+      "out_degree": {
+        "mean": 9.86,
+        "median": 6.0,
+        "min": 0,
+        "max": 391,
+        "stdev": 17.96
+      },
+      "histogram": {
+        "bin_edges": [
+          0,
+          2,
+          4,
+          7,
+          14,
+          27,
+          52,
+          101,
+          194,
+          376,
+          726
+        ],
+        "in_counts": [
+          348,
+          322,
+          403,
+          419,
+          156,
+          79,
+          29,
+          7,
+          3,
+          1,
+          1
+        ],
+        "out_counts": [
+          274,
+          303,
+          410,
+          480,
+          177,
+          85,
+          28,
+          9,
+          1,
+          1,
+          0
+        ]
+      }
+    },
+    "connectivity_stats": {
+      "num_scc": 605,
+      "largest_scc_size": 1152,
+      "scc_size_gt1": 5,
+      "avg_clustering": 0.43,
+      "estimated_diameter": 10
+    },
+    "orphan_analysis": {
+      "orphan_count": 25,
+      "orphan_rate": 0.0141,
+      "entity_orphans": 25,
+      "chunk_orphans": 0,
+      "health_score": 95.8,
+      "flag": "green",
+      "recommendation": ""
+    },
+    "density_analysis": {
+      "density": 0.005579,
+      "health_score": 100,
+      "flag": "green",
+      "recommendation": ""
+    },
+    "schema_compliance": {
+      "compliance_rate": 1.0,
+      "violations": [],
+      "health_score": 100,
+      "flag": "green"
+    },
+    "constraint_audit": {
+      "functional_violations": [],
+      "violation_count": 0,
+      "contradictory_facts": 0,
+      "health_score": 100,
+      "flag": "green",
+      "recommendation": ""
+    },
+    "entity_duplication": {
+      "duplicate_pairs": [
+        {
+          "entity_a": "Baltimore",
+          "entity_b": "Baltimore",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Baltimore",
+          "entity_b": "Baltimore",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "M&T Bank Stadium",
+          "entity_b": "M&T Bank Stadium",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "the Cleveland Browns",
+          "entity_b": "the Cleveland Browns",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Modell",
+          "entity_b": "Modell",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Steve Bisciotti",
+          "entity_b": "Steve Bisciotti's",
+          "similarity": 0.8667
+        },
+        {
+          "entity_a": "Super Bowl",
+          "entity_b": "Super Bowl",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Super Bowl XXXV",
+          "entity_b": "Super Bowl XXXV",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Super Bowl XLVII",
+          "entity_b": "Super Bowl XLVI",
+          "similarity": 0.9286
+        },
+        {
+          "entity_a": "the Tampa Bay Buccaneers",
+          "entity_b": "the Tampa Bay Buccaneers",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Ozzie Newsome",
+          "entity_b": "Ozzie Newsome",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Ray Lewis",
+          "entity_b": "Ray Lewis'",
+          "similarity": 0.875
+        },
+        {
+          "entity_a": "Edgar Allan Poe's",
+          "entity_b": "Edgar Allan Poe",
+          "similarity": 0.8667
+        },
+        {
+          "entity_a": "The Baltimore Sun",
+          "entity_b": "The Baltimore Sun",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "The Ravens",
+          "entity_b": "The Raven",
+          "similarity": 0.875
+        },
+        {
+          "entity_a": "AFC",
+          "entity_b": "AFC",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "The team",
+          "entity_b": "the teams",
+          "similarity": 0.8571
+        },
+        {
+          "entity_a": "offensive tackle Jonathan Ogden",
+          "entity_b": "UCLA offensive tackle Jonathan Ogden",
+          "similarity": 0.8529
+        },
+        {
+          "entity_a": "Colts",
+          "entity_b": "Colts",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Colts",
+          "entity_b": "Colts",
+          "similarity": 1.0
+        }
+      ],
+      "duplicate_pair_count": 63,
+      "duplicate_entity_count": 67,
+      "health_score": 82.2,
+      "flag": "yellow",
+      "recommendation": "63 potential duplicate pairs \u2014 consider entity resolution."
+    },
+    "multi_hop_connectivity": {
+      "reachable_2hop_pct": 1.0715,
+      "reachable_3hop_pct": 2.5114,
+      "health_score": 100,
+      "flag": "green",
+      "recommendation": ""
+    },
+    "overall_health_score": 96.3,
+    "verdict": "\u2705 Healthy \u2014 KG is structurally sound for SFT data generation."
+  }
+}

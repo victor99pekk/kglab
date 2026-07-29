@@ -74,7 +74,7 @@ experiment:
 
 ## neo4j-upload: Upload a knowledge_graph.json to Neo4j (always clears first)
 neo4j-upload:
-	uv run python -c "from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/outputs/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/outputs/knowledge_graph.json to Neo4j (cleared first)')"
+	uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/results/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/results/knowledge_graph.json to Neo4j (cleared first)')"
 
 # ═══════════════════════════════════════════════════════════
 # Dev
@@ -86,7 +86,7 @@ test:
 
 ## download-wikipedia: Download random Wikipedia articles as Polygraph JSONL
 download-wikipedia:
-	uv run python tools/data_retrieval/download_wikipedia.py \
+	uv run python tools/data_retrieval/download_wikipedia_random.py \
 		--count $(WIKI_COUNT) \
 		--language $(WIKI_LANGUAGE) \
 		--snapshot $(WIKI_SNAPSHOT) \

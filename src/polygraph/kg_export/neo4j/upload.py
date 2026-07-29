@@ -161,7 +161,7 @@ def upload_graph(json_path: str | Path, clear: bool = False) -> None:
 
     graph_data = data.get("graph", {})
     nodes = graph_data.get("nodes", [])
-    edges = graph_data.get("links", [])
+    edges = graph_data.get("edges", [])
 
     driver = _get_connection()
 
@@ -324,6 +324,17 @@ _LABEL_QUERIES: dict[tuple[str, str], str] = {
 }
 
 
+def _neo4j_label(node_type: str) -> str:
+    """Map a node type to the Neo4j label used at upload time.
+
+    Chunk and Document keep their labels; all entity subtypes (PERSON, ORG, etc.)
+    are stored under the ``Entity`` label.
+    """
+    if node_type in ("Chunk", "Document"):
+        return node_type
+    return "Entity"
+
+
 def _upload_relationships_batched(session, edges: list[dict], id_to_type: dict[str, str]) -> None:
     """Pre-aggregate duplicate relationships in Python, then upload in batches.
 
@@ -341,8 +352,8 @@ def _upload_relationships_batched(session, edges: list[dict], id_to_type: dict[s
         source = edge.get("source", "")
         target = edge.get("target", "")
         predicates = edge.get("predicates", ["related_to"])
-        source_label = id_to_type.get(source, "Entity")
-        target_label = id_to_type.get(target, "Entity")
+        source_label = _neo4j_label(id_to_type.get(source, "Entity"))
+        target_label = _neo4j_label(id_to_type.get(target, "Entity"))
 
         for pred in predicates:
             relation_records = [r for r in edge.get("relations", []) if r.get("predicate") == pred]

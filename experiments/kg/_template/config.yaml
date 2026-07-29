@@ -44,6 +44,9 @@ pipeline:
   build:
     method: "networkx"
 
+  # Set to true to also export GraphML (for Gephi/Cytoscape visualization).
+  graphml: false
+
 # ── Input ───────────────────────────────────────────────────────────────────
 
 input:
@@ -55,8 +58,8 @@ input:
 
 output:
   # Where to write generated artifacts (KG JSON, GraphML, metrics, etc.).
-  # If omitted, defaults to ``<experiment_dir>/outputs/``.
-  dir: "outputs/"
+  # If omitted, defaults to ``<experiment_dir>/results/``.
+  dir: "results/"
 
 # ── Ontology (optional) ─────────────────────────────────────────────────────
 

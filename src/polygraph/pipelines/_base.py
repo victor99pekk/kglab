@@ -81,13 +81,14 @@ class Pipeline(ABC):
         return report
 
     def export(self, kg: dict[str, Any]) -> None:
-        """Export KG to JSON + GraphML."""
+        """Export KG to JSON (always) and optionally GraphML."""
         from polygraph.kg_export import exporter
 
         exporter.to_json(
             kg["graph"], kg["entities"], kg["triples"], self.output_dir / "knowledge_graph.json"
         )
-        exporter.to_graphml(kg["graph"], self.output_dir / "knowledge_graph.graphml")
+        if self._config.get("graphml"):
+            exporter.to_graphml(kg["graph"], self.output_dir / "knowledge_graph.graphml")
         print(f"[export] → {self.output_dir}/")
 
     def upload_to_neo4j(self, clear: bool = False) -> None:

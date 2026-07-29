@@ -398,7 +398,8 @@ class QualityEvaluator(BaseEvaluator):
                     pass
 
         # 4. Predicate naming convention (snake_case expected)
-        for __, pred, ___, ____ in triples:
+        for triple in triples:
+            pred = triple[1] if len(triple) > 1 else ""
             total_checks += 1
             if pred and not re.match(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$", pred):
                 errors["bad_predicate_naming"] += 1

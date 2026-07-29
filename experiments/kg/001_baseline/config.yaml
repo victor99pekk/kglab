@@ -20,15 +20,11 @@ pipeline:
     threshold: 0.85
   build:
     method: "networkx"
+    graphml: false
 
 input:
   paths:
     - "data/wikipedia/"
-
-output:
-  dir: "outputs/"
-
-ontology: "configs/default_ontology.yaml"
 
 neo4j:
   upload: false
