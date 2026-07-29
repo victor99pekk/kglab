@@ -2,7 +2,7 @@
 
 Usage:
     # Run an experiment from a YAML config (recommended)
-    python main.py --experiment experiments/001_baseline/config.yaml
+    python main.py --experiment experiments/kg/001_baseline/config.yaml
 
     # Direct pipeline usage (backward compatible)
     python main.py                                              # Baseline pipeline

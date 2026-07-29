@@ -28,8 +28,8 @@ class BaseTrainer(ABC):
             def evaluate(self): ...
 
         trainer = MyTrainer(
-            kg_path="experiments/001_baseline/outputs/knowledge_graph.json",
-            output_dir="experiments/training/001_er/outputs/",
+            kg_path="experiments/kg/001_baseline/outputs/knowledge_graph.json",
+            output_dir="experiments/ML_models/001_er/outputs/",
             epochs=50,
             batch_size=64,
             learning_rate=0.001,

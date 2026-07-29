@@ -1,30 +1,23 @@
-"""ML models for improving knowledge graph quality.
+"""Model inference tools — thin wrappers that load trained checkpoints.
 
-Trainable components that can be plugged into pipelines to improve
-extraction, resolution, and graph structure.
-
-Sub-packages:
-    entity_resolution/   — binary classifier for merging duplicate entities
-    link_prediction/     — score candidate triples for missing edges
-    node_classification/ — predict entity types and attributes
+This module contains ONLY inference code. Training code (architectures,
+datasets, training loops) lives in ``src/ml/`` — the parallel package.
 
 Usage:
-    from polygraph.models import BaseTrainer
-    from polygraph.models.entity_resolution import EntityResolutionTrainer
+    from polygraph.models import ModelRegistry
+
+    # Load a trained checkpoint
+    tool = ModelRegistry.load(
+        "entity_resolution",
+        "experiments/ML_models/001_er/models/best.pt",
+    )
+
+    # Use it in a pipeline
+    is_match = tool.resolve(entity_a, entity_b)
 """
 
-from polygraph.models._base import BaseTrainer
-from polygraph.models.training_utils import (
-    EarlyStopping,
-    MetricTracker,
-    SaveBest,
-    count_parameters,
-)
+# Import the entity_resolution tool so it auto-registers with ModelRegistry
+import polygraph.models.entity_resolution  # noqa: F401 — side-effect: registers tool
+from polygraph.models.registry import ModelRegistry
 
-__all__ = [
-    "BaseTrainer",
-    "EarlyStopping",
-    "MetricTracker",
-    "SaveBest",
-    "count_parameters",
-]
+__all__ = ["ModelRegistry"]

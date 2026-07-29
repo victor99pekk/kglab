@@ -1,6 +1,6 @@
 # ── Training Experiment Configuration ───────────────────────────────────────
 # Copy this file to start a new training experiment:
-#   cp -r experiments/training/_template/ experiments/training/NNN_my_experiment/
+#   cp -r experiments/ML_models/_template/ experiments/ML_models/NNN_my_experiment/
 #
 # All fields are documented below.
 
@@ -14,7 +14,7 @@ description: >
 input:
   # Path to an existing knowledge graph JSON file to train on.
   # This is typically the output of a previous pipeline experiment.
-  kg_path: "experiments/001_baseline/outputs/knowledge_graph.json"
+  kg_path: "experiments/kg/001_baseline/outputs/knowledge_graph.json"
 
 # ── Output ──────────────────────────────────────────────────────────────────
 

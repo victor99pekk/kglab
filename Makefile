@@ -7,7 +7,7 @@ SHELL   := /bin/bash
 INPUT      ?= data/wikipedia/
 OUTPUT     ?= output/baseline
 VARIANT    ?= baseline
-EXP        ?= experiments/001_baseline/config.yaml
+EXP        ?= experiments/kg/001_baseline/config.yaml
 
 WIKI_COUNT    ?= 20
 WIKI_LANGUAGE ?= en
@@ -36,7 +36,7 @@ help:
 	@echo "   make test                                      # verify everything works"
 	@echo "   make build-kg                                  # baseline pipeline (direct)"
 	@echo "   make run-experiment                            # baseline experiment (001)"
-	@echo "   make run-experiment EXP=experiments/002_llm/config.yaml"
+	@echo "   make run-experiment EXP=experiments/kg/002_llm/config.yaml"
 	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
 
 # ═══════════════════════════════════════════════════════════

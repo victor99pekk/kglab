@@ -10,11 +10,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from polygraph.models._base import BaseTrainer
-from polygraph.models.entity_resolution.config import EntityResolutionConfig
-from polygraph.models.entity_resolution.dataset import EntityPairDataset
-from polygraph.models.entity_resolution.model import EntityResolutionModel
-from polygraph.models.training_utils import (
+from ml.base_trainer import BaseTrainer
+from ml.entity_resolution.config import EntityResolutionConfig
+from ml.entity_resolution.dataset import EntityPairDataset
+from ml.entity_resolution.model import EntityResolutionModel
+from ml.training_utils import (
     EarlyStopping,
     MetricTracker,
     SaveBest,

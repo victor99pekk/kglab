@@ -5,21 +5,24 @@ trains a binary classifier to predict whether two mentions refer to the same
 real-world entity. The trained model can then be used as a drop-in replacement
 for string-based or embedding-based resolution in any pipeline.
 
+The training code lives here in ``src/ml/``. The inference-only tool that
+pipelines import lives in ``src/polygraph/models/entity_resolution.py``.
+
 Usage:
-    from polygraph.models.entity_resolution import EntityResolutionTrainer
+    from ml.entity_resolution import EntityResolutionTrainer
 
     trainer = EntityResolutionTrainer(
-        kg_path="experiments/001_baseline/outputs/knowledge_graph.json",
-        output_dir="experiments/training/001_er/outputs/",
+        kg_path="experiments/kg/001_baseline/outputs/knowledge_graph.json",
+        output_dir="experiments/ML_models/001_er/outputs/",
         epochs=50,
     )
     trainer.run()
 """
 
-from polygraph.models.entity_resolution.config import EntityResolutionConfig
-from polygraph.models.entity_resolution.dataset import EntityPairDataset
-from polygraph.models.entity_resolution.model import EntityResolutionModel
-from polygraph.models.entity_resolution.train import EntityResolutionTrainer
+from ml.entity_resolution.config import EntityResolutionConfig
+from ml.entity_resolution.dataset import EntityPairDataset
+from ml.entity_resolution.model import EntityResolutionModel
+from ml.entity_resolution.train import EntityResolutionTrainer
 
 __all__ = [
     "EntityPairDataset",
