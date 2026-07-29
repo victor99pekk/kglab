@@ -39,3 +39,6 @@ Thumbs.db
 # Session artifacts
 saved_sessions/
 .mongo/
+
+.ruff_cache/
+.pytest_cache/

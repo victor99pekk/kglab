@@ -76,6 +76,20 @@ class Pipeline(ABC):
         exporter.to_graphml(kg["graph"], self.output_dir / "knowledge_graph.graphml")
         print(f"[export] → {self.output_dir}/")
 
+    def upload_to_neo4j(self, clear: bool = False) -> None:
+        """Upload the exported KG JSON to Neo4j.
+
+        Requires NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD environment variables.
+        Set clear=True to wipe the database before uploading.
+        """
+        from polygraph.kg_export import exporter
+
+        json_path = self.output_dir / "knowledge_graph.json"
+        if not json_path.exists():
+            raise FileNotFoundError(f"No exported KG found at {json_path}. Run export() first.")
+        exporter.to_neo4j(json_path, clear=clear)
+        print(f"[neo4j] uploaded → {json_path}")
+
     def generate_training_data(self, kg: dict[str, Any], chunks: list[Document]) -> None:
         """Generate QA training pairs from KG (and raw chunks as baseline)."""
         from polygraph.finetune.dataset import QADatasetGenerator
