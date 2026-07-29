@@ -41,9 +41,11 @@ class EntityResolutionTool:
         """
         # TODO: Replace with actual checkpoint loading:
         #   import torch
-        #   from ml.entity_resolution.model import EntityResolutionModel
-        #   self.model = EntityResolutionModel(...)
-        #   self.model.load_state_dict(torch.load(path))
+        #   from ml.entity_resolution.models import get_model
+        #   ckpt = torch.load(path)
+        #   model_cls = get_model(ckpt["model_variant"])
+        #   self.model = model_cls(**ckpt["config"])
+        #   self.model.load_state_dict(ckpt["weights"])
         raise NotImplementedError(
             "Override EntityResolutionTool.load() with real checkpoint loading "
             "(e.g., torch.load, joblib.load). The training code lives in "

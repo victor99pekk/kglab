@@ -13,7 +13,7 @@ from typing import Any
 from ml.base_trainer import BaseTrainer
 from ml.entity_resolution.config import EntityResolutionConfig
 from ml.entity_resolution.dataset import EntityPairDataset
-from ml.entity_resolution.model import EntityResolutionModel
+from ml.entity_resolution.models import get_model
 from ml.training_utils import (
     EarlyStopping,
     MetricTracker,
@@ -85,13 +85,25 @@ class EntityResolutionTrainer(BaseTrainer):
         print(f"[data] {len(train)} train pairs, {len(val)} val pairs, {len(test)} test pairs")
 
     def build_model(self) -> None:
-        """Instantiate the entity resolution model."""
-        self.model = EntityResolutionModel(
-            input_dim=self.model_config.embedding_dim,
-            hidden_dims=self.model_config.hidden_dims,
-            dropout=self.model_config.dropout,
+        """Instantiate the entity resolution model via the registry.
+
+        All ``EntityResolutionConfig`` fields are passed as keyword arguments.
+        Each model variant accepts the subset of parameters it needs.
+        """
+        model_cls = get_model(self.model_config.model_variant)
+
+        # Collect all config fields into kwargs — models pick what they need
+        from dataclasses import asdict
+
+        model_kwargs = asdict(self.model_config)
+        model_kwargs.pop("model_variant", None)  # not a model param
+
+        self.model = model_cls(**model_kwargs)
+        print(
+            f"[model] {model_cls.__name__} "
+            f"(variant={self.model_config.model_variant}, "
+            f"input_dim={self.model_config.embedding_dim})"
         )
-        print(f"[model] EntityResolutionModel(input_dim={self.model_config.embedding_dim})")
 
     def train(self) -> None:
         """Run the training loop with early stopping and metric tracking.

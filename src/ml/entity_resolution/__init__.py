@@ -21,12 +21,14 @@ Usage:
 
 from ml.entity_resolution.config import EntityResolutionConfig
 from ml.entity_resolution.dataset import EntityPairDataset
-from ml.entity_resolution.model import EntityResolutionModel
+from ml.entity_resolution.models import MODEL_REGISTRY, available_variants, get_model
 from ml.entity_resolution.train import EntityResolutionTrainer
 
 __all__ = [
     "EntityPairDataset",
     "EntityResolutionConfig",
-    "EntityResolutionModel",
+    "MODEL_REGISTRY",
+    "available_variants",
+    "get_model",
     "EntityResolutionTrainer",
 ]
