@@ -1,0 +1,37 @@
+name: "001 — Level-1 English Wikipedia Topic GNN"
+task: "topic_classification"
+status: "in_progress"
+
+input:
+  articles_path: "data/wikipedia/random_articles.jsonl"
+  labels_path: "experiments/ML_models/001_level1_topic_gnn/labels/article_topic_labels.jsonl"
+  taxonomy_path: "configs/topic_taxonomy_110.yaml"
+  prepared_graph_path: "outputs/topic_graph.pt"
+  language: "en"
+
+graph:
+  node_types:
+    - "article"
+    - "entity"
+    - "topic"
+    - "domain"
+  message_relations:
+    - ["article", "mentions", "entity"]
+    - ["article", "links_to", "article"]
+    - ["entity", "related_to", "entity"]
+    - ["topic", "in_domain", "domain"]
+  target_relation: ["article", "has_topic", "topic"]
+  include_reverse_relations: true
+  allow_target_as_message_edge: false
+
+features:
+  source: "text_encoder"
+  encoder: null
+  cache_path: "outputs/node_features.pt"
+
+model:
+  framework: "torch_geometric"
+  variant: "pyg_hetero_graphsage"
+
+output:
+  dir: "outputs/"

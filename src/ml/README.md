@@ -22,14 +22,24 @@ src/ml/
 │       ├── mlp.py                #     MLPEntityResolver
 │       └── attention.py          #     AttentionEntityResolver
 │
-└── node_classification/          # Task: GNN for predicting entity categories
+├── node_classification/          # Task: GNN for predicting entity categories
     ├── config.py                 #   NodeClassificationConfig dataclass
     ├── dataset.py                #   NodeClassificationDataset — labels from entity.type
     ├── train.py                  #   NodeClassificationTrainer
     └── models/                   #   architecture variants
         ├── __init__.py           #     MODEL_REGISTRY + get_model()
         ├── gcn.py                #     GCNNodeClassifier (PyTorch Geometric)
-        └── gat.py                #     GATNodeClassifier (PyTorch Geometric)
+│       └── gat.py                #     GATNodeClassifier (PyTorch Geometric)
+│
+└── topic_classification/         # Task: multilabel article-topic prediction
+    ├── config.py                 #   TopicClassificationConfig
+    ├── dataset.py                #   Wikipedia articles + audited topic labels
+    ├── graph.py                  #   framework-neutral heterogeneous KG
+    ├── pyg.py                    #   leakage-safe HeteroData adapter
+    ├── train.py                  #   full-batch PyG multilabel trainer
+    └── models/
+        ├── __init__.py           #     lazy MODEL_REGISTRY
+        └── hetero_graphsage.py   #     PyG HeteroConv + SAGEConv
 ```
 
 ---
