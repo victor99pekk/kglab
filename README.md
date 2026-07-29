@@ -13,11 +13,9 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
 - [Polygraph: KG-Grounded SFT Data for LLMs](#polygraph-kg-grounded-sft-data-for-llms)
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
-  - [Architecture](#architecture)
-  - [Using the Library](#using-the-library)
-    - [Run an existing pipeline](#run-an-existing-pipeline)
-    - [Extend a pipeline and benchmark](#extend-a-pipeline-and-benchmark)
-    - [Upload to Neo4j](#upload-to-neo4j)
+    - [Then build your first knowledge graph:](#then-build-your-first-knowledge-graph)
+    - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
+    - [Upload KG to Neo4j](#upload-kg-to-neo4j)
   - [Benchmarking \& Experiments](#benchmarking--experiments)
   - [ML Model Training](#ml-model-training)
   - [Contributing](#contributing)
@@ -53,23 +51,8 @@ These early results suggested that KG-structured training data could eliminate h
 
 ## Getting Started
 
-**Prerequisites:** Python 3.10+ and [uv](https://docs.astral.sh/uv/).
-
-```bash
-git clone https://github.com/your-org/polygraph.git
-cd polygraph
-make install         # syncs all deps + downloads spaCy model
-make test            # verify everything works
-make experiment      # run the baseline pipeline experiment
-```
-
-To export results to Neo4j (requires `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`):
-
-```bash
-make neo4j-upload    # upload knowledge_graph.json to Neo4j
-```
-
-## Architecture
+<details>
+<summary><strong>📁 Architecture</strong></summary>
 
 ```
 src/
@@ -101,11 +84,17 @@ experiments/
     └── _template/
 ```
 
-## Using the Library
+</details>
 
-### Run an existing pipeline
+**Prerequisites:** Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
-Build a knowledge graph from your text data using the baseline pipeline:
+```bash
+git clone git@github.com:victor99pekk/polygraph.git
+cd polygraph
+make install         # syncs all deps + downloads spaCy model
+```
+
+### Then build your first knowledge graph:
 
 ```python
 from polygraph.pipelines import Baseline
@@ -117,10 +106,7 @@ pipeline = Baseline(
 pipeline.execute()
 ```
 
-Outputs include `knowledge_graph.json`, `knowledge_graph.graphml`, and `metrics.json`.
-
-### Extend a pipeline and benchmark
-
+### Create new KG-generation pipelines
 Subclass a pipeline, override stages, and compare against the baseline (e.g., new extraction and resolution methods in the KG build stage):
 
 Custom methods like `with_new_method` are wired in `kg_build/__init__.py` — add your extraction and resolution backends there so they're callable as `extract.with_new_method` and `resolve.with_new_method`. Register it in `src/polygraph/pipelines/__init__.py`:
@@ -157,7 +143,7 @@ pipeline = MyVariant(
 pipeline.execute()
 ```
 
-### Upload to Neo4j
+### Upload KG to Neo4j
 
 Requires `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` to be set in your environment or
 a `.env` file. Install the Neo4j extra first: `uv sync --extra neo4j`
@@ -167,6 +153,9 @@ from polygraph.kg_export.neo4j.upload import upload_graph
 
 upload_graph("output/my_experiment/knowledge_graph.json", clear=True)
 ```
+
+
+
 
 ## Benchmarking & Experiments
 
