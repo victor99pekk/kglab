@@ -4,9 +4,18 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from polygraph._shared import Ontology
-from polygraph.kg_build.extract.entities import Entity, SimpleExtractor
-from polygraph.kg_build.extract.graphgen import GraphGenExtractor
-from polygraph.kg_build.extract.relations import RelationExtractor
+from polygraph.benchmark_pipeline.config import ExperimentConfig
+from polygraph.kg_build.extract._base import Entity
+from polygraph.kg_build.extract.entity import SimpleExtractor
+from polygraph.kg_build.extract.joint import GraphGenExtractor
+from polygraph.kg_build.extract.registry import (
+    create_entity_method,
+    create_joint_method,
+    create_relation_method,
+)
+from polygraph.kg_build.extract.relation.ontology_rules import (
+    OntologyRuleRelationExtractor,
+)
 
 _ONTOLOGY_PATH = Path(__file__).parents[1] / "configs" / "default_ontology.yaml"
 
@@ -29,12 +38,37 @@ def test_simple_extractor_captures_capitalized():
     )
 
 
+def test_extraction_registry_loads_each_method_family():
+    ontology = _load_test_ontology()
+
+    assert isinstance(create_entity_method("regex"), SimpleExtractor)
+    assert isinstance(
+        create_relation_method("ontology_rules", ontology=ontology),
+        OntologyRuleRelationExtractor,
+    )
+    assert isinstance(
+        create_joint_method("graphgen", ontology=ontology),
+        GraphGenExtractor,
+    )
+
+
+def test_experiment_config_passes_stage_method_selection_to_pipeline():
+    config = ExperimentConfig.from_yaml(
+        Path(__file__).parents[1] / "experiments" / "kg" / "001_baseline" / "config.yaml"
+    )
+
+    assert config.extra["extraction"]["entity_method"] == "spacy"
+    assert config.extra["extraction"]["relation_method"] == "ontology_rules"
+    assert config.extra["resolution"]["method"] == "string"
+    assert config.extra["build"]["method"] == "networkx"
+
+
 def test_relation_preserves_stable_ids_evidence_and_source_chunk():
     ontology = _load_test_ontology()
     alice = Entity(name="Alice", label="PERSON")
     acme = Entity(name="Acme Corp", label="ORG")
 
-    relations = RelationExtractor(ontology=ontology).extract(
+    relations = OntologyRuleRelationExtractor(ontology=ontology).extract(
         "Alice works at Acme Corp. Another sentence.",
         [alice, acme],
         source_chunk_id="chunk:123",

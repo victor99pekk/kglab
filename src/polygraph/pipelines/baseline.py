@@ -17,11 +17,7 @@ _DEFAULT_ONTOLOGY_PATH = Path(__file__).parents[3] / "configs" / "default_ontolo
 
 
 class Baseline(Pipeline):
-    """Standard pipeline: minhash dedup, spaCy extraction, string resolution.
-
-    Good defaults for getting started. For LLM extraction or embedding
-    resolution, subclass and override build_kg().
-    """
+    """Standard pipeline with configurable extraction, resolution, and build methods."""
 
     def _load_ontology(self) -> Ontology:
         """Load the ontology from the path given at construction time."""
@@ -50,9 +46,53 @@ class Baseline(Pipeline):
 
     def build_kg(self, chunks: list[Document]) -> dict:
         ontology = self._load_ontology()
-        entities, triples = extract.with_spacy(chunks, ontology=ontology, model="en_core_web_sm")
-        resolved = resolve.by_string(entities, threshold=0.85)
-        graph = build.from_resolved(resolved, triples)
+        extraction = self._config.get("extraction", {}) or {}
+        legacy_method = extraction.get("method")
+        mode = extraction.get(
+            "mode",
+            "joint" if legacy_method == "graphgen" else "composed",
+        )
+
+        if mode == "joint":
+            entities, triples = extract.jointly(
+                chunks,
+                ontology,
+                method=extraction.get("joint_method", "graphgen"),
+                options=extraction.get("options", {}),
+            )
+        elif mode == "composed":
+            entity_method = extraction.get("entity_method", "spacy")
+            entity_options = extraction.get("entity_options")
+            if entity_options is None:
+                entity_options = (
+                    {"model_name": "en_core_web_sm"} if entity_method == "spacy" else {}
+                )
+            entities, triples = extract.with_methods(
+                chunks,
+                ontology,
+                entity_method=entity_method,
+                relation_method=extraction.get("relation_method", "ontology_rules"),
+                entity_options=entity_options,
+                relation_options=extraction.get("relation_options", {}),
+            )
+        else:
+            raise ValueError("pipeline.extraction.mode must be one of: composed, joint")
+
+        resolution = self._config.get("resolution", {}) or {}
+        resolved = resolve.with_method(
+            entities,
+            method=resolution.get("method", "string"),
+            threshold=resolution.get("threshold", 0.85),
+            **resolution.get("options", {}),
+        )
+
+        graph_config = self._config.get("build", {}) or {}
+        graph = build.from_resolved(
+            resolved,
+            triples,
+            method=graph_config.get("method", "networkx"),
+            ontology=ontology,
+        )
 
         print(
             f"[build_kg] {len(entities)} entities → {len(resolved)} resolved, "

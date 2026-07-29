@@ -107,6 +107,10 @@ class PipelineConfig:
     semantic_dedup_max_records: int = 5_000
 
     # Extract
+    extraction_mode: str = "composed"  # composed | joint
+    entity_method: str = "spacy"
+    relation_method: str = "ontology_rules"
+    joint_method: str = "graphgen"
     llm_model: str = "deepseek-v4-flash"
     use_llm: bool = False
     spacy_model: str = "en_core_web_sm"
@@ -148,10 +152,27 @@ class PipelineConfig:
         extraction_method = extraction.get("method")
         if extraction_method not in {None, "offline", "graphgen"}:
             raise ValueError("extraction.method must be one of: offline, graphgen")
+        extraction_mode = extraction.get(
+            "mode",
+            "joint" if extraction_method == "graphgen" else "composed",
+        )
+        if extraction_mode not in {"composed", "joint"}:
+            raise ValueError("extraction.mode must be one of: composed, joint")
+        entity_method = extraction.get("entity_method", "spacy")
+        if entity_method not in {"spacy", "regex"}:
+            raise ValueError("extraction.entity_method must be one of: regex, spacy")
+        relation_method = extraction.get("relation_method", "ontology_rules")
+        if relation_method not in {"ontology_rules", "structured_llm"}:
+            raise ValueError(
+                "extraction.relation_method must be one of: ontology_rules, structured_llm"
+            )
+        joint_method = extraction.get("joint_method", "graphgen")
+        if joint_method != "graphgen":
+            raise ValueError("extraction.joint_method must be: graphgen")
         use_llm = (
-            extraction_method == "graphgen"
-            if extraction_method is not None
-            else pipeline.get("use_llm", False)
+            extraction_mode == "joint"
+            or relation_method == "structured_llm"
+            or pipeline.get("use_llm", False)
         )
         resolve_method = resolution.get("method", pipeline.get("resolve_method", "string"))
         if resolve_method == "string_similarity":
@@ -198,13 +219,34 @@ class PipelineConfig:
             semantic_dedup_max_records=deduplication.get(
                 "max_records", pipeline.get("semantic_dedup_max_records", 5_000)
             ),
-            llm_model=extraction.get("model", pipeline.get("llm_model", "deepseek-v4-flash")),
+            extraction_mode=extraction_mode,
+            entity_method=entity_method,
+            relation_method=relation_method,
+            joint_method=joint_method,
+            llm_model=extraction.get(
+                "model",
+                extraction.get("options", {}).get(
+                    "model_name",
+                    extraction.get("relation_options", {}).get(
+                        "model_name",
+                        pipeline.get("llm_model", "deepseek-v4-flash"),
+                    ),
+                ),
+            ),
             use_llm=use_llm,
             spacy_model=extraction.get(
-                "spacy_model", pipeline.get("spacy_model", "en_core_web_sm")
+                "spacy_model",
+                extraction.get("entity_options", {}).get(
+                    "model_name",
+                    pipeline.get("spacy_model", "en_core_web_sm"),
+                ),
             ),
             graphgen_max_gleanings=extraction.get(
-                "max_gleanings", pipeline.get("graphgen_max_gleanings", 3)
+                "max_gleanings",
+                extraction.get("options", {}).get(
+                    "max_gleanings",
+                    pipeline.get("graphgen_max_gleanings", 3),
+                ),
             ),
             ontology_path=pipeline.get("ontology_path", ""),
             resolve_threshold=resolution.get("threshold", pipeline.get("resolve_threshold", 0.85)),

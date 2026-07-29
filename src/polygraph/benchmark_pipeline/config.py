@@ -48,6 +48,14 @@ class ExperimentConfig:
 
             pipeline:
               variant: "baseline"
+              extraction:
+                mode: "composed"
+                entity_method: "spacy"
+                relation_method: "ontology_rules"
+              resolution:
+                method: "string"
+              build:
+                method: "networkx"
 
             input:
               paths:
@@ -99,7 +107,12 @@ class ExperimentConfig:
         eval_block = raw.get("evaluation", {})
         llm_judge = eval_block.get("llm_judge", False)
 
-        # Collect any unrecognized top-level keys as extras for pipeline kwargs
+        # Pipeline stage selectors are passed to the selected Pipeline class.
+        pipeline_options = {
+            key: value for key, value in pipeline_block.items() if key != "variant"
+        }
+
+        # Collect any unrecognized top-level keys as extras for pipeline kwargs.
         known_keys = {
             "name",
             "description",
@@ -111,6 +124,7 @@ class ExperimentConfig:
             "evaluation",
         }
         extra = {k: v for k, v in raw.items() if k not in known_keys}
+        extra.update(pipeline_options)
 
         return cls(
             name=name,

@@ -6,7 +6,32 @@ Available methods:
 """
 
 from .embedding import resolve_embedding
+from .registry import RESOLUTION_METHODS, get_resolution_method
 from .string import resolve_string
+
+
+def with_method(entities, *, method: str = "string", **options):
+    """Resolve entities with a registered method."""
+    return get_resolution_method(method)(entities, **options)
+
+
+def by_string(entities, threshold: float = 0.85):
+    return with_method(entities, method="string", threshold=threshold)
+
+
+def by_embedding(
+    entities,
+    threshold: float = 0.85,
+    model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
+    encoder=None,
+):
+    return with_method(
+        entities,
+        method="embedding",
+        threshold=threshold,
+        model_name=model_name,
+        encoder=encoder,
+    )
 
 
 # Backward compatibility: EntityResolver class delegates to the new functions
@@ -22,8 +47,9 @@ class EntityResolver:
     ) -> None:
         if method == "string_similarity":
             method = "string"
-        if method not in {"string", "embedding"}:
-            raise ValueError("Entity resolution method must be one of: string, embedding")
+        if method not in RESOLUTION_METHODS:
+            choices = ", ".join(sorted(RESOLUTION_METHODS))
+            raise ValueError(f"Entity resolution method must be one of: {choices}")
         self.threshold = threshold
         self.method = method
         self.model_name = model_name
@@ -58,4 +84,13 @@ class EntityResolver:
         return resolved, id_map
 
 
-__all__ = ["EntityResolver", "resolve_string", "resolve_embedding"]
+__all__ = [
+    "EntityResolver",
+    "RESOLUTION_METHODS",
+    "by_embedding",
+    "by_string",
+    "get_resolution_method",
+    "resolve_embedding",
+    "resolve_string",
+    "with_method",
+]

@@ -17,6 +17,33 @@ pipeline:
   # (src/polygraph/pipelines/__init__.py). Available: baseline
   variant: "baseline"
 
+  # Compose independent entity and relation methods.
+  # Available entity methods: spacy, regex
+  # Available relation methods: ontology_rules, structured_llm
+  extraction:
+    mode: "composed"  # composed | joint
+    entity_method: "spacy"
+    entity_options:
+      model_name: "en_core_web_sm"
+    relation_method: "ontology_rules"
+    relation_options: {}
+
+    # For a joint method, set mode: joint and use:
+    # joint_method: "graphgen"
+    # options:
+    #   model_name: "deepseek-v4-flash"
+    #   max_gleanings: 3
+
+  # Available methods: string, embedding
+  resolution:
+    method: "string"
+    threshold: 0.85
+    options: {}
+
+  # Available methods: networkx
+  build:
+    method: "networkx"
+
 # ── Input ───────────────────────────────────────────────────────────────────
 
 input:

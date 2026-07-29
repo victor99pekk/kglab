@@ -9,6 +9,17 @@ description: >
 
 pipeline:
   variant: "baseline"
+  extraction:
+    mode: "composed"
+    entity_method: "spacy"
+    entity_options:
+      model_name: "en_core_web_sm"
+    relation_method: "ontology_rules"
+  resolution:
+    method: "string"
+    threshold: 0.85
+  build:
+    method: "networkx"
 
 input:
   paths:
