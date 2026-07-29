@@ -17,8 +17,6 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
     - [Build a Knowledge Graph](#build-a-knowledge-graph)
     - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
     - [Upload KG to Neo4j](#upload-kg-to-neo4j)
-  - [Benchmarking \& Experiments](#benchmarking--experiments)
-  - [ML Model Training](#ml-model-training)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -152,18 +150,21 @@ pipeline.execute()
 
 ### Upload KG to Neo4j
 
-Requires `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` to be set in your environment or
-a `.env` file. Install the Neo4j extra first: `uv sync --extra neo4j`
-
 ```python
 from polygraph.kg_export.neo4j.upload import upload_graph
 
-upload_graph("output/my_experiment/knowledge_graph.json", clear=True)
+upload_graph(
+    "output/my_experiment/knowledge_graph.json",
+    clear=True,
+    uri="bolt://localhost:7687",
+    user="neo4j",
+    password="your-password",
+)
 ```
 
 
 
-
+<!--
 ## Benchmarking & Experiments
 
 All pipelines can be run and compared via experiment YAML configs:
@@ -215,7 +216,7 @@ training:
 ```
 
 GNN models use PyTorch Geometric — install with `uv sync --extra gnn`.
-See `src/ml/README.md` for the full guide on adding new tasks.
+See `src/ml/README.md` for the full guide on adding new tasks. -->
 
 ## Contributing
 
