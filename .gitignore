@@ -28,7 +28,10 @@ data/wikipedia/*.jsonl
 data/wikipedia/*.jsonl.tmp
 
 # Experiment outputs (generated KGs, metrics, reports)
-experiments/*/outputs/
+experiments/**/outputs/
+
+# Trained model checkpoints (large binaries)
+experiments/**/models/
 
 # deepeval cache
 .deepeval/

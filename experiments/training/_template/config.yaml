@@ -1,0 +1,76 @@
+# ── Training Experiment Configuration ───────────────────────────────────────
+# Copy this file to start a new training experiment:
+#   cp -r experiments/training/_template/ experiments/training/NNN_my_experiment/
+#
+# All fields are documented below.
+
+name: "My Training Experiment"
+description: >
+  A brief description of what this training experiment tests — what model,
+  on what data, and what you expect to improve in the knowledge graph.
+
+# ── Input ───────────────────────────────────────────────────────────────────
+
+input:
+  # Path to an existing knowledge graph JSON file to train on.
+  # This is typically the output of a previous pipeline experiment.
+  kg_path: "experiments/001_baseline/outputs/knowledge_graph.json"
+
+# ── Output ──────────────────────────────────────────────────────────────────
+
+output:
+  # Where to write training artifacts (metrics, logs, etc.).
+  # If omitted, defaults to ``<experiment_dir>/outputs/``.
+  dir: "outputs/"
+
+# ── Training ────────────────────────────────────────────────────────────────
+
+training:
+  # Which ML task to run. Available options (as new models are added):
+  #   entity_resolution   — binary classifier: do two entity mentions refer to the same entity?
+  #   link_prediction     — score candidate triples for missing edges
+  #   node_classification — classify entity type / attributes
+  task: "entity_resolution"
+
+  # Hyperparameters
+  epochs: 50
+  batch_size: 64
+  learning_rate: 0.001
+  train_split: 0.8
+  validation_split: 0.1
+
+  # Model-specific settings
+  model:
+    # Embedding dimension for entity representations
+    embedding_dim: 128
+    # Whether to use GPU if available
+    use_gpu: true
+    # Random seed for reproducibility
+    seed: 42
+
+  # Data preprocessing
+  data:
+    # Minimum number of entity mentions required to include an entity
+    min_entity_frequency: 2
+    # Maximum number of negative samples per positive pair
+    negative_ratio: 3
+
+# ── Evaluation ──────────────────────────────────────────────────────────────
+
+evaluation:
+  # Metrics to track during training
+  track:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+  # Evaluate on a held-out test KG (optional)
+  test_kg_path: null
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+
+logging:
+  # Log training metrics every N steps
+  log_interval: 100
+  # Save model checkpoint every N epochs (0 = only save best)
+  save_interval: 5
