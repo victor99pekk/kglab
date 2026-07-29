@@ -16,8 +16,9 @@ Usage:
     is_match = tool.resolve(entity_a, entity_b)
 """
 
-# Import the entity_resolution tool so it auto-registers with ModelRegistry
+# Import inference tools so they auto-register with ModelRegistry
 import polygraph.models.entity_resolution  # noqa: F401 — side-effect: registers tool
+import polygraph.models.node_classification  # noqa: F401 — side-effect: registers tool
 from polygraph.models.registry import ModelRegistry
 
 __all__ = ["ModelRegistry"]

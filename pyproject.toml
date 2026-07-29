@@ -57,6 +57,11 @@ scraper = [
 neo4j = [
     "neo4j>=5.15",
 ]
+# GNN models for node classification and link prediction (requires torch)
+gnn = [
+    "torch>=2.0,<2.6",
+    "torch-geometric>=2.5",
+]
 # LLM-based extraction
 llm = [
     "openai>=1.6",
@@ -82,7 +87,7 @@ eval-model = [
 ]
 # All extras
 all = [
-    "kg-generator[embeddings,curation,vi,data,scraper,neo4j,llm,mongo,dev,eval-data,eval-model]",
+    "kg-generator[embeddings,curation,vi,data,scraper,neo4j,gnn,llm,mongo,dev,eval-data,eval-model]",
 ]
 
 [project.scripts]
