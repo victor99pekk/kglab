@@ -13,6 +13,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
 - [Polygraph: KG-Grounded SFT Data for LLMs](#polygraph-kg-grounded-sft-data-for-llms)
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
+    - [Installation](#installation)
     - [Then build your first knowledge graph:](#then-build-your-first-knowledge-graph)
     - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
     - [Upload KG to Neo4j](#upload-kg-to-neo4j)
@@ -85,6 +86,9 @@ experiments/
 ```
 
 </details>
+
+
+### Installation
 
 **Prerequisites:** Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
