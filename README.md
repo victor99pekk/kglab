@@ -14,7 +14,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
     - [Installation](#installation)
-    - [Then build your first knowledge graph:](#then-build-your-first-knowledge-graph)
+    - [Build a Knowledge Graph](#build-a-knowledge-graph)
     - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
     - [Upload KG to Neo4j](#upload-kg-to-neo4j)
   - [Benchmarking \& Experiments](#benchmarking--experiments)
@@ -98,7 +98,7 @@ cd polygraph
 make install         # syncs all deps + downloads spaCy model
 ```
 
-### Then build your first knowledge graph:
+### Build a Knowledge Graph
 
 ```python
 from polygraph.pipelines import Baseline
@@ -110,10 +110,13 @@ pipeline = Baseline(
 pipeline.execute()
 ```
 
+The KG is written to `output/my_experiment/` as `knowledge_graph.json` and
+`knowledge_graph.graphml`, plus a `metrics.json` with quality scores.
+
 ### Create new KG-generation pipelines
 Subclass a pipeline, override stages, and compare against the baseline (e.g., new extraction and resolution methods in the KG build stage):
 
-Custom methods like `with_new_method` are wired in `kg_build/__init__.py` — add your extraction and resolution backends there so they're callable as `extract.with_new_method` and `resolve.with_new_method`. Register it in `src/polygraph/pipelines/__init__.py`:
+Custom methods like `with_new_extraction_method` and `with_new_resolve_method` are wired in `kg_build/__init__.py` — add your extraction and resolution backends there so they're callable as `extract.with_new_method` and `resolve.with_new_method`. Register it in `src/polygraph/pipelines/__init__.py`:
 
 ```python
 # src/polygraph/pipelines/my_variant.py
@@ -122,12 +125,12 @@ from polygraph.kg_build import extract, resolve, build
 
 class MyVariant(Baseline):
     def build_kg(self, chunks):
-        entities, triples = extract.with_new_method(
+        entities, triples = extract.with_new_extraction_method(
             chunks, self.ontology,
             entity_method="spacy",
             relation_method="structured_llm",
         )
-        resolved = resolve.with_new_method(entities, threshold=0.85)
+        resolved = resolve.with_new_resolve_method(entities, threshold=0.85)
         graph = build.from_resolved(resolved, triples)
         return {"graph": graph, "entities": resolved, "triples": triples}
 ```
