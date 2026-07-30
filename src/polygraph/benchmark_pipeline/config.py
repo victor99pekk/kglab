@@ -14,6 +14,12 @@ from typing import Any
 
 import yaml
 
+from polygraph._shared.stage_config import (
+    BuildConfig,
+    ExtractionConfig,
+    ResolutionConfig,
+)
+
 
 @dataclass
 class ExperimentConfig:
@@ -33,6 +39,9 @@ class ExperimentConfig:
     upload_neo4j: bool = False
     clear_neo4j: bool = False
     llm_judge: bool = False
+    extraction: ExtractionConfig = field(default_factory=ExtractionConfig)
+    resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
+    build: BuildConfig = field(default_factory=BuildConfig)
     extra: dict[str, Any] = field(default_factory=dict)
 
     # ── Factory ─────────────────────────────────────────────────
@@ -107,8 +116,11 @@ class ExperimentConfig:
         eval_block = raw.get("evaluation", {})
         llm_judge = eval_block.get("llm_judge", False)
 
-        # Pipeline stage selectors are passed to the selected Pipeline class.
-        pipeline_options = {key: value for key, value in pipeline_block.items() if key != "variant"}
+        # Parse pipeline block into typed stage configs
+        pipeline_block = raw.get("pipeline", {})
+        extraction = ExtractionConfig.from_dict(pipeline_block.get("extraction"))
+        resolution = ResolutionConfig.from_dict(pipeline_block.get("resolution"))
+        build = BuildConfig.from_dict(pipeline_block.get("build"))
 
         # Collect any unrecognized top-level keys as extras for pipeline kwargs.
         known_keys = {
@@ -122,7 +134,6 @@ class ExperimentConfig:
             "evaluation",
         }
         extra = {k: v for k, v in raw.items() if k not in known_keys}
-        extra.update(pipeline_options)
 
         return cls(
             name=name,
@@ -134,6 +145,9 @@ class ExperimentConfig:
             upload_neo4j=upload_neo4j,
             clear_neo4j=clear_neo4j,
             llm_judge=llm_judge,
+            extraction=extraction,
+            resolution=resolution,
+            build=build,
             extra=extra,
         )
 

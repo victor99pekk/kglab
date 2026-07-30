@@ -1,6 +1,7 @@
 """Selectable entity, relation, and joint extraction methods."""
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from polygraph._shared import Ontology
 from polygraph.kg_build.extract._base import (
@@ -20,6 +21,7 @@ from polygraph.kg_build.extract.registry import (
     create_relation_method,
 )
 from polygraph.kg_build.extract.relation import (
+    CompositeRelationExtractor,
     OntologyRuleRelationExtractor,
     StructuredLLMRelationExtractor,
 )
@@ -100,6 +102,7 @@ def with_graphgen(
 
 
 __all__ = [
+    "CompositeRelationExtractor",
     "ENTITY_METHODS",
     "EnglishExtractor",
     "Entity",

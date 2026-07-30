@@ -43,9 +43,7 @@ class SentenceChunker(TextChunker):
             return []
         packed = self._pack_units(units)
         if len(packed) == 1:
-            doc.metadata["chunk_index"] = 0
-            doc.metadata["token_count"] = count_tokens(doc.content)
-            return [doc]
+            return [self._make_chunk(doc, packed[0], 0)]
         return [self._make_chunk(doc, text, index) for index, text in enumerate(packed)]
 
     def _expanded_units(self, text: str) -> list[str]:

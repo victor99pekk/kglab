@@ -4,12 +4,12 @@
 
 Polygraph is both a **research project** and an **open-source library** for knowledge graph generation. All code must balance two goals:
 
-1. **Research agility** — enable rapid experimentation and iteration on novel KG construction techniques.
+1. **Research agility** — enable rapid experimentation and iteration on novel KG construction techniques. The knowldege graph will only ever support three types of nodes: entities, documents, and chunks, for now at least.
   - user should be able to quickly swap out components (e.g., chunkers, extractors, resolvers) and run experiments with minimal boilerplate.
   - users should be able to easily compare results across different pipelines and configurations.
   - users should be able to easily add new pipelines, exporters, or extraction strategies without modifying existing core code.
   - there should be good support for knowledge graph generation pipelines, knowledge graph export, and evaluation metrics.
-2. **Library usability** — be intuitive for new users and easy to extend with new functionality.
+2. **Library usability** — be intuitive for new users and easy to extend with new functionality. It is extremely important that it is intutitive for users to create new pipelines and use existing pipelines with python code. The library should be easy to use for new users, and easy to extend with new functionality. It should be easy to create new pipelines and use existing pipelines with python code.
 
 3. **Code quality** — maintain a high standard of code readability, maintainability, and test coverage.
 4. The codebase should be well-documented, with clear docstrings and usage examples for all public APIs.

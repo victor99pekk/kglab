@@ -1,33 +1,33 @@
 {
   "experiment_name": "001 — Baseline pipeline",
-  "timestamp": "2026-07-29T08:11:33.115513+00:00",
+  "timestamp": "2026-07-30T06:24:00.670754+00:00",
   "pipeline_variant": "baseline",
   "input_paths": [
     "data/wikipedia"
   ],
   "output_dir": "/Users/victorpekkari/Desktop/aiv/polygraph/experiments/kg/001_baseline/results",
   "metrics": {
-    "num_nodes": 1768,
+    "num_nodes": 1771,
     "num_edges": 17428,
     "num_triples": 21280,
-    "completeness": 1.0,
+    "completeness": 0.9994347088750706,
     "completeness_breakdown": {
+      "has_aliases": 0.998304126625212,
       "has_name": 1.0,
-      "has_aliases": 1.0,
       "has_type": 1.0
     },
     "consistency": 1.0,
-    "duplication_level": 0.10296504994082034,
-    "entity_duplication_rate": 0.02491506228765572,
+    "duplication_level": 0.10350921467036728,
+    "entity_duplication_rate": 0.026003391746749593,
     "triple_duplication_rate": 0.18101503759398496,
-    "missing_information": 0.0,
+    "missing_information": 0.0016958733747880158,
     "format_errors": 0.0,
-    "labeling_quality": 0.37315968289920726,
-    "reusability": 0.793212669683258,
-    "syntactic_accuracy": 0.949,
-    "syntactic_error_rate": 0.051,
+    "labeling_quality": 0.37422272470322215,
+    "reusability": 0.7928853754940712,
+    "syntactic_accuracy": 0.9489,
+    "syntactic_error_rate": 0.0511,
     "syntactic_error_breakdown": {
-      "bad_id_format": 1356,
+      "bad_id_format": 1359,
       "bad_date_format": 0,
       "bad_numeric_format": 0,
       "bad_predicate_naming": 0
@@ -41,12 +41,12 @@
         "Local Government"
       ]
     },
-    "overall_score": 0.8662010432345207,
-    "wall_time_s": 9.13
+    "overall_score": 0.8659053887181727,
+    "wall_time_s": 9.41
   },
   "structural_audit": {
     "graph_stats": {
-      "num_nodes": 1768,
+      "num_nodes": 1771,
       "num_edges": 17428,
       "num_triples": 21280,
       "is_directed": true,
@@ -54,18 +54,18 @@
     },
     "degree_distribution": {
       "in_degree": {
-        "mean": 9.86,
-        "median": 5.0,
+        "mean": 9.84,
+        "median": 5,
         "min": 0,
         "max": 726,
-        "stdev": 26.34
+        "stdev": 26.32
       },
       "out_degree": {
-        "mean": 9.86,
-        "median": 6.0,
+        "mean": 9.84,
+        "median": 6,
         "min": 0,
         "max": 391,
-        "stdev": 17.96
+        "stdev": 17.95
       },
       "histogram": {
         "bin_edges": [
@@ -82,7 +82,7 @@
           726
         ],
         "in_counts": [
-          348,
+          351,
           322,
           403,
           419,
@@ -95,7 +95,7 @@
           1
         ],
         "out_counts": [
-          274,
+          277,
           303,
           410,
           480,
@@ -110,23 +110,23 @@
       }
     },
     "connectivity_stats": {
-      "num_scc": 605,
+      "num_scc": 608,
       "largest_scc_size": 1152,
       "scc_size_gt1": 5,
-      "avg_clustering": 0.43,
+      "avg_clustering": 0.429271,
       "estimated_diameter": 10
     },
     "orphan_analysis": {
-      "orphan_count": 25,
-      "orphan_rate": 0.0141,
-      "entity_orphans": 25,
+      "orphan_count": 28,
+      "orphan_rate": 0.0158,
+      "entity_orphans": 28,
       "chunk_orphans": 0,
-      "health_score": 95.8,
+      "health_score": 95.3,
       "flag": "green",
       "recommendation": ""
     },
     "density_analysis": {
-      "density": 0.005579,
+      "density": 0.00556,
       "health_score": 100,
       "flag": "green",
       "recommendation": ""
@@ -148,6 +148,11 @@
     "entity_duplication": {
       "duplicate_pairs": [
         {
+          "entity_a": "John Rimington",
+          "entity_b": "John Rimington",
+          "similarity": 1.0
+        },
+        {
           "entity_a": "Baltimore",
           "entity_b": "Baltimore",
           "similarity": 1.0
@@ -160,6 +165,11 @@
         {
           "entity_a": "M&T Bank Stadium",
           "entity_b": "M&T Bank Stadium",
+          "similarity": 1.0
+        },
+        {
+          "entity_a": "Baltimore Ravens",
+          "entity_b": "Baltimore Ravens",
           "similarity": 1.0
         },
         {
@@ -236,23 +246,13 @@
           "entity_a": "offensive tackle Jonathan Ogden",
           "entity_b": "UCLA offensive tackle Jonathan Ogden",
           "similarity": 0.8529
-        },
-        {
-          "entity_a": "Colts",
-          "entity_b": "Colts",
-          "similarity": 1.0
-        },
-        {
-          "entity_a": "Colts",
-          "entity_b": "Colts",
-          "similarity": 1.0
         }
       ],
-      "duplicate_pair_count": 63,
-      "duplicate_entity_count": 67,
-      "health_score": 82.2,
+      "duplicate_pair_count": 65,
+      "duplicate_entity_count": 69,
+      "health_score": 81.6,
       "flag": "yellow",
-      "recommendation": "63 potential duplicate pairs — consider entity resolution."
+      "recommendation": "65 potential duplicate pairs — consider entity resolution."
     },
     "multi_hop_connectivity": {
       "reachable_2hop_pct": 1.0715,
@@ -261,7 +261,7 @@
       "flag": "green",
       "recommendation": ""
     },
-    "overall_health_score": 96.3,
+    "overall_health_score": 96.1,
     "verdict": "✅ Healthy — KG is structurally sound for SFT data generation."
   },
   "artifacts": {

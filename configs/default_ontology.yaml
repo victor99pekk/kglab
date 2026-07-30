@@ -32,6 +32,9 @@ entity_types:
   DATE:
     description: "A calendar date or time expression"
     example: "2024-01-15"
+  DOCUMENT:
+    description: "A document, article, web page, or other textual resource"
+    example: "https://example.com/article42"
 
 # Relationship types optionally specify domain/range entity types.
 # Predicates without domain/range (or with symmetric: true) are treated as
@@ -153,6 +156,55 @@ relationship_types:
     description: "Citation between works"
     domain: "WORK_OF_ART"
     range: "WORK_OF_ART"
+  # Document ↔ Document
+  hyperlinks_to:
+    description: "Hyperlink from one document to another"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+  shares_authors_with:
+    description: "Documents with overlapping authors"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+    symmetric: true
+  extends:
+    description: "One document builds upon or extends another"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+  contradicts:
+    description: "Conflicting findings between documents"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+    symmetric: true
+  summarizes:
+    description: "One document summarizes another"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+  shares_topic_with:
+    description: "Documents covering the same topic"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+    symmetric: true
+  shares_reference_with:
+    description: "Documents citing the same references"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+    symmetric: true
+  is_part_of_series:
+    description: "Document belongs to an ordered series"
+    domain: "DOCUMENT"
+    range: "DOCUMENT"
+  # Chunk ↔ Document
+  part_of:
+    description: "A chunk is part of its parent document"
+    domain: "Chunk"
+    range: "Document"
+  next:
+    description: "A chunk precedes another chunk within the same document"
+    domain: "Chunk"
+    range: "Chunk"
+  appears_in:
+    description: "An entity appears in a specific chunk"
+    symmetric: true
   # Generic / fallback (no domain/range → any pair, symmetric)
   associated_with:
     description: "Generic association"

@@ -9,13 +9,12 @@ ENTITY_METHODS = {
 }
 
 RELATION_METHODS = {
+    "composite": ("polygraph.kg_build.extract.relation.composite:CompositeRelationExtractor"),
     "ontology_rules": (
-        "polygraph.kg_build.extract.relation.ontology_rules:"
-        "OntologyRuleRelationExtractor"
+        "polygraph.kg_build.extract.relation.ontology_rules:OntologyRuleRelationExtractor"
     ),
     "structured_llm": (
-        "polygraph.kg_build.extract.relation.structured_llm:"
-        "StructuredLLMRelationExtractor"
+        "polygraph.kg_build.extract.relation.structured_llm:StructuredLLMRelationExtractor"
     ),
 }
 

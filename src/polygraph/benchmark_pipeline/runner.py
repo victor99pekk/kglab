@@ -48,7 +48,7 @@ class BenchmarkRunner:
         # 1. Resolve pipeline class
         pipeline_cls = self._resolve_pipeline(config.pipeline_variant)
 
-        # 2. Instantiate pipeline
+        # 2. Instantiate pipeline with typed configs
         pipeline_kwargs: dict[str, Any] = {}
         if config.ontology_path:
             pipeline_kwargs["ontology_path"] = str(config.ontology_path)
@@ -57,6 +57,9 @@ class BenchmarkRunner:
         pipeline: Pipeline = pipeline_cls(
             input_paths=[str(p) for p in config.input_paths],
             output_dir=str(output_dir),
+            extraction=config.extraction,
+            resolution=config.resolution,
+            build=config.build,
             **pipeline_kwargs,
         )
 

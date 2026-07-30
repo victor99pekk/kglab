@@ -57,10 +57,10 @@ def test_experiment_config_passes_stage_method_selection_to_pipeline():
         Path(__file__).parents[1] / "experiments" / "kg" / "001_baseline" / "config.yaml"
     )
 
-    assert config.extra["extraction"]["entity_method"] == "spacy"
-    assert config.extra["extraction"]["relation_method"] == "ontology_rules"
-    assert config.extra["resolution"]["method"] == "string"
-    assert config.extra["build"]["method"] == "networkx"
+    assert config.extraction.entity_method == "spacy"
+    assert config.extraction.relation_method == "ontology_rules"
+    assert config.resolution.method == "string"
+    assert config.build.method == "networkx"
 
 
 def test_relation_preserves_stable_ids_evidence_and_source_chunk():
@@ -179,3 +179,112 @@ def test_graphgen_aggregates_repeated_descriptions_with_figure_9():
     assert entities[0]["description"] == "Alice is a scientist and Nobel Prize winner."
     assert {relation[5] for relation in relations} == {"Alice founded Acme Corp and later led it."}
     assert "Description List" in client.calls[0]["messages"][0]["content"]
+
+
+# ── Composite relation extractor tests ─────────────────────────
+
+
+def test_composite_combines_multiple_extractors():
+    """Triples from all sub-extractors appear in the merged output."""
+    ontology = _load_test_ontology()
+
+    class _FakeExtractorA(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("a", "knows", "b", "evidence a", source_chunk_id)]
+
+    class _FakeExtractorB(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("c", "works_at", "d", "evidence c", source_chunk_id)]
+
+    composite = _make_composite_with_fakes(ontology, _FakeExtractorA, _FakeExtractorB)
+    alice = Entity(name="Alice", label="PERSON")
+    triples = composite.extract("text", [alice])
+
+    keys = {(t[0], t[1], t[2]) for t in triples}
+    assert ("a", "knows", "b") in keys
+    assert ("c", "works_at", "d") in keys
+    assert len(triples) == 2
+
+
+def test_composite_deduplicates_overlapping_triples():
+    """When two extractors produce the same triple, only one copy is kept."""
+    ontology = _load_test_ontology()
+
+    class _FakeExtractorA(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("a", "knows", "b", "evidence 1", source_chunk_id)]
+
+    class _FakeExtractorB(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("a", "knows", "b", "evidence 2", source_chunk_id)]
+
+    composite = _make_composite_with_fakes(ontology, _FakeExtractorA, _FakeExtractorB)
+    triples = composite.extract("text", [Entity(name="Alice", label="PERSON")])
+
+    assert len(triples) == 1
+    # First extractor's evidence is kept (first writer wins)
+    assert triples[0][3] == "evidence 1"
+
+
+def test_composite_preserves_evidence_and_source_chunk():
+    """Each triple keeps its 5-element format with evidence and source_chunk_id."""
+    ontology = _load_test_ontology()
+
+    class _FakeExtractorA(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("a", "knows", "b", "Alice knows Bob.", source_chunk_id)]
+
+    composite = _make_composite_with_fakes(ontology, _FakeExtractorA)
+    triples = composite.extract(
+        "text", [Entity(name="Alice", label="PERSON")], source_chunk_id="chunk:42"
+    )
+
+    assert len(triples) == 1
+    assert triples[0] == ("a", "knows", "b", "Alice knows Bob.", "chunk:42")
+
+
+def test_composite_with_empty_sub_extractor():
+    """An extractor returning no triples does not affect other extractors."""
+    ontology = _load_test_ontology()
+
+    class _FakeEmptyExtractor(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return []
+
+    class _FakeExtractorA(OntologyRuleRelationExtractor):
+        def extract(self, text, entities, source_chunk_id=""):
+            return [("a", "knows", "b", "evidence", source_chunk_id)]
+
+    composite = _make_composite_with_fakes(ontology, _FakeEmptyExtractor, _FakeExtractorA)
+    triples = composite.extract("text", [Entity(name="Alice", label="PERSON")])
+
+    assert len(triples) == 1
+    assert triples[0][1] == "knows"
+
+
+def test_composite_registry_instantiation():
+    """The registry can instantiate a CompositeRelationExtractor."""
+    ontology = _load_test_ontology()
+    extractor = create_relation_method(
+        "composite",
+        ontology=ontology,
+        methods=["ontology_rules"],
+    )
+
+    from polygraph.kg_build.extract.relation.composite import CompositeRelationExtractor
+
+    assert isinstance(extractor, CompositeRelationExtractor)
+    assert extractor.ontology is ontology
+    assert extractor.methods == ["ontology_rules"]
+
+
+# ── Helpers ────────────────────────────────────────────────────
+
+
+def _make_composite_with_fakes(ontology, *fake_classes):
+    """Build a CompositeRelationExtractor that uses manually instantiated fake extractors."""
+    from polygraph.kg_build.extract.relation.composite import CompositeRelationExtractor
+
+    composite = CompositeRelationExtractor(ontology, methods=[])
+    composite._extractors = [cls(ontology=ontology) for cls in fake_classes]
+    return composite

@@ -96,8 +96,10 @@ class TextChunker:
 
     def _make_chunk(self, doc: Document, text: str, idx: int) -> Document:
         """Create a Document for a GraphRAG-ready Chunk node."""
-        parent_name = Path(doc.source).stem if doc.source else "doc"
-        chunk_id = f"{parent_name}:chunk{idx}"
+        parent_name = doc.doc_id or Path(doc.source).stem or "doc"
+        # Sanitize for use in an identifier
+        parent_key = parent_name.replace("/", "_").replace(":", "_")[:80]
+        chunk_id = f"{parent_key}:chunk{idx}"
         return Document(
             content=text,
             source=doc.source,

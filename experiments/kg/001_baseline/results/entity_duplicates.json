@@ -1,0 +1,327 @@
+[
+  {
+    "entity_a": "John Rimington",
+    "entity_b": "John Rimington",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Baltimore",
+    "entity_b": "Baltimore",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Baltimore",
+    "entity_b": "Baltimore",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "M&T Bank Stadium",
+    "entity_b": "M&T Bank Stadium",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Baltimore Ravens",
+    "entity_b": "Baltimore Ravens",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Cleveland Browns",
+    "entity_b": "the Cleveland Browns",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Modell",
+    "entity_b": "Modell",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Steve Bisciotti",
+    "entity_b": "Steve Bisciotti's",
+    "similarity": 0.8667
+  },
+  {
+    "entity_a": "Super Bowl",
+    "entity_b": "Super Bowl",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Super Bowl XXXV",
+    "entity_b": "Super Bowl XXXV",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Super Bowl XLVII",
+    "entity_b": "Super Bowl XLVI",
+    "similarity": 0.9286
+  },
+  {
+    "entity_a": "the Tampa Bay Buccaneers",
+    "entity_b": "the Tampa Bay Buccaneers",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Ozzie Newsome",
+    "entity_b": "Ozzie Newsome",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Ray Lewis",
+    "entity_b": "Ray Lewis'",
+    "similarity": 0.875
+  },
+  {
+    "entity_a": "Edgar Allan Poe's",
+    "entity_b": "Edgar Allan Poe",
+    "similarity": 0.8667
+  },
+  {
+    "entity_a": "The Baltimore Sun",
+    "entity_b": "The Baltimore Sun",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "The Ravens",
+    "entity_b": "The Raven",
+    "similarity": 0.875
+  },
+  {
+    "entity_a": "AFC",
+    "entity_b": "AFC",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "The team",
+    "entity_b": "the teams",
+    "similarity": 0.8571
+  },
+  {
+    "entity_a": "offensive tackle Jonathan Ogden",
+    "entity_b": "UCLA offensive tackle Jonathan Ogden",
+    "similarity": 0.8529
+  },
+  {
+    "entity_a": "Colts",
+    "entity_b": "Colts",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Colts",
+    "entity_b": "Colts",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "October",
+    "entity_b": "October",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Baltimore",
+    "entity_b": "Baltimore",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Los Angeles Rams",
+    "entity_b": "the Los Angeles Rams",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Pro Football Hall of Fame",
+    "entity_b": "Pro Football Hall of Fame",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "whose owners",
+    "entity_b": "whose owner",
+    "similarity": 0.9
+  },
+  {
+    "entity_a": "Camden Yards",
+    "entity_b": "Camden Yards",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "NFL Draft",
+    "entity_b": "NFL Draft",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Year",
+    "entity_b": "the Year",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "20-17",
+    "entity_b": "20-17",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the season",
+    "entity_b": "the season",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Pittsburgh Steelers",
+    "entity_b": "the Pittsburgh Steelers",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Indianapolis Colts",
+    "entity_b": "the Indianapolis Colts",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "December",
+    "entity_b": "December",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Bisciotti",
+    "entity_b": "Bisciotti",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "season",
+    "entity_b": "season",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the AFC Championship",
+    "entity_b": "the AFC Championship",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Denver Broncos",
+    "entity_b": "the Denver Broncos",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Denver Broncos",
+    "entity_b": "the Denver Broncos",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Houston Texans",
+    "entity_b": "the Houston Texans",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the regular season",
+    "entity_b": "the regular season",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Pittsburgh Steelers",
+    "entity_b": "Pittsburgh Steelers'",
+    "similarity": 0.9444
+  },
+  {
+    "entity_a": "Judgment Day",
+    "entity_b": "\"Judgment Day",
+    "similarity": 0.9091
+  },
+  {
+    "entity_a": "the defending Super Bowl champion",
+    "entity_b": "the defending Super Bowl champions",
+    "similarity": 0.9688
+  },
+  {
+    "entity_a": "the AFC North",
+    "entity_b": "the AFC North",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Colts",
+    "entity_b": "Colts",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Harbaugh",
+    "entity_b": "Harbaugh",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Miami",
+    "entity_b": "Miami",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Divisional Round",
+    "entity_b": "the Divisional round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Divisional Round",
+    "entity_b": "the Divisional Round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Divisional Round",
+    "entity_b": "the Divisional Round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Terrell Suggs",
+    "entity_b": "Terrell Suggs",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Steve Smith Sr.",
+    "entity_b": "Steve Smith Sr",
+    "similarity": 0.9231
+  },
+  {
+    "entity_a": "the Divisional round",
+    "entity_b": "the Divisional Round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Divisional round",
+    "entity_b": "the Divisional Round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "The 2015 season",
+    "entity_b": "the 2015 season",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Wild Card",
+    "entity_b": "Wild Card",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Denver Broncos",
+    "entity_b": "the Denver Broncos",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "a season",
+    "entity_b": "a season",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "the Divisional Round",
+    "entity_b": "the Divisional Round",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "20",
+    "entity_b": "20",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "Pro Bowl",
+    "entity_b": "Pro Bowl",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "white jerseys",
+    "entity_b": "white jerseys",
+    "similarity": 1.0
+  },
+  {
+    "entity_a": "black jersey",
+    "entity_b": "black jerseys",
+    "similarity": 0.9091
+  }
+]
