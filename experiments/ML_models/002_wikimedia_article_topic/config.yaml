@@ -1,6 +1,6 @@
 name: "002 — Wikimedia Article Topic Classification"
 task: "article_topic_classification"
-status: "data_prepared"
+status: "kg1_a_revision_pilot_built"
 
 taxonomy:
   name: "wikimedia_original_64"

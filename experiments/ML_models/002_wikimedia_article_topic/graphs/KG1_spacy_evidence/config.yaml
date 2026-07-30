@@ -1,0 +1,57 @@
+id: "KG1-A"
+name: "spaCy evidence graph"
+status: "pilot_builder"
+
+classification_target: "article"
+label_count: 64
+labels_as_message_edges: false
+
+entity_extraction:
+  primary: "wikipedia_hyperlink_qid"
+  recovery: "spacy_ner"
+  spacy_model: "en_core_web_sm"
+  noun_chunks: false
+  fail_if_model_missing: true
+
+evidence_node_types:
+  - "article"
+  - "sentence"
+  - "mention"
+  - "entity"
+  - "entity_type"
+
+evidence_edge_types:
+  - "contains"
+  - "has_mention"
+  - "refers_to"
+  - "mentions"
+  - "links_to"
+  - "describes"
+  - "has_spacy_type"
+
+gnn_projection:
+  node_types:
+    - "article"
+    - "entity"
+    - "entity_type"
+  edge_types:
+    - "mentions"
+    - "links_to"
+    - "describes"
+    - "has_spacy_type"
+  add_reverse_edges_at_training: true
+
+provenance:
+  required_article_fields:
+    - "dataset_article_id"
+    - "article_revision_id"
+  required_mention_fields:
+    - "sentence_id"
+    - "start_char"
+    - "end_char"
+    - "extractor"
+
+next_variant:
+  id: "KG1-B"
+  addition: "evidence-backed dependency claims"
+  promotion_gate: "manual relation precision >= 0.85"

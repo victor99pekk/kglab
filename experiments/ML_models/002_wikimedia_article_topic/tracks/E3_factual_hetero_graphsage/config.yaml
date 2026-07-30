@@ -1,7 +1,7 @@
 id: "E3"
 name: "Factual Heterogeneous GraphSAGE"
-status: "planned"
-graph: "article_entity_type"
+status: "kg1_a_revision_pilot_built"
+graph: "kg1_a_article_entity_spacy_type"
 feature_vector:
   name: "hetero_graphsage_contextualized_modernbert_embeddings"
   type: "dense_neural_graph"
@@ -11,5 +11,6 @@ feature_vector:
   node_types: ["article", "entity", "entity_type"]
 model: "heterogeneous_graphsage"
 blocked_by:
-  - "revision_matched_article_text"
-  - "wikidata_entity_and_type_graph"
+  - "stratified_revision_matched_pilot"
+  - "modernbert_node_features"
+  - "heterogeneous_graphsage_training_runner"

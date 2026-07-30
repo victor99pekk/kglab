@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29  
 **Task:** multilabel article-topic classification  
-**Status:** data prepared; embedding baselines and KG1 not implemented  
+**Status:** data prepared; KG1-A revision pilot built; embedding baselines not implemented
 **Labels:** Wikimedia original 64-topic taxonomy
 
 ## Research question
@@ -195,23 +195,38 @@ Artifacts:
 - `artifacts/prepared/article_topic_labels.jsonl`
 - `artifacts/prepared/summary.json`
 
-E0–E5 model metrics are not available yet. Those tracks currently specify
-research designs; no training runner implements them.
+E0–E5 model metrics are not available yet. KG1-A now provides evidence-graph
+and GNN-projection inputs for E3, but no training runner implements those
+embeddings or models yet.
 
-## Next KG1 — traditional NLP
+## KG1-A — traditional NLP evidence graph
 
-KG1 will begin with deterministic spaCy and rule-based extraction:
+KG1-A is implemented under
+[`graphs/KG1_spacy_evidence`](graphs/KG1_spacy_evidence/README.md). It uses
+revision-matched Wikipedia prose, hyperlink/QID entity anchors, and spaCy NER:
 
 ```text
+Article -DESCRIBES-> Entity
 Article -MENTIONS-> Entity
-Entity  -HAS_TYPE-> spaCy entity type
-Entity  -RELATED_TO-> Entity
-Topic   -IN_DOMAIN-> Domain
+Article -LINKS_TO-> Article
+Entity  -HAS_SPACY_TYPE-> EntityType
 ```
 
-`RELATED_TO` must have sentence evidence and a named dependency/rule pattern.
-WikiProject/category label sources cannot become KG features.
-`Article -HAS_TOPIC-> Topic` remains supervision only.
+First real pilot:
+
+- 3 pinned historical article revisions
+- 52 article/context nodes
+- 152 entity nodes
+- 10 spaCy entity-type nodes
+- 377 compact GNN edges
+- 0 label message edges
+
+Labels are exported separately in `targets.jsonl`. WikiProject/category label
+sources cannot become KG features. `Article -HAS_TOPIC-> Topic` remains
+supervision only.
+
+KG1-B will add entity-to-entity dependency claims only after a manual
+high-precision rule audit.
 
 ## Approval boundary
 
