@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build KG1-A: a provenance-preserving Wikipedia/spaCy evidence graph."""
+"""Build KG1-A.2: a provenance-preserving Wikipedia/spaCy evidence graph."""
 
 from __future__ import annotations
 
@@ -22,15 +22,14 @@ DEFAULT_TAXONOMY = EXPERIMENT_DIR / "wikimedia_topics_64.yaml"
 DEFAULT_OUTPUT = EXPERIMENT_DIR / "artifacts" / "kg1_spacy_pilot"
 
 QID_RE = re.compile(r"^Q[1-9][0-9]*$")
-GNN_NODE_TYPES = {"article", "entity", "entity_type"}
-GNN_EDGE_TYPES = {"describes", "has_spacy_type", "links_to", "mentions"}
+GNN_NODE_TYPES = {"article", "chunk", "entity"}
+GNN_EDGE_TYPES = {"describes", "has_chunk", "links_to", "mentions", "next"}
 
 NODE_COLORS = {
     "article": "#2563eb",
-    "sentence": "#94a3b8",
+    "chunk": "#94a3b8",
     "mention": "#f59e0b",
     "entity": "#10b981",
-    "entity_type": "#8b5cf6",
 }
 
 
@@ -74,8 +73,8 @@ def _entity_id(name: str, label: str, qid: str = "") -> str:
     return f"entity:local:{label.casefold()}:{_hash(label, _normalized_name(name))}"
 
 
-def _sentence_id(article_id: str, start: int, end: int) -> str:
-    return f"sentence:{_hash(article_id, start, end)}"
+def _chunk_id(article_id: str, start: int, end: int) -> str:
+    return f"chunk:{_hash(article_id, start, end)}"
 
 
 def _mention_id(article_id: str, start: int, end: int, extractor: str) -> str:
@@ -141,7 +140,7 @@ class EvidenceGraph:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": "kg1-a.1",
+            "schema_version": "kg1-a.2",
             "nodes": sorted(self.nodes.values(), key=lambda node: node["id"]),
             "edges": sorted(
                 self.edges,
@@ -155,11 +154,11 @@ class EvidenceGraph:
         }
 
 
-def _sentence_for_span(sentence_spans: list[tuple[int, int, str]], start: int, end: int) -> str:
-    for sentence_start, sentence_end, sentence_id in sentence_spans:
-        if sentence_start <= start and end <= sentence_end:
-            return sentence_id
-    raise ValueError(f"Mention span {start}:{end} does not belong to a sentence")
+def _chunk_for_span(chunk_spans: list[tuple[int, int, str]], start: int, end: int) -> str:
+    for chunk_start, chunk_end, chunk_id in chunk_spans:
+        if chunk_start <= start and end <= chunk_end:
+            return chunk_id
+    raise ValueError(f"Mention span {start}:{end} does not belong to a chunk")
 
 
 def _occurrences(text: str, surface: str) -> Iterable[tuple[int, int]]:
@@ -174,13 +173,15 @@ def _add_mention(
     graph: EvidenceGraph,
     *,
     article_id: str,
-    sentence_id: str,
+    chunk_id: str,
     entity_id: str,
     text: str,
     start: int,
     end: int,
     extractor: str,
     confidence: float | None,
+    spacy_type: str = "",
+    spacy_model: str = "",
 ) -> str:
     mention_id = _mention_id(article_id, start, end, extractor)
     graph.add_node(
@@ -189,14 +190,42 @@ def _add_mention(
         text=text[start:end],
         start_char=start,
         end_char=end,
-        sentence_id=sentence_id,
+        chunk_id=chunk_id,
         extractor=extractor,
         confidence=confidence,
+        spacy_type=spacy_type,
+        spacy_model=spacy_model,
     )
-    graph.add_edge(sentence_id, "has_mention", mention_id)
-    graph.add_edge(mention_id, "refers_to", entity_id, evidence_id=sentence_id)
-    graph.add_edge(article_id, "mentions", entity_id, evidence_id=sentence_id)
+    graph.add_edge(chunk_id, "has_mention", mention_id)
+    graph.add_edge(mention_id, "refers_to", entity_id, evidence_id=chunk_id)
+    graph.add_edge(
+        chunk_id,
+        "mentions",
+        entity_id,
+        evidence_id=mention_id,
+        source_chunk_id=chunk_id,
+    )
+    graph.add_edge(
+        article_id,
+        "mentions",
+        entity_id,
+        evidence_id=chunk_id,
+        source_chunk_id=chunk_id,
+    )
     return mention_id
+
+
+def _record_spacy_type(graph: EvidenceGraph, entity_id: str, label: str) -> None:
+    """Aggregate mention-level spaCy predictions into entity feature evidence."""
+    entity = graph.nodes[entity_id]
+    counts = dict(entity.get("spacy_type_counts", {}))
+    counts[label] = counts.get(label, 0) + 1
+    entity["spacy_type_counts"] = dict(sorted(counts.items()))
+    entity["spacy_types"] = sorted(counts)
+    entity["primary_spacy_type"] = min(
+        counts,
+        key=lambda candidate: (-counts[candidate], candidate),
+    )
 
 
 def extract_article(record: dict[str, Any], nlp: Any, graph: EvidenceGraph) -> dict[str, Any]:
@@ -229,22 +258,29 @@ def extract_article(record: dict[str, Any], nlp: Any, graph: EvidenceGraph) -> d
         graph.add_edge(article_id, "describes", subject_entity_id)
 
     doc = nlp(text)
-    sentence_spans: list[tuple[int, int, str]] = []
-    for sentence in doc.sents:
-        sentence_id = _sentence_id(article_id, sentence.start_char, sentence.end_char)
-        sentence_spans.append((sentence.start_char, sentence.end_char, sentence_id))
+    chunk_spans: list[tuple[int, int, str]] = []
+    previous_chunk_id = ""
+    for chunk_index, sentence in enumerate(doc.sents):
+        chunk_id = _chunk_id(article_id, sentence.start_char, sentence.end_char)
+        chunk_spans.append((sentence.start_char, sentence.end_char, chunk_id))
         graph.add_node(
-            sentence_id,
-            "sentence",
+            chunk_id,
+            "chunk",
             text=sentence.text,
             start_char=sentence.start_char,
             end_char=sentence.end_char,
+            chunk_index=chunk_index,
+            chunk_method="sentence",
             article_id=article_id,
             article_revision_id=revision_id,
         )
-        graph.add_edge(article_id, "contains", sentence_id)
+        graph.add_edge(article_id, "has_chunk", chunk_id)
+        if previous_chunk_id:
+            graph.add_edge(previous_chunk_id, "next", chunk_id)
+        previous_chunk_id = chunk_id
 
-    linked_spans: list[tuple[int, int, str]] = []
+    linked_spans: list[tuple[int, int, str, str]] = []
+    link_occurrence_indexes: Counter[str] = Counter()
     for link in record.get("links", []):
         qid = str(link.get("qid", ""))
         entity_id = _entity_id(link["title"], "WIKIPEDIA_ENTITY", qid=qid)
@@ -265,75 +301,91 @@ def extract_article(record: dict[str, Any], nlp: Any, graph: EvidenceGraph) -> d
         )
         graph.add_edge(article_id, "links_to", target_article_id)
 
-        spans = list(_occurrences(text, str(link["surface"])))
-        if not spans:
+        surface = str(link["surface"])
+        spans = list(_occurrences(text, surface))
+        surface_key = _normalized_name(surface)
+        occurrence_index = int(
+            link.get("occurrence_index", link_occurrence_indexes[surface_key])
+        )
+        link_occurrence_indexes[surface_key] = occurrence_index + 1
+        if occurrence_index >= len(spans):
             raise ValueError(
-                f"Link surface {link['surface']!r} missing from article {record['title']!r}"
+                f"Link occurrence {occurrence_index} for surface {surface!r} "
+                f"missing from article {record['title']!r}"
             )
-        for start, end in spans:
-            sentence_id = _sentence_for_span(sentence_spans, start, end)
-            _add_mention(
-                graph,
-                article_id=article_id,
-                sentence_id=sentence_id,
-                entity_id=entity_id,
-                text=text,
-                start=start,
-                end=end,
-                extractor="wikipedia_link",
-                confidence=1.0,
-            )
-            linked_spans.append((start, end, entity_id))
+        start, end = spans[occurrence_index]
+        chunk_id = _chunk_for_span(chunk_spans, start, end)
+        mention_id = _add_mention(
+            graph,
+            article_id=article_id,
+            chunk_id=chunk_id,
+            entity_id=entity_id,
+            text=text,
+            start=start,
+            end=end,
+            extractor="wikipedia_link",
+            confidence=1.0,
+        )
+        linked_spans.append((start, end, entity_id, mention_id))
 
     for entity in doc.ents:
         matching_links = [
-            entity_id
-            for start, end, entity_id in linked_spans
+            (entity_id, mention_id)
+            for start, end, entity_id, mention_id in linked_spans
             if start < entity.end_char
             and entity.start_char < end
             and _same_surface(text[start:end], entity.text)
         ]
-        if subject_entity_id and _same_surface(entity.text, record["title"]):
-            matching_links.insert(0, subject_entity_id)
-        entity_id = (
-            matching_links[0]
-            if matching_links
-            else _entity_id(entity.text, entity.label_)
+        subject_match = bool(
+            subject_entity_id and _same_surface(entity.text, record["title"])
         )
+        if matching_links:
+            entity_id = matching_links[0][0]
+        elif subject_match:
+            entity_id = subject_entity_id
+        else:
+            entity_id = _entity_id(entity.text, entity.label_)
         graph.add_node(
             entity_id,
             "entity",
-            name=entity.text if not matching_links else graph.nodes[entity_id]["name"],
+            name=(
+                graph.nodes[entity_id]["name"]
+                if matching_links or subject_match
+                else entity.text
+            ),
             canonical_source=(
                 graph.nodes[entity_id].get("canonical_source", "spacy_ner")
-                if matching_links
+                if matching_links or subject_match
                 else "spacy_ner"
             ),
         )
-        type_id = f"entity_type:spacy:{entity.label_}"
-        graph.add_node(type_id, "entity_type", name=entity.label_, source="spacy")
-        graph.add_edge(
-            entity_id,
-            "has_spacy_type",
-            type_id,
-            extractor="spacy_ner",
-            model=nlp.meta.get("name", "unknown"),
-        )
+        _record_spacy_type(graph, entity_id, entity.label_)
+        spacy_model = nlp.meta.get("name", "unknown")
 
-        if not matching_links:
-            sentence_id = _sentence_for_span(
-                sentence_spans, entity.start_char, entity.end_char
+        if matching_links:
+            for _, mention_id in matching_links:
+                graph.add_node(
+                    mention_id,
+                    "mention",
+                    spacy_type=entity.label_,
+                    spacy_model=spacy_model,
+                )
+        else:
+            chunk_id = _chunk_for_span(
+                chunk_spans, entity.start_char, entity.end_char
             )
             _add_mention(
                 graph,
                 article_id=article_id,
-                sentence_id=sentence_id,
+                chunk_id=chunk_id,
                 entity_id=entity_id,
                 text=text,
                 start=entity.start_char,
                 end=entity.end_char,
                 extractor="spacy_ner",
                 confidence=None,
+                spacy_type=entity.label_,
+                spacy_model=spacy_model,
             )
 
     return {
@@ -345,7 +397,7 @@ def extract_article(record: dict[str, Any], nlp: Any, graph: EvidenceGraph) -> d
 
 
 def project_for_gnn(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Remove evidence-only nodes and edges while retaining typed structure."""
+    """Remove mention nodes while retaining chunks and entity type features."""
     nodes = [node for node in evidence["nodes"] if node["type"] in GNN_NODE_TYPES]
     node_ids = {node["id"] for node in nodes}
     edges = [
@@ -357,10 +409,33 @@ def project_for_gnn(evidence: dict[str, Any]) -> dict[str, Any]:
     ]
     return {
         "schema_version": evidence["schema_version"],
+        "type_representation": "entity_attributes",
         "labels_as_message_edges": False,
         "nodes": nodes,
         "edges": edges,
     }
+
+
+def validate_evidence_graph(evidence: dict[str, Any]) -> None:
+    """Enforce the one-mention-to-one-entity resolution contract."""
+    mention_ids = {
+        node["id"] for node in evidence["nodes"] if node["type"] == "mention"
+    }
+    refers_to_counts = Counter(
+        edge["source"]
+        for edge in evidence["edges"]
+        if edge["relation"] == "refers_to"
+    )
+    invalid = {
+        mention_id: refers_to_counts[mention_id]
+        for mention_id in mention_ids
+        if refers_to_counts[mention_id] != 1
+    }
+    if invalid:
+        raise ValueError(
+            "Every mention must resolve to exactly one entity; "
+            f"invalid mentions: {dict(sorted(invalid.items()))}"
+        )
 
 
 def build_label_graph(taxonomy: dict[str, Any]) -> dict[str, Any]:
@@ -507,9 +582,10 @@ def write_svg(path: Path, projection: dict[str, Any]) -> None:
         "</defs>",
         '<rect width="100%" height="100%" fill="#f8fafc"/>',
         '<text x="40" y="48" font-family="sans-serif" font-size="28" '
-        'font-weight="600" fill="#0f172a">KG1-A pilot GNN projection</text>',
+        'font-weight="600" fill="#0f172a">KG1-A.2 pilot GNN projection</text>',
         '<text x="40" y="78" font-family="sans-serif" font-size="16" '
-        'fill="#475569">Topic labels remain outside message-passing graph</text>',
+        'fill="#475569">Chunks are nodes; spaCy types are entity features; '
+        'labels stay outside</text>',
     ]
 
     for source, target, data in directed.edges(data=True):
@@ -585,6 +661,7 @@ def build(input_path: Path, taxonomy_path: Path, output_dir: Path, model_name: s
     validate_targets(targets, taxonomy)
 
     evidence = graph.as_dict()
+    validate_evidence_graph(evidence)
     projection = project_for_gnn(evidence)
     label_graph = build_label_graph(taxonomy)
     summary = summarize(evidence, projection, targets)
@@ -604,7 +681,7 @@ def build(input_path: Path, taxonomy_path: Path, output_dir: Path, model_name: s
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    build_parser = commands.add_parser("build", help="Build KG1-A artifacts")
+    build_parser = commands.add_parser("build", help="Build KG1-A.2 artifacts")
     build_parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     build_parser.add_argument("--taxonomy", type=Path, default=DEFAULT_TAXONOMY)
     build_parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)

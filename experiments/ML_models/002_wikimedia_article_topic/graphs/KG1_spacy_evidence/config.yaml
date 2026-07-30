@@ -1,6 +1,6 @@
-id: "KG1-A"
-name: "spaCy evidence graph"
-status: "pilot_builder"
+id: "KG1-A.2"
+name: "spaCy feature evidence graph"
+status: "neo4j_pilot_confirmed"
 
 classification_target: "article"
 label_count: 64
@@ -15,30 +15,32 @@ entity_extraction:
 
 evidence_node_types:
   - "article"
-  - "sentence"
+  - "chunk"
   - "mention"
   - "entity"
-  - "entity_type"
 
 evidence_edge_types:
-  - "contains"
+  - "has_chunk"
+  - "next"
   - "has_mention"
   - "refers_to"
   - "mentions"
   - "links_to"
   - "describes"
-  - "has_spacy_type"
 
 gnn_projection:
   node_types:
     - "article"
+    - "chunk"
     - "entity"
-    - "entity_type"
   edge_types:
+    - "has_chunk"
+    - "next"
     - "mentions"
     - "links_to"
     - "describes"
-    - "has_spacy_type"
+  entity_type_representation: "spacy_type_counts_attribute"
+  mention_nodes_in_projection: false
   add_reverse_edges_at_training: true
 
 provenance:
@@ -46,10 +48,11 @@ provenance:
     - "dataset_article_id"
     - "article_revision_id"
   required_mention_fields:
-    - "sentence_id"
+    - "chunk_id"
     - "start_char"
     - "end_char"
     - "extractor"
+    - "spacy_type"
 
 next_variant:
   id: "KG1-B"

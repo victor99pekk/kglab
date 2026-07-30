@@ -1,4 +1,4 @@
-"""Experiment-local checks for KG1-A."""
+"""Experiment-local checks for KG1-A.2."""
 
 from __future__ import annotations
 
@@ -27,6 +27,14 @@ assert NEO4J_EXPORT_SPEC and NEO4J_EXPORT_SPEC.loader
 neo4j_export = importlib.util.module_from_spec(NEO4J_EXPORT_SPEC)
 NEO4J_EXPORT_SPEC.loader.exec_module(neo4j_export)
 
+NEO4J_UPLOAD_PATH = Path(__file__).with_name("upload_neo4j.py")
+NEO4J_UPLOAD_SPEC = importlib.util.spec_from_file_location(
+    "upload_neo4j", NEO4J_UPLOAD_PATH
+)
+assert NEO4J_UPLOAD_SPEC and NEO4J_UPLOAD_SPEC.loader
+neo4j_upload = importlib.util.module_from_spec(NEO4J_UPLOAD_SPEC)
+NEO4J_UPLOAD_SPEC.loader.exec_module(neo4j_upload)
+
 
 def _nlp():
     nlp = spacy.blank("en")
@@ -35,6 +43,7 @@ def _nlp():
     ruler.add_patterns(
         [
             {"label": "PERSON", "pattern": "Ada Lovelace"},
+            {"label": "PRODUCT", "pattern": "Analytical Engine"},
             {"label": "ORG", "pattern": "Analytical Engine Society"},
         ]
     )
@@ -94,20 +103,84 @@ def test_hyperlink_qid_is_canonical_entity_and_spacy_recovers_unlinked_entity():
     assert entities["entity:wikidata:Q7259"]["canonical_source"] == "wikipedia_page"
 
 
-def test_projection_removes_sentence_and_mention_nodes_but_keeps_types():
+def test_projection_keeps_chunks_and_entity_type_features_without_type_nodes():
     graph = kg1.EvidenceGraph()
     kg1.extract_article(_record(), _nlp(), graph)
     projection = kg1.project_for_gnn(graph.as_dict())
 
     assert {node["type"] for node in projection["nodes"]} <= {
         "article",
+        "chunk",
         "entity",
-        "entity_type",
     }
+    assert "entity_type" not in {node["type"] for node in projection["nodes"]}
     relations = {edge["relation"] for edge in projection["edges"]}
-    assert "has_spacy_type" in relations
+    assert "has_chunk" in relations
     assert "mentions" in relations
     assert "describes" in relations
+
+    evidence = graph.as_dict()
+    mentions = [node for node in evidence["nodes"] if node["type"] == "mention"]
+    assert any(
+        node["text"] == "Analytical Engine"
+        and node["spacy_type"] == "PRODUCT"
+        for node in mentions
+    )
+    linked_entity = next(
+        node
+        for node in projection["nodes"]
+        if node["id"] == "entity:wikidata:Q160928"
+    )
+    assert linked_entity["primary_spacy_type"] == "PRODUCT"
+    assert linked_entity["spacy_type_counts"] == {"PRODUCT": 1}
+
+
+def test_sentence_chunks_preserve_order_and_mention_provenance():
+    graph = kg1.EvidenceGraph()
+    kg1.extract_article(_record(), _nlp(), graph)
+    evidence = graph.as_dict()
+
+    chunks = [node for node in evidence["nodes"] if node["type"] == "chunk"]
+    ordered_chunks = sorted(chunks, key=lambda node: node["chunk_index"])
+    assert [node["chunk_index"] for node in ordered_chunks] == [0, 1]
+    assert all(node["chunk_method"] == "sentence" for node in chunks)
+    assert sum(edge["relation"] == "next" for edge in evidence["edges"]) == 1
+    assert all(
+        node.get("chunk_id")
+        for node in evidence["nodes"]
+        if node["type"] == "mention"
+    )
+
+
+def test_duplicate_link_surfaces_resolve_one_occurrence_per_target():
+    record = _record()
+    record["text"] = "Ada Lovelace compared palette with another palette."
+    record["links"] = [
+        {"surface": "palette", "title": "Color scheme", "qid": "Q859170"},
+        {"surface": "palette", "title": "Palette", "qid": "Q425548"},
+    ]
+    graph = kg1.EvidenceGraph()
+    kg1.extract_article(record, _nlp(), graph)
+    evidence = graph.as_dict()
+
+    refers_to = [
+        edge for edge in evidence["edges"] if edge["relation"] == "refers_to"
+    ]
+    palette_mentions = [
+        node
+        for node in evidence["nodes"]
+        if node["type"] == "mention" and node["text"] == "palette"
+    ]
+    assert len(palette_mentions) == 2
+    assert {
+        edge["target"]
+        for edge in refers_to
+        if edge["source"] in {node["id"] for node in palette_mentions}
+    } == {"entity:wikidata:Q859170", "entity:wikidata:Q425548"}
+    assert all(
+        sum(edge["source"] == mention["id"] for edge in refers_to) == 1
+        for mention in palette_mentions
+    )
 
 
 def test_label_graph_has_64_topics_and_no_article_nodes():
@@ -149,10 +222,38 @@ def test_neo4j_adapter_matches_repository_contract_without_label_edges():
 
     assert set(adapted) == {"metadata", "graph", "entities", "triples", "stats"}
     assert len(adapted["graph"]["nodes"]) == len(projection["nodes"])
-    assert len(adapted["graph"]["edges"]) == len(projection["edges"])
+    assert len(adapted["graph"]["edges"]) <= len(projection["edges"])
+    assert adapted["stats"]["edge_weight_sum"] == len(projection["edges"])
     assert all("predicates" in edge for edge in adapted["graph"]["edges"])
     assert all(
         "HAS_TOPIC" not in edge["predicates"]
         for edge in adapted["graph"]["edges"]
     )
     assert adapted["metadata"]["labels_as_message_edges"] is False
+
+
+def test_native_neo4j_uploader_accepts_only_fixed_schema():
+    graph = kg1.EvidenceGraph()
+    kg1.extract_article(_record(), _nlp(), graph)
+    adapted = neo4j_export.adapt_graph(kg1.project_for_gnn(graph.as_dict()))
+
+    nodes_by_type, edges_by_type = neo4j_upload.group_payload(adapted)
+
+    assert set(nodes_by_type) <= {"ARTICLE", "CHUNK", "ENTITY"}
+    assert nodes_by_type["CHUNK"]
+    assert set(edges_by_type) <= neo4j_upload.ALLOWED_PREDICATES
+    assert "HAS_TOPIC" not in edges_by_type
+    linked_entity = next(
+        row
+        for row in nodes_by_type["ENTITY"]
+        if row["id"] == "entity:wikidata:Q160928"
+    )
+    assert linked_entity["properties"]["primary_spacy_type"] == "PRODUCT"
+    assert linked_entity["properties"]["spacyTypeCountsJson"] == '{"PRODUCT": 1}'
+    assert all(
+        row["properties"]["kg1Graph"] == "KG1-A.2"
+        for rows in nodes_by_type.values()
+        for row in rows
+    )
+    assert neo4j_upload.CURRENT_GRAPH == "KG1-A.2"
+    assert neo4j_upload.REPLACEABLE_GRAPHS == ("KG1-A", "KG1-A.2")

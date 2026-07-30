@@ -1,6 +1,6 @@
 name: "002 — Wikimedia Article Topic Classification"
 task: "article_topic_classification"
-status: "kg1_a_revision_pilot_built"
+status: "kg1_a2_neo4j_pilot_confirmed"
 
 taxonomy:
   name: "wikimedia_original_64"
@@ -56,11 +56,11 @@ tracks:
     status: "planned"
   - id: "E3"
     path: "tracks/E3_factual_hetero_graphsage"
-    graph: "article_entity_type"
+    graph: "article_chunk_entity"
     feature_vector: "hetero_graphsage_contextualized_modernbert_embeddings"
     model: "heterogeneous_graphsage"
     role: "factual_kg"
-    status: "planned"
+    status: "neo4j_pilot_confirmed_model_untrained"
   - id: "E4"
     path: "tracks/E4_topic_label_gcn"
     graph: "topic_hierarchy_and_cooccurrence"

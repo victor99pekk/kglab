@@ -25,8 +25,8 @@ DEFAULT_OUTPUT = (
 
 NODE_TYPE_MAP = {
     "article": "ARTICLE",
+    "chunk": "CHUNK",
     "entity": "ENTITY",
-    "entity_type": "ENTITY_TYPE",
 }
 RELATION_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
@@ -54,6 +54,15 @@ def adapt_node(node: dict[str, Any]) -> dict[str, Any]:
         "qid",
         "source",
         "split",
+        "article_id",
+        "chunk_index",
+        "chunk_method",
+        "end_char",
+        "primary_spacy_type",
+        "spacy_type_counts",
+        "spacy_types",
+        "start_char",
+        "text",
         "title",
     ):
         if key in node:
@@ -75,7 +84,7 @@ def adapt_edge(edge: dict[str, Any]) -> dict[str, Any]:
     relation_record = {
         "predicate": predicate,
         "evidence_sentence": edge.get("evidence_sentence", ""),
-        "source_chunk_id": edge.get("evidence_id", ""),
+        "source_chunk_id": edge.get("source_chunk_id", edge.get("evidence_id", "")),
         "description": edge.get("description", ""),
     }
     return {
@@ -95,7 +104,20 @@ def adapt_graph(source: dict[str, Any]) -> dict[str, Any]:
     if len(node_ids) != len(nodes):
         raise ValueError("Duplicate node IDs in KG1 projection")
 
-    edges = [adapt_edge(edge) for edge in source["edges"]]
+    source_edges = [adapt_edge(edge) for edge in source["edges"]]
+    aggregated: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for edge in source_edges:
+        predicate = edge["predicates"][0]
+        key = (edge["source"], edge["target"], predicate)
+        if key not in aggregated:
+            aggregated[key] = {
+                **edge,
+                "weight": 0,
+                "relations": [],
+            }
+        aggregated[key]["weight"] += 1
+        aggregated[key]["relations"].extend(edge["relations"])
+    edges = list(aggregated.values())
     missing = sorted(
         {
             endpoint
@@ -115,10 +137,10 @@ def adapt_graph(source: dict[str, Any]) -> dict[str, Any]:
     return {
         "metadata": {
             "experiment": "002_wikimedia_article_topic",
-            "graph": "KG1-A",
+            "graph": "KG1-A.2",
             "source_schema_version": source.get("schema_version", ""),
             "labels_as_message_edges": False,
-            "adapter": "kg1_repository_neo4j_v1",
+            "adapter": "kg1_repository_neo4j_v2",
         },
         "graph": {
             "directed": True,
@@ -128,7 +150,7 @@ def adapt_graph(source: dict[str, Any]) -> dict[str, Any]:
             "edges": edges,
         },
         "entities": [
-            node for node in nodes if node["type"] in {"ENTITY", "ENTITY_TYPE"}
+            node for node in nodes if node["type"] == "ENTITY"
         ],
         "triples": [
             {
@@ -145,6 +167,8 @@ def adapt_graph(source: dict[str, Any]) -> dict[str, Any]:
             "num_nodes": len(nodes),
             "num_edges": len(edges),
             "num_triples": len(edges),
+            "num_source_edges": len(source_edges),
+            "edge_weight_sum": sum(edge["weight"] for edge in edges),
             "node_types": dict(sorted(Counter(node["type"] for node in nodes).items())),
             "predicates": dict(sorted(predicates.items())),
         },
@@ -178,4 +202,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

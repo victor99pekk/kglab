@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29  
 **Task:** multilabel article-topic classification  
-**Status:** data prepared; KG1-A revision pilot built; embedding baselines not implemented
+**Status:** data prepared; KG1-A.2 Neo4j pilot confirmed; embedding baselines not implemented
 **Labels:** Wikimedia original 64-topic taxonomy
 
 ## Research question
@@ -20,8 +20,10 @@ One Wikipedia article is one supervised example. The output is a 64-dimensional
 multilabel vector.
 
 - Articles are classified.
-- Chunks are evidence used to construct article text features.
-- Entities, entity types, topics, and domains are context nodes.
+- Chunks are evidence nodes used to construct article text features.
+- Entities are context nodes; spaCy types are mention/entity attributes.
+- Canonical entity classes, topics, and domains may become context nodes in
+  later tracks.
 - WikiProject assessments generate labels and must not enter the graph as
   features.
 
@@ -73,8 +75,8 @@ Purpose: measure graph value for genuinely new article nodes.
 
 ### E3 — factual heterogeneous GraphSAGE
 
-Add article-to-entity, entity-to-type, and type hierarchy edges sourced from
-Wikipedia links and Wikidata.
+Add chunk/entity context sourced from Wikipedia links and spaCy. spaCy types
+remain features; later curated Wikidata classes may add a type hierarchy.
 
 Purpose: test whether factual context improves article embeddings.
 
@@ -98,8 +100,9 @@ Initial node features:
 
 ```text
 x_article: [article_count, text_dim]
-x_entity:  [entity_count, text_dim]
-x_type:    [type_count, text_dim]
+x_chunk:   [chunk_count, text_dim]
+x_entity:  [entity_count, text_dim + spacy_type_feature_dim]
+x_class:   [canonical_class_count, text_dim]  # later Wikidata variant
 x_topic:   [64, text_dim]
 x_domain:  [4, text_dim]
 ```
@@ -108,9 +111,11 @@ Candidate message edges:
 
 ```text
 Article -LINKS_TO-> Article
-Article -MENTIONS-> Entity
-Entity  -INSTANCE_OF-> Type
-Type    -SUBCLASS_OF-> Type
+Article -HAS_CHUNK-> Chunk
+Chunk   -NEXT-> Chunk
+Chunk   -MENTIONS-> Entity
+Entity  -INSTANCE_OF-> EntityClass  # later curated variant
+EntityClass -SUBCLASS_OF-> EntityClass
 Topic   -IN_DOMAIN-> Domain
 Topic   -RELATED_TO-> Topic
 ```
@@ -195,35 +200,46 @@ Artifacts:
 - `artifacts/prepared/article_topic_labels.jsonl`
 - `artifacts/prepared/summary.json`
 
-E0–E5 model metrics are not available yet. KG1-A now provides evidence-graph
+E0–E5 model metrics are not available yet. KG1-A.2 provides evidence-graph
 and GNN-projection inputs for E3, but no training runner implements those
 embeddings or models yet.
 
-## KG1-A — traditional NLP evidence graph
+## KG1-A.2 — traditional NLP evidence graph
 
-KG1-A is implemented under
+KG1-A.2 is implemented under
 [`graphs/KG1_spacy_evidence`](graphs/KG1_spacy_evidence/README.md). It uses
 revision-matched Wikipedia prose, hyperlink/QID entity anchors, and spaCy NER:
 
 ```text
+Article -HAS_CHUNK-> Chunk
+Chunk   -NEXT-> Chunk
+Chunk   -MENTIONS-> Entity
 Article -DESCRIBES-> Entity
 Article -MENTIONS-> Entity
 Article -LINKS_TO-> Article
-Entity  -HAS_SPACY_TYPE-> EntityType
 ```
 
-First real pilot:
+spaCy type predictions live on mention nodes and are aggregated into entity
+features. Raw `PERSON`, `ORG`, and similar labels are not graph nodes.
 
-- 3 pinned historical article revisions
+Confirmed KG1-A.2 revision-matched pilot:
+
+- 3 classified Wikipedia articles
 - 52 article/context nodes
-- 152 entity nodes
-- 10 spaCy entity-type nodes
-- 377 compact GNN edges
+- 69 sentence-chunk nodes
+- 156 entity nodes
+- 533 unique Neo4j relationships
+- 567 weighted source edges
+- 0 retired KG1-A nodes or relationships
 - 0 label message edges
 
 Labels are exported separately in `targets.jsonl`. WikiProject/category label
 sources cannot become KG features. `Article -HAS_TOPIC-> Topic` remains
 supervision only.
+
+No GNN has been trained. KG1-A.2 currently supplies graph structure only;
+ModernBERT embeddings, a GraphSAGE runner, checkpoints, and evaluation metrics
+do not yet exist.
 
 KG1-B will add entity-to-entity dependency claims only after a manual
 high-precision rule audit.
