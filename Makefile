@@ -117,22 +117,11 @@ test:
 
 ## download-wikipedia: Download random Wikipedia articles as Polygraph JSONL
 download-wikipedia:
-	uv run python tools/data_retrieval/download_wikipedia_random.py \
-		--count $(WIKI_COUNT) \
-		--language $(WIKI_LANGUAGE) \
-		--snapshot $(WIKI_SNAPSHOT) \
-		--output $(WIKI_OUTPUT) \
-		--max-scan $(WIKI_MAX_SCAN) \
-		$(if $(WIKI_SEED),--seed $(WIKI_SEED),) \
-		--verbose || true
+	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN)$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
 
 ## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
 enrich-wikipedia:
-	uv run python tools/data_retrieval/enrich_wikipedia_links.py \
-		--input $(WIKI_OUTPUT) \
-		--output $(WIKI_OUTPUT) \
-		--language $(WIKI_LANGUAGE) \
-		--verbose
+	uv run python -c "from polygraph.data import Data; Data.enrich('wikipedia_random', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
 
 ## wikipedia-full: Download random articles + enrich with hyperlinks
 wikipedia-full: download-wikipedia enrich-wikipedia

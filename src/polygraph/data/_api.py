@@ -115,7 +115,12 @@ class Data:
 
         if enrich and entry.get("enrich"):
             enrich_fn = _import_fn(entry["enrich"])
-            enriched = enrich_fn(input_path=path, force=force, **kwargs)
+            # Only pass kwargs that the enrich function accepts
+            enrich_kwargs: dict[str, Any] = {}
+            for key in ("language", "delay"):
+                if key in kwargs:
+                    enrich_kwargs[key] = kwargs[key]
+            enriched = enrich_fn(input_path=path, force=force, **enrich_kwargs)
             result["enriched"] = enriched
         elif enrich and not entry.get("enrich"):
             raise ValueError(f"Dataset '{name}' does not support enrichment.")
