@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import random
+import re
 import signal
 import time
 from collections.abc import Iterable
@@ -188,22 +189,86 @@ def download_wikipedia(
     max_scan: int = DEFAULT_MAX_SCAN,
     min_chars: int = 200,
     append: bool = False,
+    strategy: str = "random",
+    urls: list[str] | None = None,
+    url_file: str | Path | None = None,
+    target_degree: float = 3.0,
+    max_articles: int | None = None,
 ) -> int:
-    """Download random Wikipedia articles and write Polygraph JSONL.
+    """Download Wikipedia articles and write Polygraph JSONL.
+
+    Supports three strategies:
+
+    * ``"random"`` — reservoir-sample from HuggingFace (default).
+    * ``"specific"`` — fetch articles from a list of URLs or a file of URLs.
+    * ``"degree"`` — grow a connected set of articles to hit a target
+      average hyperlink degree.
 
     Args:
         path: Output JSONL file path.
-        count: Number of usable articles to download.
+        count: Number of articles to download.
         language: Wikipedia language code (e.g., ``"en"``).
-        snapshot: HuggingFace dataset snapshot (e.g., ``"20231101"``).
+        snapshot: HuggingFace dataset snapshot (for ``"random"`` strategy).
         seed: Reservoir-sampling seed (random if ``None``).
         max_scan: Maximum streamed rows to inspect.
         min_chars: Skip articles shorter than this character count.
         append: Append to existing file (skip already-present IDs).
+        strategy: ``"random"``, ``"specific"``, or ``"degree"``.
+        urls: List of Wikipedia article URLs (required for ``"specific"``).
+        url_file: Path to a text file with one URL per line (``"specific"``).
+        target_degree: Target average hyperlink degree (``"degree"`` strategy).
+        max_articles: Hard cap on total articles for degree strategy
+            (defaults to ``count * 5``).
 
     Returns:
         Number of records written.
     """
+    if strategy == "random":
+        return _download_random(
+            path=path,
+            count=count,
+            language=language,
+            snapshot=snapshot,
+            seed=seed,
+            max_scan=max_scan,
+            min_chars=min_chars,
+            append=append,
+        )
+    elif strategy == "specific":
+        return _download_specific(
+            path=path,
+            urls=urls,
+            url_file=url_file,
+            language=language,
+            append=append,
+        )
+    elif strategy == "degree":
+        return _download_degree_targeted(
+            path=path,
+            count=count,
+            language=language,
+            snapshot=snapshot,
+            seed=seed,
+            max_scan=max_scan,
+            min_chars=min_chars,
+            target_degree=target_degree,
+            max_articles=max_articles,
+        )
+    else:
+        raise ValueError(f"Unknown strategy '{strategy}'. Available: random, specific, degree")
+
+
+def _download_random(
+    path: str | Path,
+    count: int,
+    language: str,
+    snapshot: str,
+    seed: int | None,
+    max_scan: int,
+    min_chars: int,
+    append: bool,
+) -> int:
+    """Reservoir-sample random articles from HuggingFace (original behaviour)."""
     if count < 1:
         raise ValueError("count must be positive")
 
@@ -245,6 +310,290 @@ def download_wikipedia(
     # notebooks terminate cleanly.
     _schedule_watchdog()
 
+    return len(records)
+
+
+_WIKI_URL_RE = re.compile(r"https?://([a-z]{2,12})\.wikipedia\.org/wiki/(.+)", re.IGNORECASE)
+
+
+def _parse_wiki_url(url: str) -> tuple[str, str] | None:
+    """Extract (language, title) from a Wikipedia URL.  Returns ``None`` on failure."""
+    m = _WIKI_URL_RE.match(url.strip())
+    if not m:
+        return None
+    lang = m.group(1).lower()
+    title = m.group(2).replace("_", " ").strip()
+    return lang, title
+
+
+def _fetch_article_text(title: str, language: str = "en") -> dict[str, Any] | None:
+    """Fetch article text + metadata from the Wikipedia API.
+
+    Uses ``action=query&prop=extracts|info&exintro=0&explaintext``.
+    Returns a dict with ``page_id``, ``title``, ``text``, ``url`` or ``None``.
+    """
+    import requests
+
+    api_url = f"https://{language}.wikipedia.org/w/api.php"
+    params: dict[str, Any] = {
+        "action": "query",
+        "prop": "extracts|info",
+        "titles": title,
+        "explaintext": 1,
+        "exintro": 0,
+        "inprop": "url",
+        "format": "json",
+    }
+    headers = {
+        "User-Agent": "Polygraph/0.2 (https://github.com/user/polygraph; research KG construction)"
+    }
+
+    try:
+        resp = requests.get(api_url, params=params, timeout=30, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        logger.warning("API error fetching article '%s': %s", title, exc)
+        return None
+
+    pages = data.get("query", {}).get("pages", {})
+    if not pages:
+        return None
+    page = next(iter(pages.values()))
+    if "missing" in page:
+        logger.warning("Article not found: %s", title)
+        return None
+
+    return {
+        "page_id": str(page.get("pageid", "")),
+        "title": page.get("title", title),
+        "text": page.get("extract", ""),
+        "url": page.get("fullurl", page.get("canonicalurl", "")),
+    }
+
+
+def _download_specific(
+    path: str | Path,
+    urls: list[str] | None,
+    url_file: str | Path | None,
+    language: str,
+    append: bool,
+) -> int:
+    """Download articles from a list of Wikipedia URLs or a URL file."""
+    if urls:
+        url_list = urls
+    elif url_file:
+        url_list = Path(url_file).read_text(encoding="utf-8").strip().splitlines()
+    else:
+        raise ValueError(
+            "strategy='specific' requires either 'urls' (list of URLs) or "
+            "'url_file' (path to a text file with one URL per line)."
+        )
+
+    url_list = [u.strip() for u in url_list if u.strip()]
+    if not url_list:
+        raise ValueError("No URLs provided (empty list or file).")
+
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    existing_ids = _existing_ids(output) if append and output.exists() else set()
+
+    records: list[dict[str, Any]] = []
+    for url in url_list:
+        parsed = _parse_wiki_url(url)
+        if not parsed:
+            logger.warning("Skipping unrecognised URL: %s", url)
+            continue
+
+        url_lang, title = parsed
+        article = _fetch_article_text(title, language=url_lang)
+        if article is None:
+            continue
+        if not article["text"]:
+            logger.warning("Empty text for '%s' — skipping", title)
+            continue
+
+        page_id = article["page_id"]
+        record_id = f"wikipedia:{url_lang}:{page_id}"
+        if record_id in existing_ids:
+            logger.info("Skipping duplicate: %s", record_id)
+            continue
+
+        existing_ids.add(record_id)
+        records.append(
+            {
+                "id": record_id,
+                "text": article["text"],
+                "title": article["title"],
+                "url": article["url"],
+                "source": "wikipedia_api",
+                "dataset": "wikipedia_api",
+                "dataset_config": f"specific.{url_lang}",
+                "language": url_lang,
+                "page_id": page_id,
+                "downloaded_at": _utc_now(),
+                "license": DATASET_LICENSE,
+                "license_url": DATASET_URL,
+                "categories": [],
+            }
+        )
+
+    mode = "a" if append else "w"
+    with output.open(mode, encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    logger.info("Wrote %d specific Wikipedia articles to %s", len(records), output)
+    return len(records)
+
+
+def _download_degree_targeted(
+    path: str | Path,
+    count: int,
+    language: str,
+    snapshot: str,
+    seed: int | None,
+    max_scan: int,
+    min_chars: int,
+    target_degree: float,
+    max_articles: int | None,
+) -> int:
+    """Grow a connected set of articles to meet a target average hyperlink degree.
+
+    1. Seed with ``count // 2`` random articles from HuggingFace.
+    2. Enrich to get outgoing link titles.
+    3. Compute the average degree (edges within the downloaded set / article count).
+    4. Iteratively add articles that are linked from the current set until the
+       target degree is met or ``max_articles`` is reached.
+    """
+    import time as _time
+
+    max_articles = max_articles or count * 5
+    if target_degree <= 0:
+        raise ValueError("target_degree must be positive")
+    if count < 2:
+        raise ValueError("Need at least 2 articles for degree calculation")
+
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    # Phase 1: seed with random articles
+    seed_count = max(count // 2, 2)
+    client = HuggingFaceWikipediaClient(
+        language=language,
+        snapshot=snapshot,
+        seed=seed,
+        max_scan=max_scan,
+    )
+    records = client.fetch_random(seed_count, min_chars=min_chars)
+
+    # Phase 2: enrich to discover links
+    for record in records:
+        page_id = record.get("page_id", "")
+        if page_id:
+            titles = _fetch_outgoing_links(page_id, language=language)
+            record["_linked_titles"] = titles
+        _time.sleep(REQUEST_DELAY)
+
+    # Phase 3: iterative expansion
+    current_ids = {r["id"] for r in records}
+    title_to_id = {r["title"]: r["id"] for r in records}
+
+    def _compute_degree() -> float:
+        """Compute average degree (edges within the set / article count)."""
+        edges = 0
+        for r in records:
+            linked = r.get("_linked_titles", [])
+            edges += sum(1 for t in linked if t in title_to_id)
+        return edges / len(records) if records else 0.0
+
+    avg_degree = _compute_degree()
+    batch_size = max(5, count // 10)
+
+    while avg_degree < target_degree and len(records) < max_articles:
+        # Find candidate titles linked from current set but not yet downloaded
+        candidate_scores: dict[str, int] = {}
+        for r in records:
+            for title in r.get("_linked_titles", []):
+                if title not in title_to_id:
+                    candidate_scores[title] = candidate_scores.get(title, 0) + 1
+
+        if not candidate_scores:
+            logger.warning(
+                "No more linked articles available; stopping at degree %.2f / %d articles",
+                avg_degree,
+                len(records),
+            )
+            break
+
+        # Pick top candidates
+        top = sorted(candidate_scores, key=candidate_scores.get, reverse=True)[:batch_size]
+        new_records = []
+        for title in top:
+            if len(records) + len(new_records) >= max_articles:
+                break
+
+            article = _fetch_article_text(title, language=language)
+            if article is None or not article["text"]:
+                continue
+
+            page_id = article["page_id"]
+            record_id = f"wikipedia:{language}:{page_id}"
+            if record_id in current_ids:
+                continue
+
+            record = {
+                "id": record_id,
+                "text": article["text"],
+                "title": article["title"],
+                "url": article["url"],
+                "source": "wikipedia_api",
+                "dataset": "wikipedia_api",
+                "dataset_config": f"degree.{language}",
+                "language": language,
+                "page_id": page_id,
+                "downloaded_at": _utc_now(),
+                "license": DATASET_LICENSE,
+                "license_url": DATASET_URL,
+                "categories": [],
+            }
+
+            # Fetch outgoing links for the new article
+            links = _fetch_outgoing_links(page_id, language=language)
+            record["_linked_titles"] = links
+            _time.sleep(REQUEST_DELAY)
+
+            new_records.append(record)
+            current_ids.add(record_id)
+            title_to_id[article["title"]] = record_id
+
+        if not new_records:
+            logger.warning("No new articles could be fetched; stopping.")
+            break
+
+        records.extend(new_records)
+        avg_degree = _compute_degree()
+        logger.info(
+            "Degree expansion: %d articles, avg degree %.2f (target %.2f)",
+            len(records),
+            avg_degree,
+            target_degree,
+        )
+
+    # Clean up internal field before writing
+    for r in records:
+        r.pop("_linked_titles", None)
+
+    with output.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    logger.info(
+        "Wrote %d degree-targeted articles to %s (avg degree %.2f)",
+        len(records),
+        output,
+        avg_degree,
+    )
     return len(records)
 
 
