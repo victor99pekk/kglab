@@ -64,6 +64,7 @@ class BenchmarkRunner:
         )
 
         # 3. Execute
+        self.pipeline = pipeline
         t0 = time.perf_counter()
         pipeline.execute()
         elapsed_s = time.perf_counter() - t0

@@ -74,11 +74,13 @@ class GraphExporter:
             cleaned["text"] = data.get("text", "")
             cleaned["tokenCount"] = data.get("tokenCount", 0)
             cleaned["index"] = data.get("index", 0)
+            cleaned["upload_date"] = data.get("upload_date", "")
         elif node_type == "Document":
             cleaned["name"] = data.get("name", data.get("id", ""))
             cleaned["description"] = data.get("description", "")
             cleaned["source"] = data.get("source", [])
             cleaned["chunk_count"] = data.get("chunk_count", 0)
+            cleaned["upload_date"] = data.get("upload_date", "")
         else:
             # Entity node
             cleaned["name"] = data.get("name", data.get("id", ""))

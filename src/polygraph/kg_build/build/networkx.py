@@ -47,6 +47,7 @@ class GraphBuilder:
                 "tokenCount": entity.get("tokenCount", 0),
                 "index": entity.get("index", 0),
                 "chunk_count": entity.get("chunk_count", 0),
+                "upload_date": entity.get("upload_date", ""),
             }
             for key in (
                 "title",
@@ -147,8 +148,7 @@ class GraphBuilder:
         node_mismatches = sum(
             1
             for _, data in graph.nodes(data=True)
-            if (label := data.get("type", data.get("label", "")))
-            and label not in ontology_labels
+            if (label := data.get("type", data.get("label", ""))) and label not in ontology_labels
         )
         relation_mismatches = sum(
             predicate not in ontology_relations

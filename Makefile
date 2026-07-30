@@ -7,6 +7,8 @@ SHELL   := /bin/bash
 INPUT      ?= data/wikipedia/
 OUTPUT     ?= output/baseline
 VARIANT    ?= baseline
+NEO4J      ?= 0
+CLEAR_NEO4J ?= 0
 EXP        ?= kg/001_baseline
 
 WIKI_COUNT    ?= 3
@@ -17,6 +19,7 @@ WIKI_MAX_SCAN ?= 10000
 WIKI_SEED     ?=
 
 GRAPH         ?= kg/001_baseline
+GRAPH_PATH    ?=
 
 WIKIMEDIA_TOPIC_EXP       ?= experiments/ML_models/002_wikimedia_article_topic
 WIKIMEDIA_TOPIC_TOOL      := tools/data_retrieval/prepare_wikimedia_topic_labels.py
@@ -81,15 +84,24 @@ clean:
 
 ## build-kg: Run the full pipeline (preprocess → build KG → evaluate → export)
 build-kg:
-	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT)
+	@neo4j_flag=""; clear_flag=""; \
+	if [ "$(NEO4J)" = "1" ]; then neo4j_flag="--neo4j"; fi; \
+	if [ "$(CLEAR_NEO4J)" = "1" ]; then clear_flag="--clear-neo4j"; fi; \
+	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT) $$neo4j_flag $$clear_flag
 
 ## experiment: Run an experiment from a YAML config file (EXP relative to experiments/)
 experiment:
 	uv run python main.py --experiment experiments/$(EXP)/config.yaml
 
 ## neo4j-upload: Upload a knowledge_graph.json to Neo4j (always clears first)
+##   make neo4j-upload GRAPH=kg/002_llm                  # experiments/kg/002_llm/results/
+##   make neo4j-upload GRAPH_PATH=/tmp/polygraph_test/knowledge_graph.json   # arbitrary path
 neo4j-upload:
-	uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/results/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/results/knowledge_graph.json to Neo4j (cleared first)')"
+	@if [ -n "$(GRAPH_PATH)" ]; then \
+		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('$(GRAPH_PATH)', clear=True); print('Uploaded $(GRAPH_PATH) to Neo4j (cleared first)')"; \
+	else \
+		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/results/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/results/knowledge_graph.json to Neo4j (cleared first)')"; \
+	fi
 
 # ═══════════════════════════════════════════════════════════
 # Dev

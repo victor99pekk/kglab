@@ -6,21 +6,27 @@ All data entering the KG generation pipeline **must** follow the JSONL (JSON Lin
 
 ## Required Format
 
-Each line in a `.jsonl` file is a single, complete JSON object. Every object **must** include the following four fields:
+Each line in a `.jsonl` file is a single, complete JSON object. Two fields are required; the rest are optional with sensible defaults:
 
 | Field    | Type   | Required | Description |
 |----------|--------|----------|-------------|
 | `id`     | string | ✅ Yes   | Unique identifier for the document. Must be stable across pipeline runs (used for deduplication and version tracking). |
 | `text`   | string | ✅ Yes   | Full body text of the document. Must be non-empty and UTF-8 encoded. |
-| `title`  | string | ✅ Yes   | Human-readable title or heading of the document. Used for entity linking and graph node labels. |
-| `url`    | string | ✅ Yes   | Source URL or canonical reference. Used for provenance tracking. |
+| `title`  | string | No       | Human-readable title or heading of the document. Defaults to `id` if omitted. Used for entity linking and graph node labels. |
+| `url`    | string | No       | Source URL or canonical reference. Defaults to `polygraph://{id}` if omitted. Used for provenance tracking. |
 
-### Example
+### Examples
 
+**Full record (recommended):**
 ```jsonl
 {"id": "12", "text": "Anarchism is a political philosophy and movement that is skeptical of all justifications for authority...", "title": "Anarchism", "url": "https://en.wikipedia.org/wiki/Anarchism"}
-{"id": "39", "text": "Albedo is the fraction of sunlight that is diffusely reflected by a body...", "title": "Albedo", "url": "https://en.wikipedia.org/wiki/Albedo"}
 ```
+
+**Minimal record (id + text only):**
+```jsonl
+{"id": "doc_001", "text": "Some document content here..."}
+```
+> `title` defaults to `"doc_001"` and `url` defaults to `"polygraph://doc_001"`.
 
 ---
 
@@ -38,12 +44,12 @@ Each line in a `.jsonl` file is a single, complete JSON object. Every object **m
 
 ### `title`
 - **Purpose**: Document-level label for graph nodes and human-readable references.
-- **Constraints**: Non-empty string. Should be the canonical title of the document.
+- **Constraints**: Optional. If omitted or empty, falls back to the `id` value.
 - **Used by**: Graph node naming, entity resolution, QA context headers.
 
 ### `url`
 - **Purpose**: Provenance link back to the original source.
-- **Constraints**: Valid URL string. May be a file path for local documents (`file:///path/to/doc`) if no web source exists.
+- **Constraints**: Optional. If omitted, defaults to `polygraph://{id}` (a synthetic identifier indicating no real URL was provided). May be a real URL, a `file://` URI for local documents, or any string.
 - **Used by**: Metadata management, source manifest generation, dataset auditing.
 
 ---
@@ -89,11 +95,11 @@ jsonl_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="u
 Before running the pipeline, verify that every `.jsonl` file:
 
 - [ ] Contains exactly one JSON object per line (no pretty-printing, no trailing commas)
-- [ ] Every line has all four required fields (`id`, `text`, `title`, `url`)
+- [ ] Every line has both required fields (`id`, `text`)
 - [ ] `text` is non-empty and UTF-8 encoded
 - [ ] `id` values are unique across all files in the input directory
-- [ ] `title` values are non-empty
-- [ ] `url` values are valid strings (URL or `file://` URI)
+- [ ] (Optional) `title` is provided for human-readable graph labels
+- [ ] (Optional) `url` is provided for source provenance tracking
 
 ---
 

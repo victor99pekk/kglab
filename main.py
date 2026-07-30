@@ -85,6 +85,9 @@ def main() -> None:
         config = ExperimentConfig.from_yaml(args.experiment)
         runner = BenchmarkRunner(config)
         runner.run()
+
+        if args.neo4j:
+            runner.pipeline.upload_to_neo4j(clear=args.clear_neo4j)
         return
 
     # ── Direct pipeline mode (backward compatible) ─────────────
