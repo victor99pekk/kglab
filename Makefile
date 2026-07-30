@@ -11,12 +11,14 @@ NEO4J      ?= 0
 CLEAR_NEO4J ?= 0
 EXP        ?= kg/001_baseline
 
-WIKI_COUNT    ?= 3
-WIKI_LANGUAGE ?= en
-WIKI_SNAPSHOT ?= 20231101
-WIKI_OUTPUT   ?= data/wikipedia/random_articles.jsonl
-WIKI_MAX_SCAN ?= 10000
-WIKI_SEED     ?=
+WIKI_COUNT        ?= 3
+WIKI_LANGUAGE     ?= en
+WIKI_SNAPSHOT     ?= 20231101
+WIKI_OUTPUT       ?= data/wikipedia/random_articles.jsonl
+WIKI_MAX_SCAN     ?= 10000
+WIKI_SEED         ?=
+WIKI_STRATEGY     ?= random
+WIKI_TARGET_DEGREE ?= 3.0
 
 GRAPH         ?= kg/001_baseline
 GRAPH_PATH    ?=
@@ -45,6 +47,8 @@ help:
 	@echo "   download-wikipedia  Download random Wikipedia articles as JSONL"
 	@echo "   enrich-wikipedia    Add outgoing hyperlinks to existing Wikipedia JSONL"
 	@echo "   wikipedia-full      Download + enrich Wikipedia articles in one step"
+	@echo ""
+	@echo "   Wikipedia vars: WIKI_COUNT WIKI_LANGUAGE WIKI_STRATEGY WIKI_TARGET_DEGREE WIKI_OUTPUT"
 	@echo "   wikimedia-topic-labels           Prepare pinned Wikimedia topic labels"
 	@echo "   wikimedia-topic-labels-validate  Validate label manifest and taxonomy"
 	@echo "   wikimedia-topic-labels-download  Download and verify English labels"
@@ -115,13 +119,18 @@ neo4j-upload:
 test:
 	uv run pytest tests/ -v
 
-## download-wikipedia: Download random Wikipedia articles as Polygraph JSONL
+## download-wikipedia: Download Wikipedia articles as Polygraph JSONL
+##   make download-wikipedia WIKI_STRATEGY=degree WIKI_COUNT=20 WIKI_TARGET_DEGREE=3.0
 download-wikipedia:
-	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN)$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
+	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN), strategy='$(WIKI_STRATEGY)', target_degree=$(WIKI_TARGET_DEGREE)$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
 
 ## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
 enrich-wikipedia:
 	uv run python -c "from polygraph.data import Data; Data.enrich('wikipedia_random', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
+
+## download-data: Download Wikipedia data (edit values in tools/data_retrieval/download_data.py)
+download-data:
+	uv run python tools/data_retrieval/download_data.py
 
 ## wikipedia-full: Download random articles + enrich with hyperlinks
 wikipedia-full: download-wikipedia enrich-wikipedia

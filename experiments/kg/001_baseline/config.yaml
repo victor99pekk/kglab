@@ -25,6 +25,12 @@ pipeline:
 input:
   paths:
     - "data/wikipedia/"
+  dataset:
+    name: "wikipedia_random"
+    params:
+      count: 2
+      strategy: "degree"
+      target_degree: 1
 
 neo4j:
   upload: false
