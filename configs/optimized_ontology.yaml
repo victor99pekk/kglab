@@ -1,0 +1,493 @@
+# Optimized Ontology Configuration
+# ================================
+# A richer schema for knowledge graphs used in LLM training, with:
+#   - Type hierarchy via `parent` / `subtypes`
+#   - Broader relation coverage across all entity types
+#   - Optional relation metadata (confidence, temporal validity)
+#
+# Compatible with the default ontology parser — extra fields are
+# ignored by the current extractors but available for future use.
+
+entity_types:
+  # Labels match spaCy NER output so the spaCy extractor works
+  # out of the box.  The `parent` field encodes the conceptual
+  # hierarchy from the design doc without changing labels.
+  #
+  # ── Core types ───────────────────────────────────────────────
+  PERSON:
+    description: "A human individual"
+    example: "Marie Curie"
+    parent: null
+
+  ORG:
+    description: "A company, institution, or organized group"
+    example: "Google"
+    parent: null
+
+  GPE:
+    description: "A geopolitical entity (country, city, state)"
+    example: "France"
+    parent: null
+
+  LOC:
+    description: "A physical or geographic place (non-GPE)"
+    example: "Mount Everest"
+    parent: null
+
+  CONCEPT:
+    description: "An abstract idea, topic, or theme"
+    example: "Machine Learning"
+    parent: null
+
+  EVENT:
+    description: "An occurrence or happening"
+    example: "World War II"
+    parent: null
+
+  PRODUCT:
+    description: "A tangible or digital product"
+    example: "iPhone"
+    parent: null
+
+  WORK_OF_ART:
+    description: "A creative work (book, film, paper, etc.)"
+    example: "Attention Is All You Need"
+    parent: null
+
+  DATE:
+    description: "A calendar date or time expression"
+    example: "2024-01-15"
+    parent: null
+
+  # ── Extended types (less common in spaCy, useful for LLM extraction) ──
+  FAC:
+    description: "A building, airport, highway, or other facility"
+    example: "SFO Airport"
+    parent: null
+
+  NORP:
+    description: "Nationality, religious, or political group"
+    example: "Buddhists"
+    parent: null
+
+  LAW:
+    description: "A law, regulation, or legal document"
+    example: "GDPR"
+    parent: null
+
+  LANGUAGE:
+    description: "A named language"
+    example: "Vietnamese"
+    parent: null
+
+  MONEY:
+    description: "A monetary value or currency"
+    example: "$1 million"
+    parent: null
+
+  QUANTITY:
+    description: "A measurement or quantity"
+    example: "500 kilometers"
+    parent: null
+
+# ═══════════════════════════════════════════════════════════════
+# Relationship types
+# ═══════════════════════════════════════════════════════════════
+# Each relation may include optional metadata:
+#   - temporal:   whether facts have valid_from / valid_to windows
+#   - confidence: extraction confidence score (0.0–1.0)
+
+relationship_types:
+  # ── Person ↔ Org ─────────────────────────────────────────────
+  works_at:
+    description: "Employment or affiliation"
+    domain: "PERSON"
+    range: "ORG"
+    temporal: true
+  founded:
+    description: "Founder relationship"
+    domain: "PERSON"
+    range: "ORG"
+  studied_at:
+    description: "Educational affiliation"
+    domain: "PERSON"
+    range: "ORG"
+    temporal: true
+  leads:
+    description: "Leadership or executive role"
+    domain: "PERSON"
+    range: "ORG"
+    temporal: true
+
+  # ── Person ↔ Location ────────────────────────────────────────
+  lives_in:
+    description: "Residence"
+    domain: "PERSON"
+    range: "GPE"
+    temporal: true
+  born_in:
+    description: "Place of birth"
+    domain: "PERSON"
+    range: "GPE"
+  died_in:
+    description: "Place of death"
+    domain: "PERSON"
+    range: "GPE"
+  visited:
+    description: "Travel or visit"
+    domain: "PERSON"
+    range: "GPE"
+    temporal: true
+
+  # ── Person ↔ Person ──────────────────────────────────────────
+  knows:
+    description: "Acquaintance or professional connection"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  collaborated_with:
+    description: "Collaboration or co-authorship"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  parent_of:
+    description: "Parent-child relationship"
+    domain: "PERSON"
+    range: "PERSON"
+  sibling_of:
+    description: "Sibling relationship"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  spouse_of:
+    description: "Marriage or domestic partnership"
+    domain: "PERSON"
+    range: "PERSON"
+    symmetric: true
+  advises:
+    description: "Mentorship or advisory relationship"
+    domain: "PERSON"
+    range: "PERSON"
+
+  # ── Person ↔ Other ───────────────────────────────────────────
+  created:
+    description: "Creator of a product"
+    domain: "PERSON"
+    range: "PRODUCT"
+  authored:
+    description: "Writer or creator of a work"
+    domain: "PERSON"
+    range: "WORK_OF_ART"
+  participated_in:
+    description: "Involvement in an event"
+    domain: "PERSON"
+    range: "EVENT"
+  spoke_at:
+    description: "Speaker or presenter at an event"
+    domain: "PERSON"
+    range: "EVENT"
+  contributed_to:
+    description: "Contribution to a field or concept"
+    domain: "PERSON"
+    range: "CONCEPT"
+  born_on:
+    description: "Date of birth"
+    domain: "PERSON"
+    range: "DATE"
+  died_on:
+    description: "Date of death"
+    domain: "PERSON"
+    range: "DATE"
+
+  # ── Org ↔ Location ───────────────────────────────────────────
+  located_in:
+    description: "Physical presence or containment"
+    domain: "ORG"
+    range: "GPE"
+  headquartered_in:
+    description: "Primary headquarters location"
+    domain: "ORG"
+    range: "GPE"
+  operates_in:
+    description: "Operates or has presence in a region"
+    domain: "ORG"
+    range: "GPE"
+
+  # ── Org ↔ Org ────────────────────────────────────────────────
+  subsidiary_of:
+    description: "Corporate ownership hierarchy"
+    domain: "ORG"
+    range: "ORG"
+  partnered_with:
+    description: "Business or strategic partnership"
+    domain: "ORG"
+    range: "ORG"
+    symmetric: true
+  competitor_of:
+    description: "Market competition"
+    domain: "ORG"
+    range: "ORG"
+    symmetric: true
+  acquired:
+    description: "Acquisition or merger"
+    domain: "ORG"
+    range: "ORG"
+    temporal: true
+
+  # ── Org ↔ Other ──────────────────────────────────────────────
+  produces:
+    description: "Manufactures or creates a product"
+    domain: "ORG"
+    range: "PRODUCT"
+  organized:
+    description: "Hosted or organized an event"
+    domain: "ORG"
+    range: "EVENT"
+  published:
+    description: "Published a work"
+    domain: "ORG"
+    range: "WORK_OF_ART"
+  founded_by:
+    description: "Founder relationship (inverse)"
+    domain: "ORG"
+    range: "PERSON"
+  funds:
+    description: "Provides funding to"
+    domain: "ORG"
+    range: "ORG"
+  researches:
+    description: "Conducts research in a field"
+    domain: "ORG"
+    range: "CONCEPT"
+
+  # ── Location ↔ Location ──────────────────────────────────────
+  part_of:
+    description: "Hierarchical containment"
+    domain: "GPE"
+    range: "GPE"
+  borders:
+    description: "Shares a border with"
+    domain: "GPE"
+    range: "GPE"
+    symmetric: true
+
+  # ── Event ↔ Other ────────────────────────────────────────────
+  took_place_in:
+    description: "Event occurred at location"
+    domain: "EVENT"
+    range: "GPE"
+  involved:
+    description: "Event involvement"
+    domain: "EVENT"
+    range: "ORG"
+  occurred_on:
+    description: "Event date"
+    domain: "EVENT"
+    range: "DATE"
+  caused_by:
+    description: "Causal relationship between events"
+    domain: "EVENT"
+    range: "EVENT"
+  followed:
+    description: "Temporal sequence between events"
+    domain: "EVENT"
+    range: "EVENT"
+
+  # ── CONCEPT ↔ CONCEPT ────────────────────────────────────────
+  subfield_of:
+    description: "Taxonomic hierarchy (narrower term)"
+    domain: "CONCEPT"
+    range: "CONCEPT"
+  prerequisite_for:
+    description: "Required prior knowledge"
+    domain: "CONCEPT"
+    range: "CONCEPT"
+  related_to:
+    description: "Loose conceptual association"
+    domain: "CONCEPT"
+    range: "CONCEPT"
+    symmetric: true
+  applied_in:
+    description: "Concept is applied in a field"
+    domain: "CONCEPT"
+    range: "CONCEPT"
+
+  # ── Work / Product ↔ Other ───────────────────────────────────
+  cites:
+    description: "Citation between works"
+    domain: "WORK_OF_ART"
+    range: "WORK_OF_ART"
+  published_on:
+    description: "Publication date"
+    domain: "WORK_OF_ART"
+    range: "DATE"
+  authored_by:
+    description: "Authorship (inverse)"
+    domain: "WORK_OF_ART"
+    range: "PERSON"
+  developed_by:
+    description: "Developer or creator organization"
+    domain: "PRODUCT"
+    range: "ORG"
+  uses:
+    description: "A work or product uses a technology/concept"
+    domain: "WORK_OF_ART"
+    range: "CONCEPT"
+
+  # ── Generic / fallback (no domain/range → any pair) ──────────
+  associated_with:
+    description: "Generic association"
+    symmetric: true
+    confidence: 0.25
+
+# ═══════════════════════════════════════════════════════════════
+# Attributes per entity type
+# `functional: true` means at most one value per entity.
+# Otherwise multi-valued (list).
+# ═══════════════════════════════════════════════════════════════
+
+attributes:
+  PERSON:
+    canonical_name:
+      functional: true
+    aliases: {}
+    birth_date:
+      functional: true
+    death_date:
+      functional: true
+    nationality: {}
+    occupation: {}
+    description:
+      functional: true
+
+  ORG:
+    canonical_name:
+      functional: true
+    aliases: {}
+    founded_date:
+      functional: true
+    dissolved_date:
+      functional: true
+    industry: {}
+    headquarters:
+      functional: true
+    employee_count:
+      functional: true
+    description:
+      functional: true
+
+  GPE:
+    canonical_name:
+      functional: true
+    aliases: {}
+    country:
+      functional: true
+    coordinates:
+      functional: true
+    population:
+      functional: true
+
+  LOC:
+    canonical_name:
+      functional: true
+    aliases: {}
+    country:
+      functional: true
+    coordinates:
+      functional: true
+
+  EVENT:
+    canonical_name:
+      functional: true
+    aliases: {}
+    date:
+      functional: true
+    end_date:
+      functional: true
+    location:
+      functional: true
+    participants: {}
+    description:
+      functional: true
+
+  CONCEPT:
+    canonical_name:
+      functional: true
+    aliases: {}
+    description:
+      functional: true
+
+  PRODUCT:
+    canonical_name:
+      functional: true
+    aliases: {}
+    release_date:
+      functional: true
+    manufacturer:
+      functional: true
+    url:
+      functional: true
+
+  WORK_OF_ART:
+    canonical_name:
+      functional: true
+    aliases: {}
+    title:
+      functional: true
+    publish_date:
+      functional: true
+    authors: {}
+    url:
+      functional: true
+
+  DATE:
+    canonical_name:
+      functional: true
+    iso_date:
+      functional: true
+
+  FAC:
+    canonical_name:
+      functional: true
+    aliases: {}
+    location:
+      functional: true
+
+  NORP:
+    canonical_name:
+      functional: true
+    aliases: {}
+    description:
+      functional: true
+
+  LAW:
+    canonical_name:
+      functional: true
+    aliases: {}
+    enacted_date:
+      functional: true
+    jurisdiction:
+      functional: true
+
+  LANGUAGE:
+    canonical_name:
+      functional: true
+    aliases: {}
+    iso_code:
+      functional: true
+
+  MONEY:
+    canonical_name:
+      functional: true
+    amount:
+      functional: true
+    currency:
+      functional: true
+
+  QUANTITY:
+    canonical_name:
+      functional: true
+    value:
+      functional: true
+    unit:
+      functional: true
