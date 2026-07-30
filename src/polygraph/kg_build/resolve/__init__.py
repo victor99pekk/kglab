@@ -15,6 +15,30 @@ def with_method(entities, *, method: str = "string", **options):
     return get_resolution_method(method)(entities, **options)
 
 
+def with_method_and_mapping(entities, *, method: str = "string", **options):
+    """Resolve entities and map every original ID to its canonical ID."""
+    resolved = with_method(entities, method=method, **options)
+    alias_index = {}
+    for canonical in resolved:
+        canonical_id = canonical.get("id", "")
+        entity_type = canonical.get("type", canonical.get("label", "ENTITY"))
+        names = [canonical.get("name", ""), *canonical.get("aliases", [])]
+        for name in names:
+            if name:
+                alias_index[(entity_type, str(name).casefold().strip())] = canonical_id
+
+    id_map = {}
+    for entity in entities:
+        original_id = entity.get("id", "")
+        entity_type = entity.get("type", entity.get("label", "ENTITY"))
+        canonical_id = alias_index.get(
+            (entity_type, str(entity.get("name", "")).casefold().strip())
+        )
+        if original_id and canonical_id:
+            id_map[original_id] = canonical_id
+    return resolved, id_map
+
+
 def by_string(entities, threshold: float = 0.85):
     return with_method(entities, method="string", threshold=threshold)
 
@@ -63,25 +87,10 @@ class EntityResolver:
         return resolve_string(entities, self.threshold)
 
     def resolve_with_mapping(self, entities):
-        resolved = self.resolve(entities)
-        alias_index = {}
-        for canonical in resolved:
-            canonical_id = canonical.get("id", "")
-            entity_type = canonical.get("type", canonical.get("label", "ENTITY"))
-            names = [canonical.get("name", ""), *canonical.get("aliases", [])]
-            for name in names:
-                if name:
-                    alias_index[(entity_type, str(name).casefold().strip())] = canonical_id
-        id_map = {}
-        for entity in entities:
-            original_id = entity.get("id", "")
-            entity_type = entity.get("type", entity.get("label", "ENTITY"))
-            canonical_id = alias_index.get(
-                (entity_type, str(entity.get("name", "")).casefold().strip())
-            )
-            if original_id and canonical_id:
-                id_map[original_id] = canonical_id
-        return resolved, id_map
+        options = {"threshold": self.threshold}
+        if self.method == "embedding":
+            options.update({"model_name": self.model_name, "encoder": self.encoder})
+        return with_method_and_mapping(entities, method=self.method, **options)
 
 
 __all__ = [
@@ -93,4 +102,5 @@ __all__ = [
     "resolve_embedding",
     "resolve_string",
     "with_method",
+    "with_method_and_mapping",
 ]

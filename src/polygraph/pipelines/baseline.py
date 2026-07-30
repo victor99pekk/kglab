@@ -162,11 +162,13 @@ class Baseline(Pipeline):
 
         # ── Entity → Chunk edges (which chunk each entity came from) ──
         entity_chunk_edges: set[tuple[str, str]] = set()
+        node_types = {entity["id"]: entity.get("type", "ENTITY") for entity in entities}
         for triple in triples:
             source_chunk = triple[4] if len(triple) > 4 else ""
             if source_chunk and source_chunk in existing_ids:
-                entity_chunk_edges.add((triple[0], source_chunk))
-                entity_chunk_edges.add((triple[2], source_chunk))
+                for endpoint in (triple[0], triple[2]):
+                    if node_types.get(endpoint) not in {None, "Chunk", "Document"}:
+                        entity_chunk_edges.add((endpoint, source_chunk))
 
         for entity_id, chunk_id in entity_chunk_edges:
             triples.append((entity_id, "appears_in", chunk_id, "", chunk_id))
@@ -175,12 +177,21 @@ class Baseline(Pipeline):
 
         # ── Resolution ─────────────────────────────────────────
         res_cfg = self.resolution or ResolutionConfig.from_dict(self._config.get("resolution"))
-        resolved = resolve.with_method(
+        resolved, entity_id_map = resolve.with_method_and_mapping(
             entities,
             method=res_cfg.method,
             threshold=res_cfg.threshold,
             **res_cfg.options,
         )
+        triples = [
+            (
+                entity_id_map.get(triple[0], triple[0]),
+                triple[1],
+                entity_id_map.get(triple[2], triple[2]),
+                *triple[3:],
+            )
+            for triple in triples
+        ]
 
         # ── Build ──────────────────────────────────────────────
         bld_cfg = self.build or BuildConfig.from_dict(self._config.get("build"))

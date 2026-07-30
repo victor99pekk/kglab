@@ -323,5 +323,1060 @@
     "entity_a": "black jersey",
     "entity_b": "black jerseys",
     "similarity": 0.9091
+  },
+  {
+    "entity_a": "Bosnia References Waterfalls of",
+    "entity_b": "Bosnia References Waterfalls",
+    "similarity": 0.8966
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk0",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk1",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk2",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9808
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk3",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk4",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk5",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk6",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk7",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "similarity": 0.9615
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk8",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk9",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9434
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk10",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk11",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk12",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk13",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk14",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk15",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk16",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk17",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "similarity": 0.9623
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk18",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
+  },
+  {
+    "entity_a": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk19",
+    "entity_b": "https___en.wikipedia.org_wiki_Baltimore%20Ravens:chunk20",
+    "similarity": 0.9259
   }
 ]

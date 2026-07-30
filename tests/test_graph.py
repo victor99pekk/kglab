@@ -1,8 +1,11 @@
 """Tests for graph construction."""
 
 import networkx as nx
+import pytest
 
+from polygraph._shared import Ontology
 from polygraph.kg_build.build import GraphBuilder
+from polygraph.kg_build.resolve import with_method_and_mapping
 
 
 def test_build_graph():
@@ -73,6 +76,70 @@ def test_graph_edge_preserves_relationship_provenance():
     ]
 
 
+def test_graph_rejects_invalid_structural_relationship_types():
+    ontology = Ontology(
+        relationship_types={
+            "appears_in": {
+                "domain": "Entity",
+                "range": "Chunk",
+                "kind": "structural",
+            }
+        }
+    )
+    entities = [
+        {"id": "entity:alice", "name": "Alice", "type": "PERSON"},
+        {"id": "entity:bob", "name": "Bob", "type": "PERSON"},
+    ]
+
+    with pytest.raises(ValueError, match=r"expected Entity->Chunk, got PERSON->PERSON"):
+        GraphBuilder(ontology=ontology).build(
+            entities,
+            [("entity:alice", "appears_in", "entity:bob")],
+        )
+
+
+def test_graph_rejects_structural_relationship_with_missing_endpoint():
+    ontology = Ontology(
+        relationship_types={
+            "part_of": {
+                "domain": "Chunk",
+                "range": "Document",
+                "kind": "structural",
+            }
+        }
+    )
+    entities = [{"id": "chunk:one", "name": "Chunk one", "type": "Chunk"}]
+
+    with pytest.raises(ValueError, match=r"missing endpoint.*document:missing"):
+        GraphBuilder(ontology=ontology).build(
+            entities,
+            [("chunk:one", "part_of", "document:missing")],
+        )
+
+
+def test_graph_accepts_valid_structural_relationship_types():
+    ontology = Ontology(
+        relationship_types={
+            "appears_in": {
+                "domain": "Entity",
+                "range": "Chunk",
+                "kind": "structural",
+            }
+        }
+    )
+    entities = [
+        {"id": "entity:alice", "name": "Alice", "type": "PERSON"},
+        {"id": "chunk:one", "name": "Chunk one", "type": "Chunk"},
+    ]
+
+    graph = GraphBuilder(ontology=ontology).build(
+        entities,
+        [("entity:alice", "appears_in", "chunk:one")],
+    )
+
+    assert graph.has_edge("entity:alice", "chunk:one")
+
+
 def test_deduplication_removes_exact_duplicates():
     from polygraph._shared import Document
     from polygraph.preprocess.dedup import Deduplicator
@@ -126,6 +193,25 @@ def test_embedding_resolution_does_not_merge_semantically_related_names():
     )
 
     assert len(resolver.resolve(entities)) == 2
+
+
+def test_resolution_maps_merged_entity_ids_to_canonical_id():
+    entities = [
+        {"id": "entity:one", "name": "Alice Smith", "type": "PERSON", "aliases": []},
+        {"id": "entity:two", "name": "Alice", "type": "PERSON", "aliases": []},
+    ]
+
+    resolved, id_map = with_method_and_mapping(
+        entities,
+        method="string",
+        threshold=0.4,
+    )
+
+    assert len(resolved) == 1
+    assert id_map == {
+        "entity:one": "entity:one",
+        "entity:two": "entity:one",
+    }
 
 
 def test_quality_filter_removes_short_docs():

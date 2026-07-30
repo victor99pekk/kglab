@@ -20,14 +20,10 @@ class OntologyRuleRelationExtractor(RelationExtractorMethod):
         self.ontology = ontology
         self.language = language
         self._typed_patterns: list[tuple[str, str, str]] = []
-        self._generic_predicates: list[str] = []
         self._symmetric_predicates: set[str] = set()
 
         for domain, range_, predicate, symmetric in ontology.get_relation_patterns():
-            if domain and range_:
-                self._typed_patterns.append((domain, range_, predicate))
-            else:
-                self._generic_predicates.append(predicate)
+            self._typed_patterns.append((domain, range_, predicate))
             if symmetric:
                 self._symmetric_predicates.add(predicate)
 
@@ -74,8 +70,6 @@ class OntologyRuleRelationExtractor(RelationExtractorMethod):
             if e1.label == dependent_label and e2.label == head_label:
                 return self._canonicalize_symmetric(e2, predicate, e1)
 
-        if self._generic_predicates:
-            return self._canonicalize_symmetric(e1, self._generic_predicates[0], e2)
         return None
 
     def _canonicalize_symmetric(

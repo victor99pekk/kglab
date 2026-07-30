@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -33,7 +34,7 @@ class Ontology:
     """
 
     entity_types: dict[str, dict[str, str]] = field(default_factory=dict)
-    relationship_types: dict[str, dict[str, str]] = field(default_factory=dict)
+    relationship_types: dict[str, dict[str, Any]] = field(default_factory=dict)
     attributes: dict[str, list[str]] = field(default_factory=dict)
 
     # ── helpers ─────────────────────────────────────────────────
@@ -45,23 +46,38 @@ class Ontology:
     def get_relation_patterns(self) -> list[tuple[str, str, str, bool]]:
         """Return (domain, range, predicate, symmetric) patterns for rule-based extraction.
 
-        Relations that define both *domain* and *range* produce a typed
-        pattern.  Relations with neither (or with ``symmetric: true``) are
-        treated as symmetric and applicable to any entity-type pair.
+        Only semantic relations with both a *domain* and a *range* are
+        extractable. Structural relations are created explicitly by the
+        pipeline, while untyped relations are metadata rather than an
+        instruction to connect every co-occurring entity pair.
         """
         patterns: list[tuple[str, str, str, bool]] = []
         for predicate, info in self.relationship_types.items():
+            if info.get("kind") == "structural":
+                continue
+
             domain = str(info.get("domain", "")).strip()
             range_ = str(info.get("range", "")).strip()
             symmetric = bool(info.get("symmetric", False))
 
             if domain and range_:
                 patterns.append((domain, range_, predicate, symmetric))
-            else:
-                # Generic / untyped — use empty strings so the extractor
-                # falls back to all-pairs matching.
-                patterns.append(("", "", predicate, True))
         return patterns
+
+    def get_structural_relation_types(self) -> dict[str, tuple[str, str]]:
+        """Return structural predicates and their required endpoint types."""
+        structural: dict[str, tuple[str, str]] = {}
+        for predicate, info in self.relationship_types.items():
+            if info.get("kind") != "structural":
+                continue
+            domain = str(info.get("domain", "")).strip()
+            range_ = str(info.get("range", "")).strip()
+            if not domain or not range_:
+                raise ValueError(
+                    f"Structural relation '{predicate}' must define domain and range"
+                )
+            structural[predicate] = (domain, range_)
+        return structural
 
     @classmethod
     def from_yaml(cls, path: Path) -> "Ontology":

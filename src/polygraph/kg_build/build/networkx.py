@@ -28,10 +28,12 @@ class GraphBuilder:
     ) -> nx.DiGraph:
         """Build a graph from ID-based triples with evidence and provenance."""
         graph = nx.DiGraph()
+        entity_types: dict[str, str] = {}
 
         for entity in entities:
             node_type = entity.get("type", entity.get("label", "ENTITY"))
             node_id = entity.get("id") or entity_id(node_type, entity.get("name", ""))
+            entity_types[node_id] = node_type
             node_data = {
                 "id": node_id,
                 "name": entity.get("name", ""),
@@ -62,6 +64,9 @@ class GraphBuilder:
                 if entity.get(key) not in (None, ""):
                     node_data[key] = entity[key]
             graph.add_node(node_id, **node_data)
+
+        if self.ontology:
+            self._validate_structural_triples(triples, entity_types)
 
         for triple in triples:
             subject, predicate, object_id = triple[0], triple[1], triple[2]
@@ -127,6 +132,51 @@ class GraphBuilder:
         if self.ontology:
             self._validate(graph)
         return graph
+
+    def _validate_structural_triples(
+        self,
+        triples: list[tuple[str, ...]],
+        entity_types: dict[str, str],
+    ) -> None:
+        """Reject structural edges whose endpoints violate the ontology."""
+        if not self.ontology:
+            return
+
+        constraints = self.ontology.get_structural_relation_types()
+        violations: list[str] = []
+        for triple in triples:
+            subject, predicate, object_id = triple[0], triple[1], triple[2]
+            if predicate not in constraints:
+                continue
+
+            expected_subject, expected_object = constraints[predicate]
+            subject_type = entity_types.get(subject)
+            object_type = entity_types.get(object_id)
+            if subject_type is None or object_type is None:
+                missing = [
+                    node_id
+                    for node_id, node_type in ((subject, subject_type), (object_id, object_type))
+                    if node_type is None
+                ]
+                violations.append(f"{predicate}: missing endpoint(s) {', '.join(missing)}")
+                continue
+
+            subject_matches = (
+                expected_subject == "Entity" and subject_type not in {"Chunk", "Document"}
+            ) or subject_type == expected_subject
+            object_matches = object_type == expected_object
+            if not subject_matches or not object_matches:
+                violations.append(
+                    f"{predicate}: expected {expected_subject}->{expected_object}, "
+                    f"got {subject_type}->{object_type} ({subject}->{object_id})"
+                )
+
+        if violations:
+            preview = "; ".join(violations[:5])
+            remainder = len(violations) - 5
+            if remainder > 0:
+                preview += f"; and {remainder} more"
+            raise ValueError(f"Invalid structural relationship(s): {preview}")
 
     @staticmethod
     def _compute_importance(graph: nx.DiGraph) -> None:

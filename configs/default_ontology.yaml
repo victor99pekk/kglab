@@ -198,14 +198,18 @@ relationship_types:
     description: "A chunk is part of its parent document"
     domain: "Chunk"
     range: "Document"
+    kind: "structural"
   next:
     description: "A chunk precedes another chunk within the same document"
     domain: "Chunk"
     range: "Chunk"
+    kind: "structural"
   appears_in:
     description: "An entity appears in a specific chunk"
-    symmetric: true
-  # Generic / fallback (no domain/range → any pair, symmetric)
+    domain: "Entity"
+    range: "Chunk"
+    kind: "structural"
+  # Untyped semantic metadata. Rule extraction does not infer these relations.
   associated_with:
     description: "Generic association"
     symmetric: true

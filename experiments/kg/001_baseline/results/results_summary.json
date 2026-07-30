@@ -1,33 +1,33 @@
 {
   "experiment_name": "001 — Baseline pipeline",
-  "timestamp": "2026-07-30T06:24:00.670754+00:00",
+  "timestamp": "2026-07-30T08:59:37.212777+00:00",
   "pipeline_variant": "baseline",
   "input_paths": [
     "data/wikipedia"
   ],
-  "output_dir": "/Users/victorpekkari/Desktop/aiv/polygraph/experiments/kg/001_baseline/results",
+  "output_dir": "/Users/armon/Documents/GitHub/vietnam_AI_hackathon/experiments/kg/001_baseline/results",
   "metrics": {
-    "num_nodes": 1771,
-    "num_edges": 17428,
-    "num_triples": 21280,
-    "completeness": 0.9994347088750706,
+    "num_nodes": 1792,
+    "num_edges": 20580,
+    "num_triples": 24413,
+    "completeness": 0.9951582867783985,
     "completeness_breakdown": {
-      "has_aliases": 0.998304126625212,
       "has_name": 1.0,
+      "has_aliases": 0.9854748603351955,
       "has_type": 1.0
     },
     "consistency": 1.0,
-    "duplication_level": 0.10350921467036728,
-    "entity_duplication_rate": 0.026003391746749593,
-    "triple_duplication_rate": 0.18101503759398496,
-    "missing_information": 0.0016958733747880158,
+    "duplication_level": 0.09135241847289444,
+    "entity_duplication_rate": 0.025698324022346397,
+    "triple_duplication_rate": 0.15700651292344248,
+    "missing_information": 0.01452513966480447,
     "format_errors": 0.0,
-    "labeling_quality": 0.37422272470322215,
-    "reusability": 0.7928853754940712,
-    "syntactic_accuracy": 0.9489,
-    "syntactic_error_rate": 0.0511,
+    "labeling_quality": 0.38212290502793295,
+    "reusability": 0.7957556863527534,
+    "syntactic_accuracy": 0.9537,
+    "syntactic_error_rate": 0.0463,
     "syntactic_error_breakdown": {
-      "bad_id_format": 1359,
+      "bad_id_format": 1380,
       "bad_date_format": 0,
       "bad_numeric_format": 0,
       "bad_predicate_naming": 0
@@ -41,31 +41,31 @@
         "Local Government"
       ]
     },
-    "overall_score": 0.8659053887181727,
-    "wall_time_s": 9.41
+    "overall_score": 0.8667370457173408,
+    "wall_time_s": 11.1
   },
   "structural_audit": {
     "graph_stats": {
-      "num_nodes": 1771,
-      "num_edges": 17428,
-      "num_triples": 21280,
+      "num_nodes": 1792,
+      "num_edges": 20580,
+      "num_triples": 24413,
       "is_directed": true,
       "is_connected": false
     },
     "degree_distribution": {
       "in_degree": {
-        "mean": 9.84,
-        "median": 5,
+        "mean": 11.48,
+        "median": 5.0,
         "min": 0,
         "max": 726,
-        "stdev": 26.32
+        "stdev": 29.2
       },
       "out_degree": {
-        "mean": 9.84,
-        "median": 6,
+        "mean": 11.48,
+        "median": 7.0,
         "min": 0,
-        "max": 391,
-        "stdev": 17.95
+        "max": 410,
+        "stdev": 18.86
       },
       "histogram": {
         "bin_edges": [
@@ -82,51 +82,51 @@
           726
         ],
         "in_counts": [
-          351,
-          322,
+          330,
+          317,
           403,
-          419,
-          156,
+          427,
+          172,
           79,
-          29,
-          7,
+          32,
+          27,
           3,
           1,
           1
         ],
         "out_counts": [
-          277,
-          303,
-          410,
-          480,
-          177,
-          85,
-          28,
-          9,
-          1,
+          102,
+          285,
+          441,
+          577,
+          241,
+          102,
+          30,
+          11,
+          2,
           1,
           0
         ]
       }
     },
     "connectivity_stats": {
-      "num_scc": 608,
-      "largest_scc_size": 1152,
-      "scc_size_gt1": 5,
-      "avg_clustering": 0.429271,
-      "estimated_diameter": 10
+      "num_scc": 572,
+      "largest_scc_size": 1186,
+      "scc_size_gt1": 8,
+      "avg_clustering": 0.431754,
+      "estimated_diameter": 11
     },
     "orphan_analysis": {
-      "orphan_count": 28,
-      "orphan_rate": 0.0158,
-      "entity_orphans": 28,
+      "orphan_count": 12,
+      "orphan_rate": 0.0067,
+      "entity_orphans": 12,
       "chunk_orphans": 0,
-      "health_score": 95.3,
+      "health_score": 98.0,
       "flag": "green",
       "recommendation": ""
     },
     "density_analysis": {
-      "density": 0.00556,
+      "density": 0.006412,
       "health_score": 100,
       "flag": "green",
       "recommendation": ""
@@ -248,24 +248,24 @@
           "similarity": 0.8529
         }
       ],
-      "duplicate_pair_count": 65,
-      "duplicate_entity_count": 69,
-      "health_score": 81.6,
-      "flag": "yellow",
-      "recommendation": "65 potential duplicate pairs — consider entity resolution."
+      "duplicate_pair_count": 276,
+      "duplicate_entity_count": 92,
+      "health_score": 22.9,
+      "flag": "red",
+      "recommendation": "276 potential duplicate pairs — consider entity resolution."
     },
     "multi_hop_connectivity": {
-      "reachable_2hop_pct": 1.0715,
-      "reachable_3hop_pct": 2.5114,
+      "reachable_2hop_pct": 1.1745,
+      "reachable_3hop_pct": 2.7524,
       "health_score": 100,
       "flag": "green",
       "recommendation": ""
     },
-    "overall_health_score": 96.1,
+    "overall_health_score": 86.8,
     "verdict": "✅ Healthy — KG is structurally sound for SFT data generation."
   },
   "artifacts": {
-    "json": "/Users/victorpekkari/Desktop/aiv/polygraph/experiments/kg/001_baseline/results/knowledge_graph.json"
+    "json": "/Users/armon/Documents/GitHub/vietnam_AI_hackathon/experiments/kg/001_baseline/results/knowledge_graph.json"
   },
   "neo4j_uploaded": false,
   "neo4j_cleared": false,

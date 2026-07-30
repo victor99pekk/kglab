@@ -83,6 +83,28 @@ def test_relation_preserves_stable_ids_evidence_and_source_chunk():
     assert source_chunk_id == "chunk:123"
 
 
+def test_ontology_rule_extractor_does_not_fallback_for_unmatched_types():
+    ontology = _load_test_ontology()
+    alice = Entity(name="Alice", label="UNMAPPED_A")
+    bob = Entity(name="Bob", label="UNMAPPED_B")
+
+    relations = OntologyRuleRelationExtractor(ontology=ontology).extract(
+        "Alice met Bob.",
+        [alice, bob],
+        source_chunk_id="chunk:123",
+    )
+
+    assert relations == []
+
+
+def test_structural_relations_are_not_extraction_patterns():
+    ontology = _load_test_ontology()
+
+    predicates = {predicate for _, _, predicate, _ in ontology.get_relation_patterns()}
+
+    assert predicates.isdisjoint({"appears_in", "part_of", "next"})
+
+
 class _FakeDeepSeekClient:
     def __init__(self, responses):
         self.responses = iter(responses)
