@@ -5,7 +5,15 @@
 Polygraph is both a **research project** and an **open-source library** for knowledge graph generation. All code must balance two goals:
 
 1. **Research agility** — enable rapid experimentation and iteration on novel KG construction techniques.
+  - user should be able to quickly swap out components (e.g., chunkers, extractors, resolvers) and run experiments with minimal boilerplate.
+  - users should be able to easily compare results across different pipelines and configurations.
+  - users should be able to easily add new pipelines, exporters, or extraction strategies without modifying existing core code.
+  - there should be good support for knowledge graph generation pipelines, knowledge graph export, and evaluation metrics.
 2. **Library usability** — be intuitive for new users and easy to extend with new functionality.
+
+3. **Code quality** — maintain a high standard of code readability, maintainability, and test coverage.
+4. The codebase should be well-documented, with clear docstrings and usage examples for all public APIs.
+5. I want the codebase to be like a libary for KG operations, with clear abstractions and interfaces for each component (e.g., chunkers, extractors, resolvers, exporters). But in my specific use case i am building this to create a Great Knowledge Graph for LLM training.
 
 When writing or modifying code, ask: *Would a new user understand how to use this? Could a contributor easily swap out this component for their own?*
 
@@ -32,5 +40,3 @@ When writing or modifying code, ask: *Would a new user understand how to use thi
 - New pipelines, exporters, or extraction strategies should be addable without modifying existing core code — follow the plugin/registry pattern already established in the codebase.
 
 ---
-
-<!-- Add your own project-specific instructions below this line -->
