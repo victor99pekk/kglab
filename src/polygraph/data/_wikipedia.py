@@ -580,9 +580,11 @@ def _download_degree_targeted(
             target_degree,
         )
 
-    # Clean up internal field before writing
+    # Convert internal linked-titles to canonical "links" field
     for r in records:
-        r.pop("_linked_titles", None)
+        titles = r.pop("_linked_titles", None)
+        if titles:
+            r["links"] = [_title_to_url(t, language=language) for t in titles]
 
     with output.open("w", encoding="utf-8") as handle:
         for record in records:
