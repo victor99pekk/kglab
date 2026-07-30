@@ -54,6 +54,18 @@ input:
   paths:
     - "data/wikipedia/"
 
+  # Optional: auto-download a supported dataset before running.
+  # When set, BenchmarkRunner calls polygraph.data.Data.download() to ensure
+  # the data exists at the first input path. Cached data is never re-downloaded.
+  #
+  # Supported dataset names: see Data.list()
+  #
+  # dataset:
+  #   name: "wikipedia_random"
+  #   params:
+  #     count: 100
+  #     language: "en"
+
 # ── Output ──────────────────────────────────────────────────────────────────
 
 output:

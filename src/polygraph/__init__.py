@@ -1,6 +1,7 @@
 """kg-generator — Research toolkit for building high-quality KGs for LLM training.
 
 Modules:
+    data/         — Download & enrich supported datasets (polygraph.data.Data)
     preprocess/   — Raw text → clean, deduplicated chunks
     kg_build/     — Chunks → Knowledge Graph (extract → resolve → build)
     kg_eval/      — KG quality evaluation & structural audits

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 
 from polygraph.benchmark_pipeline.config import ExperimentConfig
@@ -44,6 +45,28 @@ class BenchmarkRunner:
         config = self._config
         output_dir = config.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 0. Ensure dataset is downloaded (cached if already present)
+        if config.dataset_name:
+            from polygraph.data import Data
+
+            if not config.input_paths:
+                raise ValueError(
+                    f"Experiment specifies dataset '{config.dataset_name}' "
+                    "but has no input.paths to download to."
+                )
+            dataset_path = config.input_paths[0]
+            dataset_path = Path(dataset_path)
+            if dataset_path.is_dir():
+                dataset_path = dataset_path / "articles.jsonl"
+
+            params = dict(config.dataset_params)
+            Data.download(
+                config.dataset_name,
+                path=str(dataset_path),
+                enrich=True,
+                **params,
+            )
 
         # 1. Resolve pipeline class
         pipeline_cls = self._resolve_pipeline(config.pipeline_variant)

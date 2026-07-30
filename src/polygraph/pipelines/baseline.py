@@ -20,7 +20,7 @@ from polygraph._shared.stage_config import (
 )
 from polygraph.kg_build import build, extract, resolve
 from polygraph.pipelines._base import Pipeline
-from polygraph.preprocess import chunk, clean, dedup, load, quality
+from polygraph.preprocess import chunk, clean, dedup, link, load, quality
 
 _DEFAULT_ONTOLOGY_PATH = Path(__file__).parents[3] / "configs" / "default_ontology.yaml"
 
@@ -70,6 +70,7 @@ class Baseline(Pipeline):
     def preprocess(self) -> list[Document]:
         docs = load.from_paths(self.input_paths)
         docs = clean.normalize(docs)
+        docs = link.normalize_links(docs)
         docs = quality.filter(docs, min_chars=50, min_words=10)
         docs = dedup.remove_duplicates(docs, method="minhash", threshold=0.85)
 

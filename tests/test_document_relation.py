@@ -23,6 +23,7 @@ from polygraph.kg_build.extract.document_relation.shared_authors import (
 from polygraph.kg_build.extract.document_relation.shared_references import (
     SharedReferencesExtractor,
 )
+from polygraph.preprocess.link.normalize import normalize_links
 
 # ── Helpers ────────────────────────────────────────────────────
 
@@ -57,8 +58,14 @@ def test_hyperlink_extracts_entities_for_all_docs():
 
 
 def test_hyperlink_detects_url_in_content():
+    """HyperlinkExtractor reads canonical outgoing_urls from metadata."""
     docs = [
-        _make_doc("doc_a", "See https://b.com/article for more", url="https://a.com"),
+        _make_doc(
+            "doc_a",
+            "See https://b.com/article for more",
+            url="https://a.com",
+            outgoing_urls=["https://b.com/article"],
+        ),
         _make_doc("doc_b", "Content here", url="https://b.com/article"),
     ]
     _, triples = HyperlinkExtractor().extract(docs)
@@ -70,7 +77,12 @@ def test_hyperlink_detects_url_in_content():
 
 def test_hyperlink_no_self_links():
     docs = [
-        _make_doc("doc_a", "See https://a.com/self", url="https://a.com/self"),
+        _make_doc(
+            "doc_a",
+            "See https://a.com/self",
+            url="https://a.com/self",
+            outgoing_urls=["https://a.com/self"],
+        ),
     ]
     _, triples = HyperlinkExtractor().extract(docs)
     assert len(triples) == 0
@@ -78,8 +90,8 @@ def test_hyperlink_no_self_links():
 
 def test_hyperlink_no_url_no_triples():
     docs = [
-        _make_doc("doc_a", "No URLs here", url="https://a.com"),
-        _make_doc("doc_b", "Also no URLs", url="https://b.com"),
+        _make_doc("doc_a", "No URLs here", url="https://a.com", outgoing_urls=[]),
+        _make_doc("doc_b", "Also no URLs", url="https://b.com", outgoing_urls=[]),
     ]
     _, triples = HyperlinkExtractor().extract(docs)
     assert triples == []
@@ -200,7 +212,13 @@ def test_series_different_series_no_edge():
 
 def test_composite_combines_multiple_doc_extractors():
     docs = [
-        _make_doc("doc_a", "link: https://b.com", url="https://a.com", authors=["Alice"]),
+        _make_doc(
+            "doc_a",
+            "link: https://b.com",
+            url="https://a.com",
+            authors=["Alice"],
+            outgoing_urls=["https://b.com"],
+        ),
         _make_doc("doc_b", "content", url="https://b.com", authors=["Alice"]),
     ]
     composite = CompositeDocRelationExtractor(
@@ -407,3 +425,85 @@ def test_shared_references_no_refs_no_edges():
     ]
     _, triples = SharedReferencesExtractor().extract(docs)
     assert triples == []
+
+
+# ── normalize_links (preprocess/link stage) ────────────────────
+
+
+def test_normalize_links_from_structured_metadata():
+    """Structured links field in metadata is preferred over content parsing."""
+    docs = [
+        _make_doc(
+            "doc_a",
+            "Visit https://ignored.com",
+            links=["https://structured.com", "https://also.com"],
+        ),
+    ]
+    result = normalize_links(docs)
+    assert result[0].metadata["outgoing_urls"] == [
+        "https://also.com",
+        "https://structured.com",
+    ]
+
+
+def test_normalize_links_falls_back_to_content():
+    """When no structured URL fields exist, parse from content text."""
+    docs = [
+        _make_doc("doc_a", "See https://example.com and https://other.org for details."),
+    ]
+    result = normalize_links(docs)
+    assert "https://example.com" in result[0].metadata["outgoing_urls"]
+    assert "https://other.org" in result[0].metadata["outgoing_urls"]
+
+
+def test_normalize_links_empty_when_no_urls():
+    """Document with no URLs anywhere gets an empty list."""
+    docs = [
+        _make_doc("doc_a", "No URLs at all in this text."),
+    ]
+    result = normalize_links(docs)
+    assert result[0].metadata["outgoing_urls"] == []
+
+
+def test_normalize_links_handles_string_references_field():
+    """A string metadata field (e.g., references) is parsed for URLs."""
+    docs = [
+        _make_doc("doc_a", "Content", references="See https://ref.com and https://other.org"),
+    ]
+    result = normalize_links(docs)
+    assert len(result[0].metadata["outgoing_urls"]) == 2
+
+
+def test_normalize_links_custom_url_fields():
+    """User can specify which metadata fields to check."""
+    docs = [
+        _make_doc(
+            "doc_a", "Content with https://ignored.com", my_custom_field=["https://custom.com"]
+        ),
+    ]
+    result = normalize_links(docs, url_fields=["my_custom_field"])
+    assert result[0].metadata["outgoing_urls"] == ["https://custom.com"]
+
+
+def test_normalize_links_deduplicates_urls():
+    """Same URL from multiple sources → appears once."""
+    docs = [
+        _make_doc("doc_a", "See https://dup.com", links=["https://dup.com"]),
+    ]
+    result = normalize_links(docs)
+    assert result[0].metadata["outgoing_urls"] == ["https://dup.com"]
+
+
+def test_normalize_links_end_to_end_with_hyperlink_extractor():
+    """Full pipeline: normalize_links → HyperlinkExtractor produces correct edges."""
+    docs = [
+        _make_doc("doc_a", "link: https://b.com", url="https://a.com"),
+        _make_doc("doc_b", "content", url="https://b.com"),
+    ]
+    # Simulate what the pipeline does: normalize links first, then extract
+    docs = normalize_links(docs)
+    _, triples = HyperlinkExtractor().extract(docs)
+    assert len(triples) == 1
+    assert triples[0][0] == _doc_eid("doc_a")
+    assert triples[0][1] == "hyperlinks_to"
+    assert triples[0][2] == _doc_eid("doc_b")

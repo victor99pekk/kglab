@@ -1,7 +1,11 @@
-"""Hyperlink-based document-to-document relation extraction."""
+"""Hyperlink-based document-to-document relation extraction.
+
+Reads canonical ``metadata["outgoing_urls"]`` (populated by
+:func:`~polygraph.preprocess.link.normalize.normalize_links`) and
+matches them against other documents' ``metadata["url"]``.
+"""
 
 import logging
-import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -17,12 +21,15 @@ from polygraph.kg_build.extract.document_relation._helpers import (
 
 logger = logging.getLogger(__name__)
 
-_URL_PATTERN = re.compile(r"https?://[^\s<>\"')\]]+")
-
 
 class HyperlinkExtractor(DocumentRelationExtractor):
-    """Extract ``hyperlinks_to`` relations by matching URLs in document content
-    to other documents' canonical URLs.
+    """Extract ``hyperlinks_to`` relations by matching ``outgoing_urls`` on
+    each document to other documents' canonical URLs.
+
+    Requires that :func:`~polygraph.preprocess.link.normalize.normalize_links`
+    has been run during preprocessing — this populates the canonical
+    ``metadata["outgoing_urls"]`` field from either structured input fields
+    or content parsing.
     """
 
     def extract(self, documents: list[Document]) -> tuple[list[dict[str, Any]], list[DocTriple]]:
@@ -32,8 +39,8 @@ class HyperlinkExtractor(DocumentRelationExtractor):
 
         for doc in documents:
             subject_id = doc_entity_id(doc)
-            found_urls = _URL_PATTERN.findall(doc.content)
-            for url in found_urls:
+            outgoing_urls: list[str] = doc.metadata.get("outgoing_urls", [])
+            for url in outgoing_urls:
                 normalized = _normalize_url(url)
                 target_id = url_index.get(normalized)
                 if target_id and target_id != subject_id:

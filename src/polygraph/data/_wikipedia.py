@@ -1,0 +1,472 @@
+"""Wikipedia data — download and enrich Polygraph JSONL from HuggingFace + Wikipedia API.
+
+Provides two public functions:
+
+* ``download_wikipedia()`` — stream random articles from ``wikimedia/wikipedia``
+* ``enrich_wikipedia()`` — add outgoing hyperlinks via Wikipedia API
+
+Both write Polygraph-compliant JSONL.  The enrichment step populates a
+``links`` field that the preprocess ``normalize_links`` →
+``HyperlinkExtractor`` pipeline uses to create ``hyperlinks_to`` edges.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import gc
+import json
+import logging
+import os
+import random
+import signal
+import time
+from collections.abc import Iterable
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
+
+# ── Download constants ────────────────────────────────────────
+
+DEFAULT_DATASET = "wikimedia/wikipedia"
+DEFAULT_SNAPSHOT = "20231101"
+DEFAULT_MAX_SCAN = 10_000
+DATASET_LICENSE = "CC BY-SA 3.0 / GFDL"
+DATASET_URL = "https://huggingface.co/datasets/wikimedia/wikipedia"
+
+# ── Enrich constants ──────────────────────────────────────────
+
+REQUEST_DELAY = 0.1  # seconds between Wikipedia API calls
+
+
+# ═══════════════════════════════════════════════════════════════
+# Errors
+# ═══════════════════════════════════════════════════════════════
+
+
+class HuggingFaceDownloadError(RuntimeError):
+    """Raised when the public Hugging Face dataset cannot be read."""
+
+
+# ═══════════════════════════════════════════════════════════════
+# Download
+# ═══════════════════════════════════════════════════════════════
+
+
+class HuggingFaceWikipediaClient:
+    """Stream one Wikimedia Wikipedia language split and reservoir-sample rows."""
+
+    def __init__(
+        self,
+        language: str = "en",
+        snapshot: str = DEFAULT_SNAPSHOT,
+        seed: int | None = None,
+        max_scan: int = DEFAULT_MAX_SCAN,
+    ) -> None:
+        if not language.isalpha() or not 2 <= len(language) <= 12:
+            raise ValueError("language must be a Wikipedia language code, for example 'en' or 'vi'")
+        if not snapshot.isdigit():
+            raise ValueError("snapshot must be a date-like dataset version, for example '20231101'")
+        if max_scan < 1:
+            raise ValueError("max_scan must be positive")
+
+        self.language = language.lower()
+        self.snapshot = snapshot
+        self.config = f"{snapshot}.{self.language}"
+        self.seed = seed if seed is not None else random.SystemRandom().randrange(2**32)
+        self.max_scan = max_scan
+
+    def fetch_random(
+        self,
+        limit: int,
+        min_chars: int = 200,
+        excluded_ids: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Stream rows and reservoir-sample until ``limit`` usable articles are collected."""
+        if limit < 1:
+            return []
+
+        try:
+            from datasets import load_dataset
+        except ImportError as exc:
+            raise HuggingFaceDownloadError(
+                "Missing Hugging Face Datasets. Install with: uv sync --extra data"
+            ) from exc
+
+        dataset = None
+        try:
+            dataset = load_dataset(
+                DEFAULT_DATASET,
+                self.config,
+                split="train",
+                streaming=True,
+            )
+            rows: Iterable[dict[str, Any]] = dataset
+            records: list[dict[str, Any]] = []
+            excluded = excluded_ids or set()
+            eligible_seen = 0
+            rng = random.Random(self.seed)
+            for scanned, row in enumerate(rows, start=1):
+                record = self.row_to_record(
+                    row,
+                    language=self.language,
+                    snapshot=self.snapshot,
+                    downloaded_at=_utc_now(),
+                    min_chars=min_chars,
+                )
+                if record is not None and record["id"] not in excluded:
+                    eligible_seen += 1
+                    if len(records) < limit:
+                        records.append(record)
+                    else:
+                        replacement = rng.randrange(eligible_seen)
+                        if replacement < limit:
+                            records[replacement] = record
+                if scanned >= self.max_scan:
+                    break
+        except HuggingFaceDownloadError:
+            raise
+        except Exception as exc:
+            raise HuggingFaceDownloadError(
+                f"could not stream {DEFAULT_DATASET}/{self.config}: {exc}"
+            ) from exc
+        finally:
+            if dataset is not None:
+                _close_dataset(dataset)
+
+        if len(records) >= limit:
+            return records
+
+        raise HuggingFaceDownloadError(
+            f"found {len(records)} usable articles after scanning {self.max_scan} rows; "
+            f"wanted {limit}. Lower --min-chars or raise --max-scan."
+        )
+
+    @staticmethod
+    def row_to_record(
+        row: dict[str, Any],
+        language: str,
+        snapshot: str,
+        downloaded_at: str,
+        min_chars: int = 200,
+    ) -> dict[str, Any] | None:
+        """Convert one Hugging Face row to the Polygraph JSONL schema."""
+        raw_id = row.get("id")
+        title = str(row.get("title", "")).strip()
+        text = str(row.get("text", "")).strip()
+        if raw_id is None or not title or not text or len(text) < min_chars:
+            return None
+
+        page_id = str(raw_id)
+        url = str(row.get("url", "")).strip() or _article_url(language, title)
+        return {
+            "id": f"wikipedia:{language}:{page_id}",
+            "text": text,
+            "title": title,
+            "url": url,
+            "source": f"huggingface:{DEFAULT_DATASET}",
+            "dataset": DEFAULT_DATASET,
+            "dataset_config": f"{snapshot}.{language}",
+            "language": language,
+            "page_id": page_id,
+            "downloaded_at": downloaded_at,
+            "license": DATASET_LICENSE,
+            "license_url": DATASET_URL,
+            "categories": [],
+            "metadata_note": "HF Wikimedia Wikipedia rows do not include Wikipedia categories.",
+        }
+
+
+def download_wikipedia(
+    path: str | Path,
+    count: int = 20,
+    language: str = "en",
+    snapshot: str = DEFAULT_SNAPSHOT,
+    seed: int | None = None,
+    max_scan: int = DEFAULT_MAX_SCAN,
+    min_chars: int = 200,
+    append: bool = False,
+) -> int:
+    """Download random Wikipedia articles and write Polygraph JSONL.
+
+    Args:
+        path: Output JSONL file path.
+        count: Number of usable articles to download.
+        language: Wikipedia language code (e.g., ``"en"``).
+        snapshot: HuggingFace dataset snapshot (e.g., ``"20231101"``).
+        seed: Reservoir-sampling seed (random if ``None``).
+        max_scan: Maximum streamed rows to inspect.
+        min_chars: Skip articles shorter than this character count.
+        append: Append to existing file (skip already-present IDs).
+
+    Returns:
+        Number of records written.
+    """
+    if count < 1:
+        raise ValueError("count must be positive")
+
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    existing_ids = _existing_ids(output) if append and output.exists() else set()
+
+    client = HuggingFaceWikipediaClient(
+        language=language,
+        snapshot=snapshot,
+        seed=seed,
+        max_scan=max_scan,
+    )
+    candidates = client.fetch_random(count, min_chars=min_chars, excluded_ids=existing_ids)
+
+    records = []
+    for record in candidates:
+        if record["id"] not in existing_ids:
+            existing_ids.add(record["id"])
+            records.append(record)
+        if len(records) == count:
+            break
+    if len(records) < count:
+        raise HuggingFaceDownloadError(
+            f"downloaded {len(records)} new articles; wanted {count}. "
+            "Increase --max-scan or use a different --seed."
+        )
+
+    mode = "a" if append else "w"
+    with output.open(mode, encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    logger.info("Wrote %d Wikipedia articles to %s", len(records), output)
+
+    # PyArrow streaming threads from HuggingFace ``datasets`` can keep the
+    # process alive after the download loop exits.  Schedule a graceful
+    # SIGALRM that force-exits after a short grace period so scripts and
+    # notebooks terminate cleanly.
+    _schedule_watchdog()
+
+    return len(records)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Enrich
+# ═══════════════════════════════════════════════════════════════
+
+
+def _fetch_outgoing_links(page_id: str, language: str = "en") -> list[str]:
+    """Fetch all outgoing wiki-link page titles for a Wikipedia page."""
+    import requests
+
+    api_url = f"https://{language}.wikipedia.org/w/api.php"
+    titles: list[str] = []
+    params: dict[str, Any] = {
+        "action": "query",
+        "prop": "links",
+        "pageids": page_id,
+        "pllimit": "max",
+        "format": "json",
+    }
+    headers = {
+        "User-Agent": "Polygraph/0.2 (https://github.com/user/polygraph; research KG construction)"
+    }
+
+    while True:
+        try:
+            resp = requests.get(api_url, params=params, timeout=30, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as exc:
+            logger.warning("API error for page %s: %s", page_id, exc)
+            break
+
+        pages = data.get("query", {}).get("pages", {})
+        page_data = pages.get(str(page_id), pages.get(page_id, {}))
+        links = page_data.get("links", [])
+        for link in links:
+            title = link.get("title", "")
+            if title:
+                titles.append(title)
+
+        cont = data.get("continue", {})
+        if "plcontinue" in cont:
+            params["plcontinue"] = cont["plcontinue"]
+        else:
+            break
+
+    return titles
+
+
+def _title_to_url(title: str, language: str = "en") -> str:
+    """Convert a Wikipedia page title to its full URL."""
+    slug = quote(title.replace(" ", "_"), safe="()!,:;@&=+$-_.~'")
+    return f"https://{language}.wikipedia.org/wiki/{slug}"
+
+
+def enrich_wikipedia(
+    input_path: str | Path,
+    output_path: str | Path | None = None,
+    language: str = "en",
+    delay: float = REQUEST_DELAY,
+    force: bool = False,
+) -> int:
+    """Add outgoing Wikipedia hyperlinks to a Polygraph JSONL file.
+
+    Reads existing JSONL records (which must have a ``page_id`` field),
+    queries the Wikipedia API for outgoing links, and writes enriched
+    records with a ``links`` field containing full Wikipedia URLs.
+
+    By default, skips enrichment if records already contain a ``links``
+    field.  Set ``force=True`` to always re-fetch.
+
+    Args:
+        input_path: Path to existing Polygraph Wikipedia JSONL.
+        output_path: Where to write enriched JSONL (defaults to overwriting ``input_path``).
+        language: Wikipedia language code.
+        delay: Seconds to wait between API requests (be polite to Wikipedia).
+        force: If ``True``, re-enrich even if records already have links.
+
+    Returns:
+        Number of records enriched with links (0 if cached).
+    """
+    try:
+        from tqdm import tqdm
+    except ImportError:
+
+        def tqdm(x, **kw):
+            return x  # type: ignore[assignment]
+
+    inp = Path(input_path)
+    out = Path(output_path) if output_path else inp
+
+    # Read all records
+    records: list[dict[str, Any]] = []
+    with inp.open(encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                records.append(json.loads(line))
+
+    if not records:
+        logger.warning("No records found in %s", inp)
+        return 0
+
+    # Cache check: skip if records already have links (unless forced)
+    if not force and _records_have_links(records):
+        logger.info(
+            "Skipping enrichment — %d/%d records already have links (use force=True to re-enrich)",
+            sum(1 for r in records if r.get("links")),
+            len(records),
+        )
+        return 0
+
+    logger.info("Enriching %d records with Wikipedia outgoing links...", len(records))
+
+    enriched_count = 0
+    for record in tqdm(records, desc="Fetching links"):
+        page_id = record.get("page_id")
+        if not page_id:
+            logger.warning("Skipping record %s — no page_id", record.get("id", "?"))
+            continue
+
+        try:
+            titles = _fetch_outgoing_links(page_id, language=language)
+            urls = [_title_to_url(t, language=language) for t in titles]
+            record["links"] = urls
+            enriched_count += 1
+        except Exception as exc:
+            logger.warning("Failed to fetch links for page %s: %s", page_id, exc)
+
+        time.sleep(delay)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    logger.info(
+        "Wrote %d enriched records to %s (%d with links)",
+        len(records),
+        out,
+        enriched_count,
+    )
+    return enriched_count
+
+
+# ═══════════════════════════════════════════════════════════════
+# Internal helpers
+# ═══════════════════════════════════════════════════════════════
+
+
+def _existing_ids(path: Path) -> set[str]:
+    ids: set[str] = set()
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid JSONL at {path}:{line_number}") from exc
+            if value.get("id"):
+                ids.add(str(value["id"]))
+    return ids
+
+
+def _records_have_links(records: list[dict[str, Any]]) -> bool:
+    """Return ``True`` if all records already have a non-empty ``links`` field."""
+    if not records:
+        return False
+    return all(r.get("links") for r in records)
+
+
+def _close_dataset(dataset: Any) -> None:
+    """Shut down background workers of a streaming Hugging Face dataset."""
+    for attr in ("_ex_iterable", "_iterable"):
+        it = getattr(dataset, attr, None)
+        if it is not None:
+            for method in ("close", "cancel", "shutdown"):
+                closer = getattr(it, method, None)
+                if callable(closer):
+                    with contextlib.suppress(Exception):
+                        closer()
+            with contextlib.suppress(Exception):
+                setattr(dataset, attr, None)
+
+    for method in ("cleanup_cache_files", "close", "_cleanup"):
+        closer = getattr(dataset, method, None)
+        if callable(closer):
+            with contextlib.suppress(Exception):
+                closer()
+
+    gc.collect()
+
+
+def _article_url(language: str, title: str) -> str:
+    slug = quote(title.replace(" ", "_"), safe="()!,:;@&=+$-_.~'")
+    return f"https://{language}.wikipedia.org/wiki/{slug}"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _schedule_watchdog(seconds: int = 5) -> None:
+    """Force-exit the process after *seconds* if PyArrow threads keep it alive.
+
+    HuggingFace ``datasets`` streaming spawns background threads that can
+    prevent clean Python shutdown.  This watchdog gives them a grace period
+    to finish, then calls ``os._exit(0)`` to terminate immediately.
+    """
+
+    def _force_exit(_signum: int, _frame: Any) -> None:
+        os._exit(0)
+
+    signal.signal(signal.SIGALRM, _force_exit)
+    signal.alarm(seconds)
+
+
+__all__ = [
+    "HuggingFaceDownloadError",
+    "HuggingFaceWikipediaClient",
+    "download_wikipedia",
+    "enrich_wikipedia",
+]

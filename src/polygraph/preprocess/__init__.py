@@ -34,6 +34,7 @@ from polygraph.preprocess.dedup import (
     GlobalDeduplicator,
     SemanticDeduplicator,
 )
+from polygraph.preprocess.link import normalize_links
 from polygraph.preprocess.load import DataLoader
 from polygraph.preprocess.quality import (
     QualityFilter,
@@ -105,6 +106,7 @@ def _discover_stage_methods(pkg_name: str, stage: str, registry: BackendRegistry
 
 load = BackendRegistry("load")
 clean = BackendRegistry("clean")
+link = BackendRegistry("link")
 chunk = BackendRegistry("chunk")
 quality = BackendRegistry("quality")
 dedup = BackendRegistry("dedup")
@@ -114,6 +116,7 @@ dedup = BackendRegistry("dedup")
 
 _discover_stage_methods("polygraph.preprocess", "load", load)
 _discover_stage_methods("polygraph.preprocess", "clean", clean)
+_discover_stage_methods("polygraph.preprocess", "link", link)
 _discover_stage_methods("polygraph.preprocess", "chunk", chunk)
 _discover_stage_methods("polygraph.preprocess", "quality", quality)
 _discover_stage_methods("polygraph.preprocess", "dedup", dedup)
@@ -198,6 +201,8 @@ __all__ = [
     "chunk",
     "clean",
     "dedup",
+    "link",
     "load",
+    "normalize_links",
     "quality",
 ]

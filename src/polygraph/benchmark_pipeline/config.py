@@ -36,6 +36,8 @@ class ExperimentConfig:
     input_paths: list[Path] = field(default_factory=list)
     output_dir: Path = Path("outputs")
     ontology_path: Path | None = None
+    dataset_name: str | None = None
+    dataset_params: dict[str, Any] = field(default_factory=dict)
     upload_neo4j: bool = False
     clear_neo4j: bool = False
     llm_judge: bool = False
@@ -99,6 +101,11 @@ class ExperimentConfig:
         if not input_paths:
             raise ValueError(f"Experiment config missing 'input.paths': {path}")
 
+        # Optional dataset — auto-download via polygraph.data.Data
+        dataset_block = input_block.get("dataset", {})
+        dataset_name = dataset_block.get("name") if dataset_block else None
+        dataset_params = dataset_block.get("params", {}) if dataset_block else {}
+
         output_block = raw.get("output", {})
         config_dir = Path(path).resolve().parent
         output_dir_raw = output_block.get("dir")
@@ -142,6 +149,8 @@ class ExperimentConfig:
             input_paths=input_paths,
             output_dir=output_dir,
             ontology_path=ontology_path,
+            dataset_name=dataset_name,
+            dataset_params=dataset_params,
             upload_neo4j=upload_neo4j,
             clear_neo4j=clear_neo4j,
             llm_judge=llm_judge,

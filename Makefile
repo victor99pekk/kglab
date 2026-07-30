@@ -30,6 +30,7 @@ WIKIMEDIA_TOPIC_LABELS    := $(WIKIMEDIA_TOPIC_ARTIFACTS)/prepared/article_topic
 WIKIMEDIA_TOPIC_SUMMARY   := $(WIKIMEDIA_TOPIC_ARTIFACTS)/prepared/summary.json
 
 .PHONY: help install clean test build-kg experiment neo4j-upload download-wikipedia \
+	enrich-wikipedia wikipedia-full \
 	wikimedia-topic-labels wikimedia-topic-labels-validate \
 	wikimedia-topic-labels-download wikimedia-topic-labels-prepare
 
@@ -42,6 +43,8 @@ help:
 	@echo ""
 	@echo "── Data ─────────────────────────────────────────────"
 	@echo "   download-wikipedia  Download random Wikipedia articles as JSONL"
+	@echo "   enrich-wikipedia    Add outgoing hyperlinks to existing Wikipedia JSONL"
+	@echo "   wikipedia-full      Download + enrich Wikipedia articles in one step"
 	@echo "   wikimedia-topic-labels           Prepare pinned Wikimedia topic labels"
 	@echo "   wikimedia-topic-labels-validate  Validate label manifest and taxonomy"
 	@echo "   wikimedia-topic-labels-download  Download and verify English labels"
@@ -63,6 +66,7 @@ help:
 	@echo "   make experiment EXP=kg/002_llm"
 	@echo "   make neo4j-upload GRAPH=kg/002_llm"
 	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
+	@echo "   make wikipedia-full WIKI_COUNT=50              # download + enrich 50 articles"
 	@echo "   make wikimedia-topic-labels                    # Experiment 002 labels"
 
 # ═══════════════════════════════════════════════════════════
@@ -121,6 +125,18 @@ download-wikipedia:
 		--max-scan $(WIKI_MAX_SCAN) \
 		$(if $(WIKI_SEED),--seed $(WIKI_SEED),) \
 		--verbose || true
+
+## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
+enrich-wikipedia:
+	uv run python tools/data_retrieval/enrich_wikipedia_links.py \
+		--input $(WIKI_OUTPUT) \
+		--output $(WIKI_OUTPUT) \
+		--language $(WIKI_LANGUAGE) \
+		--verbose
+
+## wikipedia-full: Download random articles + enrich with hyperlinks
+wikipedia-full: download-wikipedia enrich-wikipedia
+	@echo "Done — $(WIKI_OUTPUT) ready with hyperlinks"
 
 ## wikimedia-topic-labels-validate: Validate pinned Wikimedia manifest and taxonomy
 wikimedia-topic-labels-validate:
