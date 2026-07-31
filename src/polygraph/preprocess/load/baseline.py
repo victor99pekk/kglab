@@ -8,6 +8,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 from polygraph._shared import Document
@@ -60,6 +61,57 @@ class DataLoader:
 
         logger.info(f"Loaded {len(documents)} documents from {len(paths)} path(s)")
         return documents
+
+    def iter_documents(self, paths: list[Path]) -> Iterator[Document]:
+        """Yield documents one at a time from file/directory paths.
+
+        Unlike ``load()``, which accumulates all documents in a list,
+        this method streams each document as it is read.  Use this for
+        large datasets where materialising the full document list would
+        exhaust memory.
+
+        .. note::
+           JSON files (``.json``) are still read entirely into memory
+           because the format requires it.  Prefer JSONL (``.jsonl``)
+           or CSV for true streaming.
+        """
+        for path in paths:
+            if path.is_dir():
+                for ext in self.supported:
+                    for file_path in path.rglob(f"*.{ext}"):
+                        yield from self._iter_file(file_path)
+                        # We can't count without consuming, but the caller can
+            else:
+                yield from self._iter_file(path)
+
+    def _iter_file(self, path: Path) -> Iterator[Document]:
+        """Yield documents from a single file without accumulating."""
+        suffix = path.suffix.lower()
+
+        if suffix == ".txt":
+            yield from self._load_txt(path)
+        elif suffix == ".json":
+            yield from self._load_json(path)
+        elif suffix == ".jsonl":
+            yield from self._iter_jsonl(path)
+        elif suffix == ".csv":
+            yield from self._iter_csv(path)
+        else:
+            logger.warning(f"Unsupported format: {suffix} — skipping {path}")
+
+    def _iter_jsonl(self, path: Path) -> Iterator[Document]:
+        """Yield documents from a JSONL file line-by-line."""
+        with open(path, encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                if line.strip():
+                    yield self._make_doc(json.loads(line), path, i)
+
+    def _iter_csv(self, path: Path) -> Iterator[Document]:
+        """Yield documents from a CSV file row-by-row."""
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                yield self._make_doc(row, path, i)
 
     def _load_file(self, path: Path) -> list[Document]:
         suffix = path.suffix.lower()

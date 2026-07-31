@@ -133,6 +133,19 @@ load._set(
     ),
 )
 
+load._set(
+    "stream",
+    lambda paths, formats=None: (
+        DataLoader(formats).iter_documents(
+            [Path(p) for p in (paths if isinstance(paths, list) else [paths])]
+        )
+        if formats
+        else DataLoader().iter_documents(
+            [Path(p) for p in (paths if isinstance(paths, list) else [paths])]
+        )
+    ),
+)
+
 clean._set(
     "normalize",
     lambda docs: ([TextCleaner().clean(d) for d in docs if TextCleaner().clean(d).content.strip()]),

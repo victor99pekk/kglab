@@ -328,3 +328,117 @@ class StreamingPipeline(Pipeline):
             self._disconnect()
 
         print(f"\nDone — graph in Neo4j ({self._neo4j_uri}), artifacts in {self.output_dir}/")
+
+    def execute_batched(
+        self,
+        batch_size: int = 100,
+        *,
+        skip_evaluate: bool = False,
+        skip_export: bool = False,
+    ) -> None:
+        """Stream documents in batches to avoid loading everything into RAM.
+
+        Unlike ``execute()``, which calls ``preprocess()`` once on all
+        documents, this method streams documents from disk in fixed-size
+        batches.  Each batch is independently preprocessed (clean, filter,
+        dedup, chunk) and streamed to Neo4j via ``build_kg_streaming()``.
+
+        .. warning::
+           Cross-batch deduplication and entity resolution are NOT
+           performed — each batch is processed independently.  This is a
+           deliberate tradeoff for memory efficiency with very large
+           datasets.
+
+        Args:
+            batch_size: Number of documents to process per batch.
+            skip_evaluate: If ``True``, skip the final evaluation step.
+            skip_export: If ``True``, skip the final JSON export step.
+
+        Example::
+
+            pipe = MyStreamingPipeline(
+                input_paths=["data/huge_corpus/"],
+                output_dir="output/",
+                clear_db=True,
+            )
+            pipe.execute_batched(batch_size=200)
+        """
+        from polygraph.preprocess import chunk, clean, dedup, link, load, quality
+
+        print(f"=== {self.__class__.__name__} (batched, size={batch_size}) ===")
+        print(f"Input:  {self.input_paths}")
+        print(f"Output: {self.output_dir}")
+        print(f"Neo4j:  {self._neo4j_uri}\n")
+
+        self._connect()
+        try:
+            if self._clear_db:
+                print("[neo4j] Clearing database...")
+                self._require_builder().clear_database()
+
+            builder = self._require_builder()
+            batch_num = 0
+            batch: list[Document] = []
+
+            for doc in load.stream(self.input_paths):
+                batch.append(doc)
+                if len(batch) >= batch_size:
+                    batch_num += 1
+                    self._process_batch(
+                        batch, batch_num, builder, clean, link, quality, dedup, chunk
+                    )
+                    batch = []
+
+            # Final partial batch
+            if batch:
+                batch_num += 1
+                self._process_batch(batch, batch_num, builder, clean, link, quality, dedup, chunk)
+
+            total_stats = builder.stats
+            print(
+                f"\n[batched] {batch_num} batch(es) — "
+                f"{total_stats['nodes_written']} nodes, "
+                f"{total_stats['edges_written']} edges total"
+            )
+
+            if not skip_evaluate:
+                self.evaluate()
+            if not skip_export:
+                self.export()
+
+        finally:
+            self._disconnect()
+
+        print(f"\nDone — graph in Neo4j ({self._neo4j_uri}), artifacts in {self.output_dir}/")
+
+    def _process_batch(
+        self,
+        batch: list[Document],
+        batch_num: int,
+        builder: Neo4jGraphBuilder,
+        clean,
+        link,
+        quality,
+        dedup,
+        chunk,
+    ) -> None:
+        """Preprocess and stream a single batch of documents to Neo4j."""
+        batch = clean.normalize(batch)
+        batch = link.normalize_links(batch)
+        batch = quality.filter(batch, min_chars=50, min_words=10)
+        batch = dedup.remove_duplicates(batch, method="minhash", threshold=0.85)
+        if not batch:
+            return
+
+        chunks = chunk.by_sentence(batch, target_tokens=450, overlap_tokens=60)
+        chunks = quality.filter(chunks)
+        chunks = dedup.remove_duplicates(chunks, method="minhash", threshold=0.85)
+        if not chunks:
+            return
+
+        self.build_kg_streaming(chunks, builder)
+        print(
+            f"[batch {batch_num}] {len(batch)} docs → {len(chunks)} chunks → "
+            f"Neo4j ({builder.stats['nodes_written']} nodes, "
+            f"{builder.stats['edges_written']} edges so far)"
+        )
