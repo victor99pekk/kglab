@@ -23,6 +23,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
     - [Build a Knowledge Graph](#build-a-knowledge-graph)
     - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
     - [Upload KG to Neo4j](#upload-kg-to-neo4j)
+  - [Documentation](#documentation)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -229,6 +230,23 @@ training:
 
 GNN models use PyTorch Geometric — install with `uv sync --extra gnn`.
 See `src/ml/README.md` for the full guide on adding new tasks. -->
+
+## Documentation
+
+| Resource | Description |
+|---|---|
+| [Tutorial](docs/tutorial.md) | Step-by-step walkthrough — from input data to exported KG |
+| [API Reference](docs/api_reference.md) | Complete reference for all public classes and functions |
+| [Input Data Format](docs/input_data_format.md) | JSONL schema specification |
+| [Contributing Guide](CONTRIBUTING.md) | How to add custom extractors, resolvers, and pipelines |
+| [Example Scripts](examples/) | Runnable Python examples for common workflows |
+
+To build a searchable documentation site locally:
+
+```bash
+uv sync --extra docs
+mkdocs serve
+```
 
 ## Contributing
 
