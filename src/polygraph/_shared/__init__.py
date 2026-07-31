@@ -21,7 +21,11 @@ from polygraph._shared.language_discovery import (
 from polygraph._shared.stage_config import (
     BuildConfig,
     DocumentRelationConfig,
+    EvalConfig,
+    ExportConfig,
     ExtractionConfig,
+    PreprocessConfig,
+    PreprocessStage,
     ResolutionConfig,
 )
 from polygraph._shared.types import Document
@@ -31,11 +35,15 @@ __all__ = [
     "BuildConfig",
     "Document",
     "DocumentRelationConfig",
+    "EvalConfig",
+    "ExportConfig",
     "ExtractionConfig",
     "GraphBackend",
     "Language",
     "Ontology",
     "PipelineConfig",
+    "PreprocessConfig",
+    "PreprocessStage",
     "ResolutionConfig",
     "SkippedDocs",
     "chunk_id",

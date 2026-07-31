@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared import Document
+from polygraph._shared.stage_config import EvalConfig, ExportConfig
 
 
 class Pipeline(ABC):
@@ -55,7 +56,12 @@ class Pipeline(ABC):
 
     # ── Default stages (override optional) ──────────────────────
 
-    def evaluate(self, kg: dict[str, Any], llm_client: Any = None) -> dict[str, Any]:
+    def evaluate(
+        self,
+        kg: dict[str, Any],
+        llm_client: Any = None,
+        config: EvalConfig | None = None,
+    ) -> dict[str, Any]:
         """Evaluate KG quality. Default: basic metrics + structural audit.
 
         Args:
@@ -64,14 +70,24 @@ class Pipeline(ABC):
                 When provided, also runs semantic accuracy and triple
                 classification checks. Provider-agnostic — any
                 ``(prompt: str) -> str`` callable works.
+            config: Evaluation configuration. If ``None``, runs quality
+                and structural evaluation (the default). Pass
+                ``EvalConfig(accuracy_enabled=True)`` to also run
+                accuracy checks with an LLM.
         """
         from polygraph.kg_eval import metrics, structural
         from polygraph.kg_eval.metrics import AccuracyEvaluator
 
-        report = metrics.evaluate(kg["graph"], kg["entities"], kg["triples"])
-        report["structural_audit"] = structural.run(kg["graph"], kg["entities"], kg["triples"])
+        cfg = config or EvalConfig()
+        report: dict[str, Any] = {}
 
-        if llm_client is not None:
+        if cfg.quality_enabled:
+            report.update(metrics.evaluate(kg["graph"], kg["entities"], kg["triples"]))
+
+        if cfg.structural_enabled:
+            report["structural_audit"] = structural.run(kg["graph"], kg["entities"], kg["triples"])
+
+        if cfg.accuracy_enabled and llm_client is not None:
             accuracy_eval = AccuracyEvaluator(llm_client=llm_client)
             report["accuracy"] = accuracy_eval.evaluate(kg["graph"], kg["entities"], kg["triples"])
 
@@ -80,15 +96,37 @@ class Pipeline(ABC):
         print(f"[evaluate] overall_score={report.get('overall_score', 0):.2f} → {path}")
         return report
 
-    def export(self, kg: dict[str, Any]) -> None:
-        """Export KG to JSON (always) and optionally GraphML."""
+    def export(self, kg: dict[str, Any], config: ExportConfig | None = None) -> None:
+        """Export KG to configured formats.
+
+        Args:
+            kg: Dict with ``graph``, ``entities``, ``triples`` keys.
+            config: Export configuration. Defaults to JSON only.
+        """
         from polygraph.kg_export import exporter
 
-        exporter.to_json(
-            kg["graph"], kg["entities"], kg["triples"], self.output_dir / "knowledge_graph.json"
-        )
-        if self._config.get("graphml"):
-            exporter.to_graphml(kg["graph"], self.output_dir / "knowledge_graph.graphml")
+        cfg = config or ExportConfig()
+
+        for fmt in cfg.formats:
+            if fmt == "json":
+                exporter.to_json(
+                    kg["graph"],
+                    kg["entities"],
+                    kg["triples"],
+                    self.output_dir / "knowledge_graph.json",
+                )
+            elif fmt == "graphml":
+                exporter.to_graphml(
+                    kg["graph"],
+                    self.output_dir / "knowledge_graph.graphml",
+                )
+            elif fmt == "neo4j":
+                exporter.to_graph_db(
+                    self.output_dir / "knowledge_graph.json",
+                    backend="neo4j",
+                    clear=cfg.neo4j_clear,
+                )
+
         print(f"[export] → {self.output_dir}/")
 
     def upload_to_graph_db(self, backend: str = "neo4j", clear: bool = False, **kwargs) -> None:
@@ -134,15 +172,24 @@ class Pipeline(ABC):
 
     # ── Orchestration ───────────────────────────────────────────
 
-    def execute(self) -> None:
-        """Full pipeline: preprocess → build → evaluate → export."""
+    def execute(
+        self,
+        eval_config: EvalConfig | None = None,
+        export_config: ExportConfig | None = None,
+    ) -> None:
+        """Full pipeline: preprocess → build → evaluate → export.
+
+        Args:
+            eval_config: Evaluation configuration (optional).
+            export_config: Export configuration (optional).
+        """
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
         print(f"Output: {self.output_dir}\n")
 
         chunks = self.preprocess()
         kg = self.build_kg(chunks)
-        self.evaluate(kg)
-        self.export(kg)
+        self.evaluate(kg, config=eval_config)
+        self.export(kg, config=export_config)
 
         print(f"\nDone — results in {self.output_dir}/")

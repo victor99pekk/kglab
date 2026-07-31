@@ -124,13 +124,13 @@ def replace_documents_atomic(
             raise
 
 
-def _get_connection():
-    """Create and return a Neo4j driver using env vars."""
+def _get_connection(uri: str = "", user: str = "", password: str = ""):
+    """Create and return a Neo4j driver using env vars or explicit params."""
     from neo4j import GraphDatabase
 
-    uri = os.environ.get("NEO4J_URI", "")
-    user = os.environ.get("NEO4J_USER", "")
-    password = os.environ.get("NEO4J_PASSWORD", "")
+    uri = uri or os.environ.get("NEO4J_URI", "")
+    user = user or os.environ.get("NEO4J_USER", "")
+    password = password or os.environ.get("NEO4J_PASSWORD", "")
 
     if not uri or not user or not password:
         raise RuntimeError(
@@ -141,17 +141,31 @@ def _get_connection():
     return GraphDatabase.driver(uri, auth=(user, password))
 
 
-def clear_database():
+def clear_database(uri: str = "", user: str = "", password: str = ""):
     """Delete all nodes and relationships from the Neo4j database."""
-    driver = _get_connection()
+    driver = _get_connection(uri, user, password)
     with driver.session() as session:
         session.run("MATCH (n) DETACH DELETE n").consume()
         logger.info("Cleared all nodes and relationships from Neo4j")
     driver.close()
 
 
-def upload_graph(json_path: str | Path, clear: bool = False) -> None:
-    """Upload a graph, replacing documents with matching stable IDs."""
+def upload_graph(
+    json_path: str | Path,
+    clear: bool = False,
+    uri: str = "",
+    user: str = "",
+    password: str = "",
+) -> None:
+    """Upload a graph, replacing documents with matching stable IDs.
+
+    Args:
+        json_path: Path to ``knowledge_graph.json``.
+        clear: If True, wipe the database before uploading.
+        uri: Neo4j bolt URI (overrides ``NEO4J_URI`` env var).
+        user: Neo4j username (overrides ``NEO4J_USER`` env var).
+        password: Neo4j password (overrides ``NEO4J_PASSWORD`` env var).
+    """
     json_path = Path(json_path)
     if not json_path.exists():
         raise FileNotFoundError(f"Graph file not found: {json_path}")
@@ -163,7 +177,7 @@ def upload_graph(json_path: str | Path, clear: bool = False) -> None:
     nodes = graph_data.get("nodes", [])
     edges = graph_data.get("edges", [])
 
-    driver = _get_connection()
+    driver = _get_connection(uri, user, password)
 
     # Build a node-type lookup so relationship MATCH can use label-specific indexes
     id_to_type: dict[str, str] = {
