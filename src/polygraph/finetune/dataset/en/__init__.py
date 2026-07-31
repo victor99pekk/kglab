@@ -1,6 +1,6 @@
-"""Backward-compatibility shim — templates moved to en._templates."""
+"""English QA dataset templates."""
 
-from .en._templates import (
+from ._templates import (
     _COPULA_PATTERNS,
     _KG_COMPARISON_TEMPLATES,
     _KG_MULTI_HOP_TEMPLATES,

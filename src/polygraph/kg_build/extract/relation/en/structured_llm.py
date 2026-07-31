@@ -1,4 +1,4 @@
-"""Structured-JSON LLM relation extraction method."""
+"""Structured-JSON LLM English relation extraction method."""
 
 import json
 import logging
@@ -7,7 +7,7 @@ from typing import Any
 
 from polygraph._shared import Language, Ontology
 from polygraph.kg_build.extract._base import Entity, RelationExtractorMethod, Triple
-from polygraph.kg_build.extract.relation._helpers import find_evidence
+from polygraph.kg_build.extract.relation.en._helpers import find_evidence
 
 logger = logging.getLogger(__name__)
 

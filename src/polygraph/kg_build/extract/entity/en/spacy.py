@@ -1,4 +1,4 @@
-"""spaCy entity extraction method."""
+"""spaCy English entity extraction method."""
 
 import logging
 
@@ -7,8 +7,8 @@ from polygraph.kg_build.extract._base import Entity, EntityExtractor
 logger = logging.getLogger(__name__)
 
 
-class EnglishExtractor(EntityExtractor):
-    """Extract English named entities and noun-phrase concepts with spaCy."""
+class SpacyExtractor(EntityExtractor):
+    """Extract named entities and noun-phrase concepts with spaCy (English)."""
 
     def __init__(self, model_name: str = "en_core_web_lg") -> None:
         self.model_name = model_name
@@ -23,8 +23,7 @@ class EnglishExtractor(EntityExtractor):
                 self._nlp = spacy.load(self.model_name)
             except OSError:
                 logger.warning(
-                    "spaCy model '%s' not found. Install with: "
-                    "python -m spacy download %s",
+                    "spaCy model '%s' not found. Install with: python -m spacy download %s",
                     self.model_name,
                     self.model_name,
                 )
@@ -61,11 +60,10 @@ class EnglishExtractor(EntityExtractor):
                             name=name,
                             label="CONCEPT",
                             mentions=[name],
-                            confidence=0.70,
+                            confidence=0.80,
                         )
                     )
-        except ValueError:
-            logger.debug("Noun chunks not available; skipping CONCEPT extraction")
+        except Exception:
+            logger.debug("Noun chunk extraction skipped (parser may not be available)")
 
-        logger.debug("EnglishExtractor: found %d entities", len(entities))
         return entities

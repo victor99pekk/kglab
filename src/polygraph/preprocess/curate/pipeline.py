@@ -18,7 +18,7 @@ from polygraph.preprocess._internal.manifest import (
     sha256_text,
     stable_json_hash,
 )
-from polygraph.preprocess._internal.processing import (
+from polygraph.preprocess.curate.en.processing import (
     DEFAULT_BGE_MODEL,
     BgeTokenCounter,
     CurationTextProcessor,

@@ -1,6 +1,6 @@
-"""Backward-compatibility shim — imports moved to curate.en.processing."""
+"""English curation processing methods."""
 
-from polygraph.preprocess.curate.en.processing import (
+from .processing import (
     DEFAULT_BGE_MODEL,
     BgeTokenCounter,
     CurationTextProcessor,

@@ -1,4 +1,4 @@
-"""Public API for dataset download, enrichment, and merging.
+"""Public API for dataset download and enrichment.
 
 .. code-block:: python
 
@@ -6,16 +6,10 @@
 
     Data.list()
     Data.download("wikipedia_random", path="data/wikipedia/", count=100, enrich=True)
-    Data.merge(["part1.jsonl", "part2.jsonl"], output="merged.jsonl", dedup_key="id")
-    Data.download_many([
-        {"name": "wikipedia_random", "count": 50, "language": "en"},
-        {"name": "wikipedia_random", "count": 30, "language": "fr"},
-    ], output="merged.jsonl", dedup_key="id")
 """
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 from importlib import import_module
@@ -26,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class Data:
-    """Download, enrich, and merge supported datasets for Polygraph pipelines.
+    """Download and enrich supported datasets for Polygraph pipelines.
 
     All methods are static.  Supported datasets are registered in
     ``DATASET_REGISTRY`` — each entry maps a short name to a description,
@@ -166,209 +160,6 @@ class Data:
             raise ValueError(f"Dataset '{name}' does not support enrichment.")
         enrich_fn = _import_fn(entry["enrich"])
         return enrich_fn(input_path=input_path, output_path=output_path, force=force, **kwargs)
-
-    @staticmethod
-    def merge(
-        paths: list[str | Path],
-        output: str | Path,
-        dedup_key: str | None = None,
-        keep: str = "first",
-    ) -> dict[str, Any]:
-        """Merge multiple JSONL files into one, optionally deduplicating.
-
-        Without deduplication the merge is a streaming concatenation
-        (constant memory).  With ``dedup_key`` set, all records are read into
-        memory so that ``keep="last"`` works correctly — keep this in mind for
-        very large datasets.
-
-        Args:
-            paths: List of JSONL file paths to merge.
-            output: Path for the merged output file.
-            dedup_key: If set, deduplicate records by this JSON field.
-            keep: When deduplicating, keep ``"first"`` or ``"last"``
-                  occurrence of each key.
-
-        Returns:
-            Dict with ``merged`` (total records written), ``duplicates_removed``,
-            and ``output``.
-
-        Raises:
-            FileNotFoundError: If any input path does not exist.
-            ValueError: If *keep* is not ``"first"`` or ``"last"``,
-                        or a record is missing the *dedup_key* field.
-        """
-        if keep not in ("first", "last"):
-            raise ValueError(f"keep must be 'first' or 'last', got '{keep}'")
-
-        target = Path(output)
-
-        if dedup_key is None:
-            # Streaming concatenation — no dedup needed
-            return _merge_streaming(paths, target)
-
-        # In-memory merge with deduplication
-        return _merge_dedup(paths, target, dedup_key, keep)
-
-    @staticmethod
-    def download_many(
-        specs: list[dict[str, Any]],
-        output: str | Path,
-        enrich: bool = False,
-        force: bool = False,
-        dedup_key: str | None = None,
-        keep: str = "first",
-    ) -> dict[str, Any]:
-        """Download multiple datasets and merge into one output file.
-
-        Each spec is a dict with a ``"name"`` key (dataset short name) plus
-        any keyword arguments for that dataset's download function.  Temporary
-        files are created for intermediate downloads and cleaned up after merging.
-
-        Args:
-            specs: List of download specs. Each must contain ``"name"`` plus
-                   dataset-specific kwargs (e.g., ``count``, ``language``).
-            output: Path for the merged output file.
-            enrich: Passed through to each ``Data.download()`` call.
-            force: Passed through to each ``Data.download()`` call.
-            dedup_key: If set, deduplicate merged records by this JSON field.
-            keep: When deduplicating, keep ``"first"`` or ``"last"`` occurrence.
-
-        Returns:
-            Merge result dict (see ``Data.merge()``) with an additional
-            ``downloads`` key listing each individual download result.
-
-        Raises:
-            ValueError: If any spec is missing a ``"name"`` key.
-        """
-        import tempfile
-
-        temp_dir = Path(tempfile.mkdtemp(prefix="polygraph_dl_"))
-        temp_paths: list[Path] = []
-        download_results: list[dict[str, Any]] = []
-
-        try:
-            for i, spec in enumerate(specs):
-                name = spec.get("name")
-                if name is None:
-                    raise ValueError(f"Spec {i} is missing required 'name' key: {spec}")
-                # Build kwargs without mutating the caller's dict
-                download_kwargs = {k: v for k, v in spec.items() if k != "name"}
-                tmp_path = temp_dir / f"part_{i:03d}.jsonl"
-                temp_paths.append(tmp_path)
-
-                result = Data.download(
-                    name=name,
-                    path=str(tmp_path),
-                    enrich=enrich,
-                    force=force,
-                    **download_kwargs,
-                )
-                download_results.append(result)
-                logger.info(
-                    "Downloaded %s → %s (%d records)",
-                    name,
-                    tmp_path,
-                    result.get("downloaded", 0),
-                )
-
-            merge_result = Data.merge(
-                paths=[str(p) for p in temp_paths],
-                output=output,
-                dedup_key=dedup_key,
-                keep=keep,
-            )
-            merge_result["downloads"] = download_results
-            return merge_result
-
-        finally:
-            # Clean up temp files
-            for p in temp_paths:
-                with contextlib.suppress(OSError):
-                    p.unlink(missing_ok=True)
-            with contextlib.suppress(OSError):
-                temp_dir.rmdir()
-
-
-def _merge_streaming(paths: list[str | Path], target: Path) -> dict[str, Any]:
-    """Concatenate JSONL files without deduplication (constant memory)."""
-    total = 0
-
-    with target.open("w", encoding="utf-8") as out:
-        for p in paths:
-            source = Path(p)
-            if not source.exists():
-                raise FileNotFoundError(f"Merge input not found: {source}")
-            with source.open(encoding="utf-8") as f:
-                for line in f:
-                    stripped = line.strip()
-                    if not stripped:
-                        continue
-                    out.write(line if line.endswith("\n") else line + "\n")
-                    total += 1
-
-    logger.info("Merged %d records into %s (no dedup)", total, target)
-    return {"merged": total, "duplicates_removed": 0, "output": str(target)}
-
-
-def _merge_dedup(
-    paths: list[str | Path],
-    target: Path,
-    dedup_key: str,
-    keep: str,
-) -> dict[str, Any]:
-    """Merge JSONL files with deduplication (reads all records into memory)."""
-    # key_str → (line, source_index) — source_index preserves input order
-    unique: dict[str, tuple[str, int]] = {}
-    duplicates = 0
-
-    for i, p in enumerate(paths):
-        source = Path(p)
-        if not source.exists():
-            raise FileNotFoundError(f"Merge input not found: {source}")
-
-        with source.open(encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    record = json.loads(stripped)
-                except json.JSONDecodeError:
-                    logger.warning("Skipping unparseable line in %s", source)
-                    continue
-
-                key_val = record.get(dedup_key)
-                if key_val is None:
-                    raise ValueError(
-                        f"Record in {source} is missing dedup key '{dedup_key}': {stripped[:200]}"
-                    )
-                key_str = json.dumps(key_val, sort_keys=True, ensure_ascii=False)
-
-                if key_str in unique:
-                    duplicates += 1
-                    if keep == "last":
-                        unique[key_str] = (stripped, i)
-                else:
-                    unique[key_str] = (stripped, i)
-
-    total = len(unique)
-    with target.open("w", encoding="utf-8") as out:
-        for _, (line, _) in unique.items():
-            out.write(line + "\n")
-
-    logger.info(
-        "Merged %d records into %s (%d duplicates removed, key=%s, keep=%s)",
-        total,
-        target,
-        duplicates,
-        dedup_key,
-        keep,
-    )
-    return {
-        "merged": total,
-        "duplicates_removed": duplicates,
-        "output": str(target),
-    }
 
 
 def _resolve(name: str) -> dict[str, Any]:

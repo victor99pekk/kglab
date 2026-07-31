@@ -1,4 +1,4 @@
-"""Paper-faithful GraphGen KG extraction using DeepSeek as the synthesizer."""
+"""Paper-faithful GraphGen KG extraction using DeepSeek as the synthesizer (English)."""
 
 from __future__ import annotations
 
@@ -112,6 +112,11 @@ Description List: {description_list}
 Output:
 """
 
+# Map Language enum values to human-readable names for prompt templates.
+_LANGUAGE_NAMES: dict[Language, str] = {
+    Language.ENGLISH: "English",
+}
+
 
 class GraphGenExtractor(JointExtractor):
     """Extract and aggregate the descriptive graph used by GraphGen.
@@ -148,7 +153,7 @@ class GraphGenExtractor(JointExtractor):
 
     @property
     def output_language(self) -> str:
-        return "English"
+        return _LANGUAGE_NAMES.get(self.language, self.language.value)
 
     def extract(
         self,
@@ -398,10 +403,14 @@ class GraphGenExtractor(JointExtractor):
             name=name,
             description_list=unique,
         )
-        return self._generate([{"role": "user", "content": prompt}])
+        merged = self._generate([{"role": "user", "content": prompt}], max_tokens=1024)
+        return merged.strip()
 
     @staticmethod
-    def _clean(value: str) -> str:
-        value = html.unescape(value.strip())
-        value = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", value)
-        return value.strip().strip('"').strip("'").strip()
+    def _clean(field: str) -> str:
+        """Remove stray quotes and whitespace so entity names match across records."""
+        field = field.strip()
+        # Strip one layer of surrounding matching quotes (single or double)
+        if len(field) >= 2 and field[0] == field[-1] and field[0] in ('"', "'"):
+            field = field[1:-1]
+        return html.unescape(field)

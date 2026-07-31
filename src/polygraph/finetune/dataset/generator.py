@@ -27,7 +27,7 @@ from ._loaders import (  # noqa: F401 — re-exported for backward compatibility
     load_raw_documents,
     load_raw_documents_from_kg,
 )
-from ._templates import (  # noqa: F401 — re-exported for backward compatibility
+from .en._templates import (  # noqa: F401 — re-exported for backward compatibility
     _COPULA_PATTERNS,
     _KG_COMPARISON_TEMPLATES,
     _KG_MULTI_HOP_TEMPLATES,

@@ -1,5 +1,5 @@
 """Joint entity-and-relation extraction methods."""
 
-from .graphgen import GraphGenExtractor
+from .en.graphgen import GraphGenExtractor
 
 __all__ = ["GraphGenExtractor"]

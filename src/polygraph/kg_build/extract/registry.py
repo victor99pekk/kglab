@@ -5,21 +5,21 @@ from typing import Any
 
 ENTITY_METHODS = {
     "regex": "polygraph.kg_build.extract.entity.regex:SimpleExtractor",
-    "spacy": "polygraph.kg_build.extract.entity.spacy:EnglishExtractor",
+    "spacy": "polygraph.kg_build.extract.entity.en.spacy:SpacyExtractor",
 }
 
 RELATION_METHODS = {
     "composite": ("polygraph.kg_build.extract.relation.composite:CompositeRelationExtractor"),
     "ontology_rules": (
-        "polygraph.kg_build.extract.relation.ontology_rules:OntologyRuleRelationExtractor"
+        "polygraph.kg_build.extract.relation.en.ontology_rules:OntologyRuleRelationExtractor"
     ),
     "structured_llm": (
-        "polygraph.kg_build.extract.relation.structured_llm:StructuredLLMRelationExtractor"
+        "polygraph.kg_build.extract.relation.en.structured_llm:StructuredLLMRelationExtractor"
     ),
 }
 
 JOINT_METHODS = {
-    "graphgen": "polygraph.kg_build.extract.joint.graphgen:GraphGenExtractor",
+    "graphgen": "polygraph.kg_build.extract.joint.en.graphgen:GraphGenExtractor",
 }
 
 

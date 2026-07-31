@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from polygraph.preprocess._internal.manifest import SourceManifest
-from polygraph.preprocess._internal.processing import (
+from polygraph.preprocess.curate.en.processing import (
     SemanticReviewer,
     TextSpan,
     split_text_to_token_limit,

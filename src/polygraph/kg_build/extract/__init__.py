@@ -10,7 +10,7 @@ from polygraph.kg_build.extract._base import (
     JointExtractor,
     RelationExtractorMethod,
 )
-from polygraph.kg_build.extract.entity import EnglishExtractor, SimpleExtractor
+from polygraph.kg_build.extract.entity import SimpleExtractor, SpacyExtractor
 from polygraph.kg_build.extract.joint import GraphGenExtractor
 from polygraph.kg_build.extract.registry import (
     ENTITY_METHODS,
@@ -104,7 +104,6 @@ def with_graphgen(
 __all__ = [
     "CompositeRelationExtractor",
     "ENTITY_METHODS",
-    "EnglishExtractor",
     "Entity",
     "EntityExtractor",
     "GraphGenExtractor",
@@ -114,6 +113,7 @@ __all__ = [
     "RELATION_METHODS",
     "RelationExtractorMethod",
     "SimpleExtractor",
+    "SpacyExtractor",
     "StructuredLLMRelationExtractor",
     "create_entity_method",
     "create_joint_method",

@@ -1,10 +1,10 @@
-"""Ontology-guided, rule-based relation extraction method."""
+"""Ontology-guided, rule-based English relation extraction method."""
 
 import logging
 
 from polygraph._shared import Language, Ontology
 from polygraph.kg_build.extract._base import Entity, RelationExtractorMethod, Triple
-from polygraph.kg_build.extract.relation._helpers import sentences
+from polygraph.kg_build.extract.relation.en._helpers import sentences
 
 logger = logging.getLogger(__name__)
 

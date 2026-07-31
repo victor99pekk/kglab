@@ -13,7 +13,7 @@ from polygraph.kg_build.extract.registry import (
     create_joint_method,
     create_relation_method,
 )
-from polygraph.kg_build.extract.relation.ontology_rules import (
+from polygraph.kg_build.extract.relation.en.ontology_rules import (
     OntologyRuleRelationExtractor,
 )
 

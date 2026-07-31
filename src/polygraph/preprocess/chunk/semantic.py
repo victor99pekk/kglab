@@ -8,8 +8,8 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from polygraph._shared import Document, Language
+from polygraph.preprocess.chunk.en.sentence import SentenceChunker
 from polygraph.preprocess.chunk.fixed import count_tokens
-from polygraph.preprocess.chunk.sentence import SentenceChunker
 
 
 class SemanticChunker(SentenceChunker):

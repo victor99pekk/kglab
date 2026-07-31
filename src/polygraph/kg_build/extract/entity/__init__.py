@@ -1,6 +1,6 @@
 """Entity extraction methods."""
 
+from .en.spacy import SpacyExtractor
 from .regex import SimpleExtractor
-from .spacy import EnglishExtractor
 
-__all__ = ["EnglishExtractor", "SimpleExtractor"]
+__all__ = ["SimpleExtractor", "SpacyExtractor"]

@@ -9,7 +9,7 @@ from typing import Any
 
 import networkx as nx
 
-from ._templates import _STRUCTURAL_PREDICATES
+from .en._templates import _STRUCTURAL_PREDICATES
 
 
 def load_kg(

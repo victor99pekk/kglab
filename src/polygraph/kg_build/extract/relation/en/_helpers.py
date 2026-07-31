@@ -1,4 +1,4 @@
-"""Shared relation-extraction parsing helpers."""
+"""Shared English relation-extraction parsing helpers."""
 
 import re
 
