@@ -1,33 +1,19 @@
 site_name: Polygraph
-site_description: Research toolkit for building high-quality knowledge graphs for LLM training
 site_url: https://victor99pekk.github.io/polygraph/
-use_directory_urls: false
 repo_url: https://github.com/victor99pekk/polygraph
 theme:
   name: material
-  features:
-    - navigation.sections
-    - navigation.expand
-    - search.suggest
-    - search.highlight
-    - content.code.copy
 
 nav:
-  - Home: README.md
+  - Home: docs/index.md
   - Tutorial: docs/tutorial.md
   - API Reference: docs/api_reference.md
-  - Input Data Format: docs/input_data_format.md
+  - Data Format: docs/input_data_format.md
   - Contributing: CONTRIBUTING.md
-
-plugins:
-  - search
 
 markdown_extensions:
   - admonition
-  - pymdownx.highlight:
-      anchor_linenums: true
+  - pymdownx.highlight
   - pymdownx.superfences
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
   - toc:
       permalink: true
