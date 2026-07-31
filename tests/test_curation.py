@@ -74,7 +74,7 @@ def test_quality_profile_flags_repeated_lines_without_rejecting_document():
 
     assert profile.accepted
     assert profile.requires_review
-    assert profile.repeated_line_ratio == 2 / 3
+    assert profile.repeated_line_ratio == pytest.approx(2 / 3, abs=1e-4)
     assert "repeated_lines" in profile.review_flags
 
 

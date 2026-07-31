@@ -66,6 +66,8 @@ class SemanticDeduplicator:
                             similarity=similarity,
                         )
                     )
+        self.last_matches = matches
+
         groups: dict[int, list[int]] = {}
         for index in range(len(records)):
             groups.setdefault(find(index), []).append(index)
@@ -76,6 +78,14 @@ class SemanticDeduplicator:
         return GlobalDeduplicator._assignments(records, groups, matches)
 
     def _encode(self, texts: list[str]) -> Sequence[Sequence[float]]:
+        if self.encoder is not None:
+            embeddings = self.encoder(texts)
+            if len(embeddings) != len(texts):
+                raise ValueError(
+                    "Semantic encoder returned a different number of embeddings than texts."
+                )
+            return embeddings
+
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError as error:

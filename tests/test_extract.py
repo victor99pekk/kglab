@@ -13,8 +13,9 @@ from polygraph.kg_build.extract.registry import (
     create_joint_method,
     create_relation_method,
 )
-from polygraph.kg_build.extract.relation.en.ontology_rules import (
+from polygraph.kg_build.extract.relation import (
     OntologyRuleRelationExtractor,
+    StructuredLLMRelationExtractor,
 )
 
 _ONTOLOGY_PATH = Path(__file__).parents[1] / "configs" / "default_ontology.yaml"
@@ -115,6 +116,107 @@ class _FakeDeepSeekClient:
         self.calls.append(kwargs)
         content = next(self.responses)
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+
+def test_structured_llm_uses_and_enforces_ontology_schema():
+    ontology = _load_test_ontology()
+    alice = Entity(name="Alice", label="PERSON")
+    acme = Entity(name="Acme Corp", label="ORG")
+    client = _FakeDeepSeekClient(
+        [
+            '[{"subject":"Alice","predicate":"works_at","object":"Acme Corp",'
+            '"evidence":"Alice works at Acme Corp."}]'
+        ]
+    )
+
+    relations = StructuredLLMRelationExtractor(ontology, client=client).extract(
+        "Alice works at Acme Corp.",
+        [alice, acme],
+        source_chunk_id="chunk:123",
+    )
+
+    assert relations == [
+        (
+            alice.id,
+            "works_at",
+            acme.id,
+            "Alice works at Acme Corp.",
+            "chunk:123",
+        )
+    ]
+    prompt = client.calls[0]["messages"][0]["content"]
+    assert "works_at: PERSON -> ORG" in prompt
+    assert "appears_in" not in prompt
+
+
+def test_structured_llm_rejects_unknown_structural_and_wrongly_typed_predicates():
+    ontology = _load_test_ontology()
+    alice = Entity(name="Alice", label="PERSON")
+    acme = Entity(name="Acme Corp", label="ORG")
+    client = _FakeDeepSeekClient(
+        [
+            """[
+                {"subject":"Alice","predicate":"invented_relation","object":"Acme Corp",
+                 "evidence":"Alice works at Acme Corp."},
+                {"subject":"Alice","predicate":"appears_in","object":"Acme Corp",
+                 "evidence":"Alice works at Acme Corp."},
+                {"subject":"Acme Corp","predicate":"works_at","object":"Alice",
+                 "evidence":"Alice works at Acme Corp."}
+            ]"""
+        ]
+    )
+
+    relations = StructuredLLMRelationExtractor(ontology, client=client).extract(
+        "Alice works at Acme Corp.",
+        [alice, acme],
+    )
+
+    assert relations == []
+
+
+def test_structured_llm_requires_grounded_evidence_and_deduplicates():
+    ontology = _load_test_ontology()
+    alice = Entity(name="Alice", label="PERSON")
+    acme = Entity(name="Acme Corp", label="ORG")
+    client = _FakeDeepSeekClient(
+        [
+            """```json
+            {"relations": [
+                {"subject":"Alice","predicate":"works_at","object":"Acme Corp",
+                 "evidence":"Unsupported sentence."},
+                {"subject":"Alice","predicate":"works_at","object":"Acme Corp",
+                 "evidence":""}
+            ]}
+            ```"""
+        ]
+    )
+
+    relations = StructuredLLMRelationExtractor(ontology, client=client).extract(
+        "Alice works at Acme Corp. Bob lives elsewhere.",
+        [alice, acme],
+    )
+
+    assert len(relations) == 1
+    assert relations[0][3] == "Alice works at Acme Corp."
+
+
+def test_structured_llm_rejects_relation_without_shared_evidence_sentence():
+    ontology = _load_test_ontology()
+    alice = Entity(name="Alice", label="PERSON")
+    acme = Entity(name="Acme Corp", label="ORG")
+    client = _FakeDeepSeekClient(
+        [
+            '[{"subject":"Alice","predicate":"works_at","object":"Acme Corp",'
+            '"evidence":"Alice is an engineer."}]'
+        ]
+    )
+
+    relations = StructuredLLMRelationExtractor(ontology, client=client).extract(
+        "Alice is an engineer. Acme Corp is a company.",
+        [alice, acme],
+    )
+
+    assert relations == []
 
 
 def test_graphgen_jointly_extracts_entities_and_descriptive_relationships():

@@ -10,12 +10,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+_DEFAULT_DOCUMENT_RELATION_METHODS = ("hyperlink",)
+
 
 @dataclass
 class DocumentRelationConfig:
     """Document-to-document relation extraction settings."""
 
-    methods: list[str] = field(default_factory=lambda: ["hyperlink"])
+    methods: list[str] = field(default_factory=lambda: list(_DEFAULT_DOCUMENT_RELATION_METHODS))
     method_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     enabled: bool = True
 
@@ -23,10 +25,27 @@ class DocumentRelationConfig:
     def from_dict(cls, data: dict[str, Any] | None) -> DocumentRelationConfig:
         if not data:
             return cls()
+
+        raw_methods = data.get("methods")
+        if raw_methods is None:
+            methods = list(_DEFAULT_DOCUMENT_RELATION_METHODS)
+        elif not isinstance(raw_methods, list) or not all(
+            isinstance(method, str) and method for method in raw_methods
+        ):
+            raise ValueError("document_relation.methods must be a list of non-empty strings")
+        else:
+            methods = list(raw_methods)
+
+        enabled = data.get("enabled", True)
+        if enabled and not methods:
+            raise ValueError(
+                "document_relation.methods must contain at least one method when enabled"
+            )
+
         return cls(
-            methods=data.get("methods", cls.methods),
+            methods=methods,
             method_options=data.get("method_options", {}),
-            enabled=data.get("enabled", True),
+            enabled=enabled,
         )
 
 
