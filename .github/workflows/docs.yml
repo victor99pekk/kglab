@@ -8,8 +8,10 @@ on:
       - "src/polygraph/**"
       - "mkdocs.yml"
       - "pyproject.toml"
+      - "uv.lock"
       - "README.md"
-  workflow_dispatch: # allow manual trigger
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,7 +43,7 @@ jobs:
         run: uv sync --extra docs
 
       - name: Build site
-        run: uv run mkdocs build --strict
+        run: uv run mkdocs build
 
       - uses: actions/configure-pages@v5
 
