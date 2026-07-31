@@ -43,6 +43,7 @@ class GraphBuilder:
                 "importanceScore": entity.get("importanceScore", 0.0),
                 "confidenceScore": entity.get("confidenceScore", 1.0),
                 "source": entity.get("source", []),
+                "source_chunk_ids": entity.get("source_chunk_ids", []),
                 "embedding": entity.get("embedding"),
                 "updatedAt": entity.get("updatedAt", ""),
                 "text": entity.get("text", ""),

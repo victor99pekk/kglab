@@ -27,6 +27,15 @@ from polygraph.kg_build.extract.relation import (
 )
 
 
+def _stamp_chunk_provenance(entities: list[Entity], chunk_id: str) -> None:
+    """Record the chunk that produced every extracted entity."""
+    if not chunk_id:
+        return
+    for entity in entities:
+        if chunk_id not in entity.source_chunk_ids:
+            entity.source_chunk_ids.append(chunk_id)
+
+
 def with_methods(
     chunks: Iterable[Any],
     ontology: Ontology,
@@ -47,6 +56,7 @@ def with_methods(
     all_triples = []
     for chunk in chunks:
         entities = entity_extractor.extract(chunk.content)
+        _stamp_chunk_provenance(entities, chunk.doc_id)
         triples = relation_extractor.extract(
             chunk.content,
             entities,
@@ -70,6 +80,7 @@ def jointly(
     all_triples = []
     for chunk in chunks:
         entities, triples = extractor.extract(chunk.content, source_chunk_id=chunk.doc_id)
+        _stamp_chunk_provenance(entities, chunk.doc_id)
         all_entities.extend(entity.to_dict() for entity in entities)
         all_triples.extend(triples)
     return all_entities, all_triples

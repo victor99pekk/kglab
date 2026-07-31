@@ -6,6 +6,7 @@ import pytest
 from polygraph._shared import Ontology
 from polygraph.kg_build.build import GraphBuilder
 from polygraph.kg_build.resolve import with_method_and_mapping
+from polygraph.pipelines.baseline import _entity_chunk_membership_triples
 
 
 def test_build_graph():
@@ -16,6 +17,7 @@ def test_build_graph():
             "type": "PERSON",
             "aliases": ["alice"],
             "confidenceScore": 0.9,
+            "source_chunk_ids": ["chunk:one"],
         },
         {
             "id": "entity:acme",
@@ -35,6 +37,7 @@ def test_build_graph():
     assert graph.number_of_edges() == 1
     assert graph.has_edge("entity:alice", "entity:acme")
     assert graph.nodes["entity:alice"]["name"] == "Alice"
+    assert graph.nodes["entity:alice"]["source_chunk_ids"] == ["chunk:one"]
     assert "works_at" in graph.edges["entity:alice", "entity:acme"]["predicates"]
 
 
@@ -197,8 +200,20 @@ def test_embedding_resolution_does_not_merge_semantically_related_names():
 
 def test_resolution_maps_merged_entity_ids_to_canonical_id():
     entities = [
-        {"id": "entity:one", "name": "Alice Smith", "type": "PERSON", "aliases": []},
-        {"id": "entity:two", "name": "Alice", "type": "PERSON", "aliases": []},
+        {
+            "id": "entity:one",
+            "name": "Alice Smith",
+            "type": "PERSON",
+            "aliases": [],
+            "source_chunk_ids": ["chunk:one"],
+        },
+        {
+            "id": "entity:two",
+            "name": "Alice",
+            "type": "PERSON",
+            "aliases": [],
+            "source_chunk_ids": ["chunk:two"],
+        },
     ]
 
     resolved, id_map = with_method_and_mapping(
@@ -208,10 +223,57 @@ def test_resolution_maps_merged_entity_ids_to_canonical_id():
     )
 
     assert len(resolved) == 1
+    assert resolved[0]["source_chunk_ids"] == ["chunk:one", "chunk:two"]
     assert id_map == {
         "entity:one": "entity:one",
         "entity:two": "entity:one",
     }
+
+
+def test_embedding_resolution_merges_source_chunk_provenance():
+    entities = [
+        {
+            "id": "entity:one",
+            "name": "Alice Smith",
+            "type": "PERSON",
+            "aliases": [],
+            "source_chunk_ids": ["chunk:one"],
+        },
+        {
+            "id": "entity:two",
+            "name": "Alice",
+            "type": "PERSON",
+            "aliases": [],
+            "source_chunk_ids": ["chunk:two"],
+        },
+    ]
+
+    resolved, _ = with_method_and_mapping(
+        entities,
+        method="embedding",
+        threshold=0.8,
+        encoder=lambda _texts: [[1.0, 0.0], [1.0, 0.0]],
+    )
+
+    assert len(resolved) == 1
+    assert resolved[0]["source_chunk_ids"] == ["chunk:one", "chunk:two"]
+
+
+def test_relationless_entity_still_gets_chunk_membership():
+    entities = [
+        {
+            "id": "entity:alice",
+            "name": "Alice",
+            "type": "PERSON",
+            "source_chunk_ids": ["chunk:one"],
+        }
+    ]
+
+    triples = _entity_chunk_membership_triples(entities, {"chunk:one"})
+
+    assert triples == [
+        ("entity:alice", "appears_in", "chunk:one", "", "chunk:one")
+    ]
 
 
 def test_quality_filter_removes_short_docs():

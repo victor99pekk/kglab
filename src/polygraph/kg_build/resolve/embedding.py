@@ -47,6 +47,7 @@ def _merge_cluster(entities: list[dict[str, Any]], cluster: list[int]) -> dict[s
     )
     all_aliases: list[str] = []
     all_sources: list[str] = []
+    all_source_chunk_ids: list[str] = []
     best_description = ""
     for e in cluster_entities:
         all_aliases.extend(e.get("aliases", []))
@@ -57,6 +58,12 @@ def _merge_cluster(entities: list[dict[str, Any]], cluster: list[int]) -> dict[s
                 all_sources.extend(src)
             else:
                 all_sources.append(src)
+        if e.get("source_chunk_ids"):
+            source_chunk_ids = e["source_chunk_ids"]
+            if isinstance(source_chunk_ids, list):
+                all_source_chunk_ids.extend(source_chunk_ids)
+            else:
+                all_source_chunk_ids.append(source_chunk_ids)
         if len(e.get("description", "")) > len(best_description):
             best_description = e["description"]
     return {
@@ -68,6 +75,7 @@ def _merge_cluster(entities: list[dict[str, Any]], cluster: list[int]) -> dict[s
         "confidenceScore": max(e.get("confidenceScore", 0) for e in cluster_entities),
         "importanceScore": max(e.get("importanceScore", 0) for e in cluster_entities),
         "source": list(dict.fromkeys(all_sources)),
+        "source_chunk_ids": list(dict.fromkeys(all_source_chunk_ids)),
         "embedding": best.get("embedding"),
         "updatedAt": max((e.get("updatedAt", "") for e in cluster_entities), default=""),
     }

@@ -39,6 +39,30 @@ _STAGE_PATHS = [
 _PIPELINE_LANGUAGES = discover_pipeline_languages(*_STAGE_PATHS)
 
 
+def _entity_chunk_membership_triples(
+    entities: list[dict[str, Any]],
+    valid_chunk_ids: set[str],
+) -> list[tuple[str, str, str, str, str]]:
+    """Build direct Entity→Chunk membership edges from extraction provenance."""
+    memberships: set[tuple[str, str]] = set()
+    for entity in entities:
+        entity_id = entity.get("id", "")
+        if not entity_id or entity.get("type") in {"Chunk", "Document"}:
+            continue
+
+        source_chunk_ids = entity.get("source_chunk_ids", [])
+        if isinstance(source_chunk_ids, str):
+            source_chunk_ids = [source_chunk_ids]
+        for chunk_id in source_chunk_ids:
+            if chunk_id in valid_chunk_ids:
+                memberships.add((entity_id, chunk_id))
+
+    return [
+        (entity_id, "appears_in", chunk_id, "", chunk_id)
+        for entity_id, chunk_id in sorted(memberships)
+    ]
+
+
 class Baseline(Pipeline):
     """Standard pipeline with configurable extraction, resolution, and build methods.
 
@@ -202,21 +226,6 @@ class Baseline(Pipeline):
             f"{chunk_next_edges} chunk→next_chunk edges"
         )
 
-        # ── Entity → Chunk edges (which chunk each entity came from) ──
-        entity_chunk_edges: set[tuple[str, str]] = set()
-        node_types = {entity["id"]: entity.get("type", "ENTITY") for entity in entities}
-        for triple in triples:
-            source_chunk = triple[4] if len(triple) > 4 else ""
-            if source_chunk and source_chunk in existing_ids:
-                for endpoint in (triple[0], triple[2]):
-                    if node_types.get(endpoint) not in {None, "Chunk", "Document"}:
-                        entity_chunk_edges.add((endpoint, source_chunk))
-
-        for entity_id, chunk_id in entity_chunk_edges:
-            triples.append((entity_id, "appears_in", chunk_id, "", chunk_id))
-
-        print(f"[entities] {len(entity_chunk_edges)} entity→chunk edges")
-
         # ── Resolution ─────────────────────────────────────────
         res_cfg = self.resolution or ResolutionConfig.from_dict(self._config.get("resolution"))
         resolved, entity_id_map = resolve.with_method_and_mapping(
@@ -234,6 +243,15 @@ class Baseline(Pipeline):
             )
             for triple in triples
         ]
+
+        # ── Entity → Chunk edges (which chunks each entity came from) ──
+        entity_chunk_triples = _entity_chunk_membership_triples(
+            resolved,
+            {chunk.doc_id for chunk in chunks},
+        )
+        triples.extend(entity_chunk_triples)
+
+        print(f"[entities] {len(entity_chunk_triples)} entity→chunk edges")
 
         # ── Build ──────────────────────────────────────────────
         bld_cfg = self.build or BuildConfig.from_dict(self._config.get("build"))

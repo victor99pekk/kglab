@@ -53,6 +53,15 @@ def resolve_string(entities: list[dict[str, Any]], threshold: float = 0.85) -> l
                 if isinstance(new_src, str):
                     new_src = [new_src] if new_src else []
                 canonical["source"] = list(dict.fromkeys(existing_src + new_src))
+                existing_chunks = canonical.get("source_chunk_ids", [])
+                if not isinstance(existing_chunks, list):
+                    existing_chunks = [existing_chunks] if existing_chunks else []
+                new_chunks = entity.get("source_chunk_ids", [])
+                if not isinstance(new_chunks, list):
+                    new_chunks = [new_chunks] if new_chunks else []
+                canonical["source_chunk_ids"] = list(
+                    dict.fromkeys(existing_chunks + new_chunks)
+                )
                 matched = True
                 break
 

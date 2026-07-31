@@ -3,6 +3,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import polygraph.kg_build.extract as extract_module
 from polygraph._shared import Ontology
 from polygraph.benchmark_pipeline.config import ExperimentConfig
 from polygraph.kg_build.extract._base import Entity
@@ -51,6 +52,46 @@ def test_extraction_registry_loads_each_method_family():
         create_joint_method("graphgen", ontology=ontology),
         GraphGenExtractor,
     )
+
+
+def test_extraction_orchestration_records_chunk_provenance_without_relations(monkeypatch):
+    class _EntityExtractor:
+        def extract(self, _text):
+            return [Entity(name="Alice", label="PERSON")]
+
+    class _RelationExtractor:
+        def extract(self, _text, _entities, source_chunk_id=""):
+            return []
+
+    class _JointExtractor:
+        def extract(self, _text, source_chunk_id=""):
+            return [Entity(name="Bob", label="PERSON")], []
+
+    monkeypatch.setattr(
+        extract_module,
+        "create_entity_method",
+        lambda *_args, **_kwargs: _EntityExtractor(),
+    )
+    monkeypatch.setattr(
+        extract_module,
+        "create_relation_method",
+        lambda *_args, **_kwargs: _RelationExtractor(),
+    )
+    monkeypatch.setattr(
+        extract_module,
+        "create_joint_method",
+        lambda *_args, **_kwargs: _JointExtractor(),
+    )
+    chunks = [SimpleNamespace(content="No relation.", doc_id="chunk:123")]
+    ontology = _load_test_ontology()
+
+    composed_entities, composed_triples = extract_module.with_methods(chunks, ontology)
+    joint_entities, joint_triples = extract_module.jointly(chunks, ontology)
+
+    assert composed_triples == []
+    assert joint_triples == []
+    assert composed_entities[0]["source_chunk_ids"] == ["chunk:123"]
+    assert joint_entities[0]["source_chunk_ids"] == ["chunk:123"]
 
 
 def test_experiment_config_passes_stage_method_selection_to_pipeline():

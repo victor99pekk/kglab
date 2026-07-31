@@ -23,6 +23,7 @@ class Entity:
     source: str = ""
     embedding: list[float] | None = None
     node_id: str = ""
+    source_chunk_ids: list[str] = field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -46,6 +47,7 @@ class Entity:
             "confidenceScore": self.confidence,
             "importanceScore": 0.0,
             "source": [self.source] if self.source else [],
+            "source_chunk_ids": list(dict.fromkeys(self.source_chunk_ids)),
             "embedding": self.embedding,
             "updatedAt": datetime.now(UTC).isoformat(),
         }
