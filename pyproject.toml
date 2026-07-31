@@ -77,6 +77,12 @@ eval-data = [
     "deepeval>=2.0",
     "sentence-transformers>=2.2",
 ]
+# Documentation
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.23",
+]
 # Evaluation — model_eval: fine-tuning ablation (Colab GPU only — NOT for Mac)
 eval-model = [
     "kg-generator[eval-data]",
