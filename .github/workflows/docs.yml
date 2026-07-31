@@ -5,11 +5,9 @@ on:
     branches: [main]
     paths:
       - "docs/**"
-      - "src/polygraph/**"
-      - "mkdocs.yml"
-      - "pyproject.toml"
       - "README.md"
-  workflow_dispatch: # allow manual trigger
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,25 +27,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Install docs dependencies
-        run: uv sync --extra docs
-
-      - name: Build site
-        run: uv run mkdocs build --strict
+      - name: Copy site files
+        run: |
+          mkdir -p _site
+          cp docs/index.html _site/index.html
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site/
+          path: _site/
 
       - id: deployment
         uses: actions/deploy-pages@v4
