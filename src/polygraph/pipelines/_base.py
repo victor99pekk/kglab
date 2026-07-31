@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -179,23 +180,91 @@ class Pipeline(ABC):
 
     # ── Orchestration ───────────────────────────────────────────
 
+    def _pipeline_hash(self) -> str:
+        """Content hash of inputs + config — cache key for the full pipeline.
+
+        Hashes input file sizes, modification times, and the pipeline
+        ``_config`` dict so any change invalidates the cache.
+        """
+        h = hashlib.sha256()
+        for p in sorted(self.input_paths):
+            h.update(str(p).encode())
+            if p.is_file():
+                stat = p.stat()
+                h.update(f"{stat.st_size}:{stat.st_mtime}".encode())
+            elif p.is_dir():
+                for f in sorted(p.rglob("*")):
+                    if f.is_file():
+                        h.update(str(f).encode())
+                        s = f.stat()
+                        h.update(f"{s.st_size}:{s.st_mtime}".encode())
+        h.update(json.dumps(self._config, sort_keys=True, default=str).encode())
+        return h.hexdigest()[:16]
+
+    @property
+    def _cache_root(self) -> Path:
+        return self.output_dir / ".pipeline_cache" / self._pipeline_hash()
+
+    def _read_cache(self, key: str) -> Any | None:
+        """Read a cached stage result, or None if missing."""
+        path = self._cache_root / f"{key}.json"
+        if path.exists():
+            with open(path) as f:
+                return json.load(f)
+        return None
+
+    def _write_cache(self, key: str, data: Any) -> None:
+        """Write a stage result to the cache."""
+        self._cache_root.mkdir(parents=True, exist_ok=True)
+        path = self._cache_root / f"{key}.json"
+        path.write_text(json.dumps(data, indent=2, default=str))
+
     def execute(
         self,
         eval_config: EvalConfig | None = None,
         export_config: ExportConfig | None = None,
+        cache: bool = False,
+        force: bool = False,
     ) -> None:
         """Full pipeline: preprocess → build → evaluate → export.
 
         Args:
             eval_config: Evaluation configuration (optional).
             export_config: Export configuration (optional).
+            cache: If True, skip the entire pipeline when
+                ``knowledge_graph.json`` and ``metrics.json`` already
+                exist for the current input hash.  Pass ``force=True``
+                to re-run regardless.
+            force: Ignore cache and re-run all stages.
         """
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
-        print(f"Output: {self.output_dir}\n")
+        print(f"Output: {self.output_dir}")
+
+        if cache and not force:
+            kg_path = self.output_dir / "knowledge_graph.json"
+            metrics_path = self.output_dir / "metrics.json"
+            if kg_path.exists() and metrics_path.exists():
+                cache_key = self._pipeline_hash()
+                hash_file = self._cache_root / "hash.txt"
+                cached_hash = hash_file.read_text().strip() if hash_file.exists() else ""
+                if cached_hash == cache_key:
+                    print(
+                        f"[cache] Pipeline output is fresh "
+                        f"(hash={cache_key[:8]}…) — skipping.\n"
+                        f"        Pass force=True to re-run."
+                    )
+                    return
+
+        print()
 
         chunks = self.preprocess()
         kg = self.build_kg(chunks)
+
+        if cache:
+            self._cache_root.mkdir(parents=True, exist_ok=True)
+            (self._cache_root / "hash.txt").write_text(self._pipeline_hash())
+
         self.evaluate(kg, config=eval_config)
         self.export(kg, config=export_config)
 

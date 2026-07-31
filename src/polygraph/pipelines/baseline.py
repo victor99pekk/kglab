@@ -314,11 +314,13 @@ class Baseline(Pipeline):
             result["extra"] = extra
         return result
 
-    def execute(self) -> None:
+    def execute(self, cache: bool = False, force: bool = False) -> None:
         """Full pipeline, forwarding eval/export configs."""
         super().execute(
             eval_config=self.eval_config,
             export_config=self.export_config,
+            cache=cache,
+            force=force,
         )
 
     def _extract_document_relations(
