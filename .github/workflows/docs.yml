@@ -37,8 +37,10 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install docs dependencies
-        run: uv sync --extra docs
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install mkdocs mkdocs-material "mkdocstrings[python]"
 
       - name: Build site
         run: uv run mkdocs build --strict
