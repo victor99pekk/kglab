@@ -25,8 +25,8 @@ class Pipeline(ABC):
         pipe = MyPipeline(input_paths=["data/"], output_dir="output/")
         pipe.execute()              # full pipeline
         # — or —
-        chunks = pipe.preprocess()
-        kg = pipe.build_kg(chunks)
+        result = pipe.preprocess()
+        kg = pipe.build_kg(result)
         pipe.evaluate(kg)
         pipe.export(kg)
     """
@@ -46,12 +46,19 @@ class Pipeline(ABC):
 
     @abstractmethod
     def preprocess(self) -> list[Document]:
-        """Raw files → clean, deduplicated chunks."""
+        """Raw files → clean, deduplicated chunks.
+
+        May also return a ``PreprocessResult`` if extraction was performed
+        during preprocessing — ``build_kg`` handles both.
+        """
         ...
 
     @abstractmethod
-    def build_kg(self, chunks: list[Document]) -> dict[str, Any]:
-        """Chunks → knowledge graph. Returns {"graph", "entities", "triples"}."""
+    def build_kg(self, chunks: list[Document] | Any) -> dict[str, Any]:
+        """Chunks or PreprocessResult → knowledge graph.
+
+        Returns ``{"graph", "entities", "triples"}``.
+        """
         ...
 
     # ── Default stages (override optional) ──────────────────────

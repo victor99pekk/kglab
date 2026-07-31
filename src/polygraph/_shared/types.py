@@ -1,6 +1,9 @@
 """Shared types used across all pipeline modules."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -46,3 +49,29 @@ class Document:
             f"Document(id={self.doc_id!r}, source={self.source!r}, "
             f"lang={self.language!r}, content={preview!r}...)"
         )
+
+
+@dataclass
+class PreprocessResult:
+    """Container returned by preprocessing — chunks plus optional extracted data.
+
+    When an ``"extract"`` stage is included in the preprocessing pipeline,
+    entities and triples are accumulated here and ``build_kg`` can skip
+    re-extraction.  This allows extraction to happen at any point in the
+    preprocessing sequence (e.g., before chunking).
+
+    Attributes:
+        chunks: Clean, deduplicated Document chunks.
+        entities: Entities extracted during preprocessing (if any).
+        triples: Relation triples extracted during preprocessing (if any).
+        raw_docs: Raw documents before chunking, for doc-relation extraction.
+    """
+
+    chunks: list[Document] = field(default_factory=list)
+    entities: list[dict[str, Any]] = field(default_factory=list)
+    triples: list[tuple] = field(default_factory=list)
+    raw_docs: list[Document] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
+    """Arbitrary payload from custom preprocessing stages (embeddings,
+    topic labels, clusters, etc.).  Downstream stages access it via
+    ``result.extra[\"my_key\"]``."""

@@ -28,7 +28,7 @@ from polygraph._shared.stage_config import (
     PreprocessStage,
     ResolutionConfig,
 )
-from polygraph._shared.types import Document
+from polygraph._shared.types import Document, PreprocessResult
 
 __all__ = [
     "ALL_LANGUAGES",
@@ -43,6 +43,7 @@ __all__ = [
     "Ontology",
     "PipelineConfig",
     "PreprocessConfig",
+    "PreprocessResult",
     "PreprocessStage",
     "ResolutionConfig",
     "SkippedDocs",

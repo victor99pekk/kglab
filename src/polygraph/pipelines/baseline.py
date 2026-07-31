@@ -119,7 +119,15 @@ class Baseline(Pipeline):
         **kwargs: Any,
     ) -> None:
         super().__init__(input_paths, output_dir, **kwargs)
-        self._preprocessor = preprocessor or DefaultPreprocessor(preprocess)
+        # Wire up the preprocessor, passing ontology and extraction config
+        # so the "extract" stage can use them during preprocessing.
+        if preprocessor is None:
+            ontology = self._load_ontology()
+            self._preprocessor = DefaultPreprocessor(
+                preprocess, ontology=ontology, extraction=extraction
+            )
+        else:
+            self._preprocessor = preprocessor
         self.extraction = extraction
         self.resolution = resolution
         self.build = build
@@ -153,33 +161,57 @@ class Baseline(Pipeline):
         """Delegate to the configured preprocessor."""
         return self._preprocessor.preprocess(self.input_paths)
 
-    def build_kg(self, chunks: list[Document]) -> dict[str, Any]:
-        ontology = self._load_ontology()
+    def build_kg(self, chunks: list[Document] | Any) -> dict[str, Any]:
+        """Build the knowledge graph from chunks or a PreprocessResult.
 
-        # ── Resolve extraction config (typed → dict fallback) ──
+        If ``chunks`` is a ``PreprocessResult`` and contains pre-extracted
+        entities/triples, extraction is skipped and those are used directly.
+        """
+        from polygraph._shared.types import PreprocessResult
+
+        ontology = self._load_ontology()
         ext_cfg = self.extraction or ExtractionConfig.from_dict(self._config.get("extraction"))
 
-        if ext_cfg.mode == "joint":
-            entities, triples = extract.jointly(
-                chunks,
-                ontology,
-                method=ext_cfg.joint_method,
-                options=ext_cfg.options,
+        # ── Unpack PreprocessResult if provided ────────────────
+        pre_extracted_entities: list[dict[str, Any]] = []
+        pre_extracted_triples: list[tuple] = []
+        extra: dict[str, Any] = {}
+        if isinstance(chunks, PreprocessResult):
+            pre_extracted_entities = chunks.entities
+            pre_extracted_triples = chunks.triples
+            extra = chunks.extra
+            chunks = chunks.chunks
+
+        # ── Extract entities and triples (or use pre-extracted) ─
+        if pre_extracted_entities:
+            print(
+                f"[build_kg] Using {len(pre_extracted_entities)} pre-extracted entities "
+                f"and {len(pre_extracted_triples)} triples from preprocessing"
             )
-        elif ext_cfg.mode == "composed":
-            entity_options = ext_cfg.entity_options
-            if entity_options is None and ext_cfg.entity_method == "spacy":
-                entity_options = {"model_name": "en_core_web_sm"}
-            entities, triples = extract.with_methods(
-                chunks,
-                ontology,
-                entity_method=ext_cfg.entity_method,
-                relation_method=ext_cfg.relation_method,
-                entity_options=entity_options,
-                relation_options=ext_cfg.relation_options,
-            )
+            entities = list(pre_extracted_entities)
+            triples = list(pre_extracted_triples)
         else:
-            raise ValueError("extraction.mode must be one of: composed, joint")
+            if ext_cfg.mode == "joint":
+                entities, triples = extract.jointly(
+                    chunks,
+                    ontology,
+                    method=ext_cfg.joint_method,
+                    options=ext_cfg.options,
+                )
+            elif ext_cfg.mode == "composed":
+                entity_options = ext_cfg.entity_options
+                if entity_options is None and ext_cfg.entity_method == "spacy":
+                    entity_options = {"model_name": "en_core_web_sm"}
+                entities, triples = extract.with_methods(
+                    chunks,
+                    ontology,
+                    entity_method=ext_cfg.entity_method,
+                    relation_method=ext_cfg.relation_method,
+                    entity_options=entity_options,
+                    relation_options=ext_cfg.relation_options,
+                )
+            else:
+                raise ValueError("extraction.mode must be one of: composed, joint")
 
         # ── Document-to-document relation extraction ───────────
         raw_docs = self._preprocessor.raw_docs
@@ -277,7 +309,10 @@ class Baseline(Pipeline):
             f"[build_kg] {len(entities)} entities → {len(resolved)} resolved, "
             f"{graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges"
         )
-        return {"graph": graph, "entities": resolved, "triples": triples}
+        result: dict[str, Any] = {"graph": graph, "entities": resolved, "triples": triples}
+        if extra:
+            result["extra"] = extra
+        return result
 
     def execute(self) -> None:
         """Full pipeline, forwarding eval/export configs."""

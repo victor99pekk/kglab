@@ -24,6 +24,7 @@ from typing import Any
 
 from polygraph._shared import (
     Document,
+    PreprocessResult,
     discover_pipeline_languages,
     filter_by_language,
 )
@@ -55,9 +56,19 @@ class DefaultPreprocessor(Preprocessor):
             (Tier 0).
     """
 
-    def __init__(self, config: PreprocessConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: PreprocessConfig | None = None,
+        ontology: Any | None = None,
+        extraction: Any | None = None,
+    ) -> None:
         self.config = config or PreprocessConfig()
+        self.ontology = ontology
+        self.extraction = extraction  # ExtractionConfig
         self._raw: list[Document] = []
+        self._entities: list[dict[str, Any]] = []
+        self._triples: list[tuple] = []
+        self._extra: dict[str, Any] = {}
 
     @property
     def _r(self) -> Any:
@@ -93,7 +104,7 @@ class DefaultPreprocessor(Preprocessor):
         """
         return self._raw
 
-    def preprocess(self, input_paths: list[Path]) -> list[Document]:
+    def preprocess(self, input_paths: list[Path]) -> PreprocessResult:
         """Run preprocessing — Tier 2 stages or Tier 1 defaults."""
         if self.config.stages is not None:
             return self._run_custom_stages(input_paths)
@@ -122,7 +133,7 @@ class DefaultPreprocessor(Preprocessor):
 
         if not docs:
             print("[preprocess] No supported documents — pipeline stopping.")
-            return []
+            return PreprocessResult()
 
         if c.clean_enabled:
             docs = r.clean.normalize(docs)
@@ -168,18 +179,30 @@ class DefaultPreprocessor(Preprocessor):
         )
 
         print(f"[preprocess] {len(docs)} documents → {len(chunks)} chunks")
-        return chunks
+        return PreprocessResult(
+            chunks=chunks,
+            raw_docs=self._raw,
+            entities=self._entities,
+            triples=self._triples,
+            extra=self._extra,
+        )
 
     # ── Tier 2: User-defined stage list ────────────────────────
 
-    def _run_custom_stages(self, input_paths: list[Path]) -> list[Document]:
+    def _run_custom_stages(self, input_paths: list[Path]) -> PreprocessResult:
         """Run user-defined stages in order, skipping disabled ones."""
         state: list[Document] = []
         for stage in self.config.stages:  # type: ignore[union-attr]
             if not stage.enabled:
                 continue
             state = self._dispatch_stage(stage, state, input_paths)
-        return state
+        return PreprocessResult(
+            chunks=state,
+            raw_docs=self._raw,
+            entities=self._entities,
+            triples=self._triples,
+            extra=self._extra,
+        )
 
     def _dispatch_stage(
         self,
@@ -246,7 +269,19 @@ class DefaultPreprocessor(Preprocessor):
             chunk_fn = getattr(r.chunk, f"by_{method}")
             return chunk_fn(docs, **opts)
 
+        elif name == "extract":
+            return self._run_extract_stage(docs, method, opts)
+
+        elif name == "extra":
+            # Store arbitrary key-value pairs for downstream use
+            self._extra[method] = opts
+            return docs
+
         else:
+            # Unknown stages pass through — custom Preprocessor subclasses
+            # can handle them by overriding _dispatch_stage
+            print(f"[preprocess] Unknown stage '{name}' — passing through")
+            return docs
             known = ", ".join(
                 [
                     "load",
@@ -256,9 +291,61 @@ class DefaultPreprocessor(Preprocessor):
                     "quality",
                     "dedup",
                     "chunk",
+                    "extract",
+                    "extra",
                 ]
             )
             raise ValueError(f"Unknown preprocessing stage: '{name}'. Known stages: {known}")
+
+    # ── Extraction stage ──────────────────────────────────────
+
+    def _run_extract_stage(
+        self, docs: list[Document], method: str, opts: dict[str, Any]
+    ) -> list[Document]:
+        """Run entity/relation extraction on the current document set.
+
+        Accumulates extracted entities and triples into ``self._entities``
+        and ``self._triples`` so ``build_kg`` can skip re-extraction.
+        Returns the documents unchanged (extraction doesn't alter docs).
+        """
+        if not docs:
+            return docs
+        if self.ontology is None:
+            raise ValueError(
+                "Extraction stage requires an ontology. "
+                "Pass ontology= to DefaultPreprocessor or ensure the pipeline "
+                "provides one."
+            )
+
+        from polygraph._shared.stage_config import ExtractionConfig
+        from polygraph.kg_build import extract as kg_extract
+
+        ext_cfg = self.extraction or ExtractionConfig()
+
+        if ext_cfg.mode == "joint":
+            entities, triples = kg_extract.jointly(
+                docs,
+                self.ontology,
+                method=method or ext_cfg.joint_method,
+                options={**ext_cfg.options, **opts},
+            )
+        else:
+            entities, triples = kg_extract.with_methods(
+                docs,
+                self.ontology,
+                entity_method=method or ext_cfg.entity_method,
+                relation_method=opts.get("relation_method", ext_cfg.relation_method),
+                entity_options=ext_cfg.entity_options,
+                relation_options=ext_cfg.relation_options,
+            )
+
+        self._entities.extend(entities)
+        self._triples.extend(triples)
+        print(
+            f"[extract] {len(entities)} entities, {len(triples)} triples "
+            f"(total: {len(self._entities)} entities, {len(self._triples)} triples)"
+        )
+        return docs
 
     # ── Memory management ──────────────────────────────────────
 
