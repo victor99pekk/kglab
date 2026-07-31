@@ -91,19 +91,31 @@ class Pipeline(ABC):
             exporter.to_graphml(kg["graph"], self.output_dir / "knowledge_graph.graphml")
         print(f"[export] → {self.output_dir}/")
 
-    def upload_to_neo4j(self, clear: bool = False) -> None:
-        """Upload the exported KG JSON to Neo4j.
+    def upload_to_graph_db(self, backend: str = "neo4j", clear: bool = False, **kwargs) -> None:
+        """Upload the exported KG JSON to a graph database.
 
-        Requires NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD environment variables.
-        Set clear=True to wipe the database before uploading.
+        Args:
+            backend: Which graph DB to use. Currently only ``"neo4j"`` is supported.
+            clear: If True, wipe the database before uploading.
+            **kwargs: Forwarded to the backend constructor (e.g. ``uri``, ``user``,
+                ``password`` for Neo4j; defaults to ``NEO4J_URI`` / ``NEO4J_USER`` /
+                ``NEO4J_PASSWORD`` env vars).
+
+        Example::
+
+            pipe.upload_to_graph_db(backend="neo4j", clear=True)
         """
         from polygraph.kg_export import exporter
 
         json_path = self.output_dir / "knowledge_graph.json"
         if not json_path.exists():
             raise FileNotFoundError(f"No exported KG found at {json_path}. Run export() first.")
-        exporter.to_neo4j(json_path, clear=clear)
-        print(f"[neo4j] uploaded → {json_path}")
+        exporter.to_graph_db(json_path, backend=backend, clear=clear, **kwargs)
+        print(f"[{backend}] uploaded → {json_path}")
+
+    def upload_to_neo4j(self, clear: bool = False) -> None:
+        """Upload the exported KG JSON to Neo4j (backward-compatible alias)."""
+        self.upload_to_graph_db(backend="neo4j", clear=clear)
 
     def generate_training_data(self, kg: dict[str, Any], chunks: list[Document]) -> None:
         """Generate QA training pairs from KG (and raw chunks as baseline)."""

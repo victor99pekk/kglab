@@ -154,17 +154,45 @@ exporter.to_neo4j("output/kg.json", clear=False)  # needs NEO4J_URI env vars
 
 ---
 
-## 6. Upload to Neo4j
+## 6. Upload to a graph database
 
-After building a KG, upload it to Neo4j for graph database queries:
+After building a KG, upload it to a graph database. Neo4j is currently the only
+supported backend:
 
 ```python
 pipe = Baseline(input_paths=["data/"], output_dir="output/")
 pipe.execute()
-pipe.upload_to_neo4j(clear=True)  # wipe DB first; set to False to merge
+pipe.upload_to_graph_db(backend="neo4j", clear=True)
+
+# Or pass explicit credentials
+pipe.upload_to_graph_db(
+    backend="neo4j",
+    clear=True,
+    uri="bolt://localhost:7687",
+    user="neo4j",
+    password="your-password",
+)
 ```
 
-Requires `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` environment variables.
+Requires `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` environment variables
+(or pass them explicitly).
+
+To add support for another graph database (e.g. ArangoDB, Neptune), subclass
+`GraphDBUploader` and register it:
+
+```python
+from polygraph.kg_export.graph_db import GraphDBUploader, BACKENDS
+
+class ArangoUploader(GraphDBUploader):
+    def __init__(self, host="localhost", port=8529, **kwargs):
+        self.host = host
+        self.port = port
+
+    def upload(self, json_path, clear=False):
+        ...
+
+BACKENDS["arangodb"] = ArangoUploader
+```
 
 ---
 

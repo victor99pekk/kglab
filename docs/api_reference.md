@@ -262,7 +262,11 @@ ge.export(graph, entities, triples, output_dir, formats=["json", "graphml", "neo
 # Function API — one call per format
 exporter.to_json(graph, entities, triples, "output/kg.json")
 exporter.to_graphml(graph, "output/kg.graphml")
-exporter.to_neo4j("output/kg.json", clear=False)
+
+# Graph database upload (Neo4j is the only currently supported backend)
+exporter.to_graph_db("output/kg.json", backend="neo4j", clear=False)
+exporter.to_graph_db("output/kg.json", backend="neo4j",
+                     uri="bolt://localhost:7687", user="neo4j", password="secret")
 ```
 
 | Format | Key | Description |
@@ -272,6 +276,23 @@ exporter.to_neo4j("output/kg.json", clear=False)
 | `neo4j_csv` | `"neo4j_csv"` | CSV files for Neo4j bulk import |
 | `rdf` | `"rdf"` | RDF/Turtle triples |
 | `cytoscape` | `"cytoscape"` | Cytoscape.js JSON |
+
+### Graph Database Upload (`polygraph.kg_export.graph_db`)
+
+```python
+from polygraph.kg_export.graph_db import Neo4jUploader, GraphDBUploader, BACKENDS
+
+# Direct uploader usage
+uploader = Neo4jUploader(uri="bolt://localhost:7687", user="neo4j", password="secret")
+uploader.upload("output/kg.json", clear=True)
+
+# Add a new backend
+class ArangoUploader(GraphDBUploader):
+    def upload(self, json_path, clear=False):
+        ...
+
+BACKENDS["arangodb"] = ArangoUploader
+```
 
 ---
 

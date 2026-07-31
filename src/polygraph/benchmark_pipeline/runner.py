@@ -199,9 +199,7 @@ class BenchmarkRunner:
                 "or use BenchmarkRunner.from_config()."
             )
         if not self._input_paths:
-            raise ValueError(
-                "No input paths specified. Pass input_paths= to BenchmarkRunner()."
-            )
+            raise ValueError("No input paths specified. Pass input_paths= to BenchmarkRunner().")
 
         output_dir = self._output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -342,7 +340,9 @@ class BenchmarkRunner:
         if self._config is not None:
             config_snapshot = {
                 "description": self._config.description,
-                "ontology_path": str(self._config.ontology_path) if self._config.ontology_path else None,
+                "ontology_path": str(self._config.ontology_path)
+                if self._config.ontology_path
+                else None,
                 "llm_judge": self._config.llm_judge,
             }
 
