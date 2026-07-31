@@ -5,36 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Polygraph</title>
 <style>
-body { font-family: sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem; color: #222; }
-pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; }
-code { background: #f5f5f5; padding: 2px 5px; border-radius: 3px; }
-a { color: #00e; }
+  body { margin: 0; font: 16px/1.6 system-ui, -apple-system, sans-serif; color: #333; }
+  header { background: #2c3e50; color: #fff; padding: 3rem 2rem 2rem; }
+  header h1 { margin: 0; font-size: 2.2rem; letter-spacing: -0.5px; }
+  header p { margin: 0.5rem 0 0; opacity: 0.8; font-size: 1.1rem; }
+  main { max-width: 800px; margin: 0 auto; padding: 2rem; }
+  h2 { font-size: 1.3rem; margin-top: 2.5rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.3rem; }
+  pre { background: #f7f7f7; padding: 1rem; border-radius: 5px; border-left: 3px solid #2c3e50; font-size: 0.9rem; overflow-x: auto; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul { padding-left: 1.2rem; }
+  li { margin: 0.3rem 0; }
+  .btn { display: inline-block; background: #2980b9; color: #fff; padding: 0.5rem 1.2rem; border-radius: 4px; margin-right: 0.5rem; margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .btn:hover { background: #2472a4; text-decoration: none; }
+  footer { text-align: center; padding: 2rem; color: #999; font-size: 0.85rem; }
 </style>
 </head>
 <body>
 
-<h1>Polygraph</h1>
-<p>Research toolkit for building knowledge graphs for LLM training.</p>
+<header>
+  <h1>Polygraph</h1>
+  <p>A research toolkit for building high-quality knowledge graphs for LLM training.</p>
+</header>
 
-<h2>Quick Start</h2>
+<main>
+
+<h2>Install</h2>
 <pre>git clone git@github.com:victor99pekk/polygraph.git
 cd polygraph
 uv sync</pre>
 
+<h2>Quick Start</h2>
 <pre>from polygraph.pipelines import Baseline
 
-Baseline(input_paths=["data/"], output_dir="output/").execute()</pre>
+pipeline = Baseline(input_paths=["data/"], output_dir="output/")
+pipeline.execute()</pre>
 
 <h2>Pipeline</h2>
 <p>Raw documents → Preprocess → Extract → Resolve → Build → Export</p>
 
-<h2>Docs</h2>
-<ul>
-<li><a href="https://github.com/victor99pekk/polygraph">GitHub</a></li>
-<li><a href="https://github.com/victor99pekk/polygraph/blob/main/docs/tutorial.md">Tutorial</a></li>
-<li><a href="https://github.com/victor99pekk/polygraph/blob/main/docs/api_reference.md">API Reference</a></li>
-<li><a href="https://github.com/victor99pekk/polygraph/blob/main/CONTRIBUTING.md">Contributing</a></li>
-</ul>
+<h2>Links</h2>
+<a class="btn" href="https://github.com/victor99pekk/polygraph">GitHub</a>
+<a class="btn" href="https://github.com/victor99pekk/polygraph/blob/main/docs/tutorial.md">Tutorial</a>
+<a class="btn" href="https://github.com/victor99pekk/polygraph/blob/main/docs/api_reference.md">API Reference</a>
+
+</main>
+
+<footer>Polygraph</footer>
 
 </body>
 </html>
