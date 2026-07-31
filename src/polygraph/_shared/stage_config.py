@@ -15,15 +15,7 @@ from typing import Any
 class DocumentRelationConfig:
     """Document-to-document relation extraction settings."""
 
-    methods: list[str] = field(
-        default_factory=lambda: [
-            "hyperlink",
-            "shared_authors",
-            "series",
-            "citation",
-            "shared_references",
-        ]
-    )
+    methods: list[str] = field(default_factory=lambda: ["hyperlink"])
     method_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     enabled: bool = True
 

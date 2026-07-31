@@ -8,6 +8,16 @@ from polygraph._shared.config import (
     load_config,
 )
 from polygraph._shared.identity import chunk_id, document_id, entity_id, stable_id
+from polygraph._shared.language import (
+    ALL_LANGUAGES,
+    SkippedDocs,
+    filter_by_language,
+    get_language_support,
+)
+from polygraph._shared.language_discovery import (
+    discover_pipeline_languages,
+    discover_stage_languages,
+)
 from polygraph._shared.stage_config import (
     BuildConfig,
     DocumentRelationConfig,
@@ -17,6 +27,7 @@ from polygraph._shared.stage_config import (
 from polygraph._shared.types import Document
 
 __all__ = [
+    "ALL_LANGUAGES",
     "BuildConfig",
     "Document",
     "DocumentRelationConfig",
@@ -26,9 +37,14 @@ __all__ = [
     "Ontology",
     "PipelineConfig",
     "ResolutionConfig",
+    "SkippedDocs",
     "chunk_id",
+    "discover_pipeline_languages",
+    "discover_stage_languages",
     "document_id",
     "entity_id",
+    "filter_by_language",
+    "get_language_support",
     "load_config",
     "stable_id",
 ]

@@ -129,5 +129,6 @@ class DataLoader:
             content=content,
             source=str(path),
             doc_id=doc_id,
+            language=item.get("language", item.get("lang", "en")),
             metadata=metadata,
         )

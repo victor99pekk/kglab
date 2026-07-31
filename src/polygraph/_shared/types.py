@@ -10,8 +10,9 @@ class Document:
     content: str
     source: str = ""
     doc_id: str = ""
+    language: str = "en"
     metadata: dict = field(default_factory=dict)
 
     def __repr__(self) -> str:
         preview = self.content[:60].replace("\n", " ")
-        return f"Document(id={self.doc_id!r}, source={self.source!r}, content={preview!r}...)"
+        return f"Document(id={self.doc_id!r}, source={self.source!r}, lang={self.language!r}, content={preview!r}...)"

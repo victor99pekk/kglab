@@ -6,8 +6,8 @@ Available methods:
     semantic  — Semantic boundary detection via embeddings
 """
 
+from .en.sentence import SentenceChunker
 from .fixed import TextChunker
 from .semantic import SemanticChunker
-from .sentence import SentenceChunker
 
 __all__ = ["TextChunker", "SentenceChunker", "SemanticChunker"]

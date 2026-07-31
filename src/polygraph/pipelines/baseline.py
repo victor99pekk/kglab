@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from polygraph._shared import Document, Ontology
+from polygraph._shared import Document, Ontology, discover_pipeline_languages, filter_by_language
 from polygraph._shared.stage_config import (
     BuildConfig,
     DocumentRelationConfig,
@@ -24,6 +24,20 @@ from polygraph.preprocess import chunk, clean, dedup, link, load, quality
 
 _DEFAULT_ONTOLOGY_PATH = Path(__file__).parents[3] / "configs" / "default_ontology.yaml"
 
+# ── Pipeline-level language support ────────────────────────────
+# Auto-computed from folder structure.  Stages with an ``en/``
+# subdirectory (containing language-specific implementations) are
+# English-only.  Stages without language subdirectories are universal.
+
+_PREPROCESS_ROOT = Path(__file__).parents[1] / "preprocess"
+
+_STAGE_PATHS = [
+    _PREPROCESS_ROOT / "clean",
+    _PREPROCESS_ROOT / "chunk",
+]
+
+_PIPELINE_LANGUAGES = discover_pipeline_languages(*_STAGE_PATHS)
+
 
 class Baseline(Pipeline):
     """Standard pipeline with configurable extraction, resolution, and build methods.
@@ -31,6 +45,10 @@ class Baseline(Pipeline):
     Accepts optional typed config objects in addition to the raw ``**kwargs``
     dict from the base class. When provided, these are used directly instead
     of dict-digging — the YAML must conform to the code, not the other way around.
+
+    Language support: computed as the intersection of all stage-level
+    ``supported_languages`` declarations.  Documents whose language falls
+    outside this set are skipped entirely and reported at the end.
 
     Args:
         input_paths: Data files or directories to load.
@@ -40,6 +58,12 @@ class Baseline(Pipeline):
         build: Typed build config (optional, preferred).
         **kwargs: Legacy raw config dict (backward compatible).
     """
+
+    #: Languages fully supported by every stage in this pipeline.
+    #: Auto-computed as the intersection of ``supported_languages``
+    #: from each constituent stage class.  Stages declaring ``"*"``
+    #: (universal) don't constrain the set.
+    supported_languages: set[str] = _PIPELINE_LANGUAGES
 
     def __init__(
         self,
@@ -69,6 +93,24 @@ class Baseline(Pipeline):
 
     def preprocess(self) -> list[Document]:
         docs = load.from_paths(self.input_paths)
+
+        # ── Language gate: reject unsupported documents upfront ──
+        kept, skipped = filter_by_language(docs, self.supported_languages)
+        if skipped:
+            skipped_ids = [d.doc_id for d in skipped]
+            langs = {d.language for d in skipped}
+            print(
+                f"[language] Skipping {len(skipped)} document(s) — "
+                f"languages {sorted(langs)} not supported. "
+                f"Pipeline supports: {sorted(self.supported_languages)}"
+            )
+            print(f"[language] Skipped IDs: {skipped_ids}")
+        docs = kept
+
+        if not docs:
+            print("[preprocess] No supported documents — pipeline stopping.")
+            return []
+
         docs = clean.normalize(docs)
         docs = link.normalize_links(docs)
         docs = quality.filter(docs, min_chars=50, min_words=10)
@@ -218,11 +260,12 @@ class Baseline(Pipeline):
         from polygraph.kg_build.extract.document_relation import create_doc_relation_method
 
         methods = config.methods
-        extractor = create_doc_relation_method(
-            "composite" if len(methods) > 1 else methods[0],
-            methods=methods,
-            method_options=config.method_options,
-        )
+        if len(methods) > 1:
+            extractor = create_doc_relation_method(
+                "composite", methods=methods, method_options=config.method_options
+            )
+        else:
+            extractor = create_doc_relation_method(methods[0])
 
         doc_entities, doc_triples = extractor.extract(self._raw_docs)
 

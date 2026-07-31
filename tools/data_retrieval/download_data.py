@@ -5,10 +5,10 @@ from polygraph.data import Data
 
 # ── Edit these ────────────────────────────────────────────────
 PATH = "data/wikipedia/connected.jsonl"
-COUNT = 10
+COUNT = 2
 STRATEGY = "degree"  # "random", "degree", or "specific"
 LANGUAGE = "en"
-TARGET_DEGREE = 2.0
+TARGET_DEGREE = 1.0
 SNAPSHOT = "20231101"
 MAX_SCAN = 10000
 ENRICH = True  # safe with degree — skips if links already exist
