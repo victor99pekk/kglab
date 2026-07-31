@@ -2,7 +2,35 @@
 
 from polygraph.pipelines.baseline import Baseline
 
+# Zero config (sensible defaults):
 pipe = Baseline(input_paths=["data/"], output_dir="output/")
+pipe.execute()
+
+# With preprocessing knobs:
+pipe = Baseline(
+    input_paths=["data/"],
+    output_dir="output/",
+    preprocess=PreprocessConfig(chunk_method="semantic", chunk_target_tokens=300),
+)
+pipe.execute()
+
+# Full stage control:
+pipe = Baseline(
+    input_paths=["data/"],
+    output_dir="output/",
+    preprocess=PreprocessConfig(stages=[
+        PreprocessStage("load", "baseline"),
+        PreprocessStage("chunk", "sentence", options={"target_tokens": 500}),
+    ]),
+)
+pipe.execute()
+
+# Custom preprocessor:
+pipe = Baseline(
+    input_paths=["data/"],
+    output_dir="output/",
+    preprocessor=MyCustomPreprocessor(),
+)
 pipe.execute()
 """
 
@@ -11,32 +39,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from polygraph._shared import Document, Ontology, discover_pipeline_languages, filter_by_language
+from polygraph._shared import Document, Ontology
 from polygraph._shared.stage_config import (
     BuildConfig,
     DocumentRelationConfig,
+    EvalConfig,
+    ExportConfig,
     ExtractionConfig,
+    PreprocessConfig,
     ResolutionConfig,
 )
 from polygraph.kg_build import build, extract, resolve
 from polygraph.pipelines._base import Pipeline
-from polygraph.preprocess import chunk, clean, dedup, link, load, quality
+from polygraph.preprocess import DefaultPreprocessor
+from polygraph.preprocess._base import Preprocessor
 
 _DEFAULT_ONTOLOGY_PATH = Path(__file__).parents[3] / "configs" / "default_ontology.yaml"
-
-# ── Pipeline-level language support ────────────────────────────
-# Auto-computed from folder structure.  Stages with an ``en/``
-# subdirectory (containing language-specific implementations) are
-# English-only.  Stages without language subdirectories are universal.
-
-_PREPROCESS_ROOT = Path(__file__).parents[1] / "preprocess"
-
-_STAGE_PATHS = [
-    _PREPROCESS_ROOT / "clean",
-    _PREPROCESS_ROOT / "chunk",
-]
-
-_PIPELINE_LANGUAGES = discover_pipeline_languages(*_STAGE_PATHS)
 
 
 def _entity_chunk_membership_triples(
@@ -66,42 +84,56 @@ def _entity_chunk_membership_triples(
 class Baseline(Pipeline):
     """Standard pipeline with configurable extraction, resolution, and build methods.
 
-    Accepts optional typed config objects in addition to the raw ``**kwargs``
-    dict from the base class. When provided, these are used directly instead
-    of dict-digging — the YAML must conform to the code, not the other way around.
-
-    Language support: computed as the intersection of all stage-level
-    ``supported_languages`` declarations.  Documents whose language falls
-    outside this set are skipped entirely and reported at the end.
+    Preprocessing is delegated to a ``Preprocessor`` instance — by default
+    ``DefaultPreprocessor``, which is driven by ``PreprocessConfig``.
+    Pass a custom ``Preprocessor`` subclass to replace the entire
+    preprocessing strategy.
 
     Args:
         input_paths: Data files or directories to load.
         output_dir: Where results are written.
-        extraction: Typed extraction config (optional, preferred).
-        resolution: Typed resolution config (optional, preferred).
-        build: Typed build config (optional, preferred).
+        preprocessor: Custom ``Preprocessor`` instance (Tier 3 — full control).
+            Overrides ``preprocess`` config when both are provided.
+        preprocess: ``PreprocessConfig`` for simple knobs (Tier 1) or
+            stage-level control (Tier 2). Ignored when ``preprocessor``
+            is provided.
+        extraction: Typed extraction config (optional).
+        resolution: Typed resolution config (optional).
+        build: Typed build config (optional).
+        eval_: Evaluation config (optional).
+        export: Export config (optional).
         **kwargs: Legacy raw config dict (backward compatible).
     """
-
-    #: Languages fully supported by every stage in this pipeline.
-    #: Auto-computed as the intersection of ``supported_languages``
-    #: from each constituent stage class.  Stages declaring ``"*"``
-    #: (universal) don't constrain the set.
-    supported_languages: set[str] = _PIPELINE_LANGUAGES
 
     def __init__(
         self,
         input_paths: list[str | Path],
         output_dir: str | Path,
+        preprocessor: Preprocessor | None = None,
+        preprocess: PreprocessConfig | None = None,
         extraction: ExtractionConfig | None = None,
         resolution: ResolutionConfig | None = None,
         build: BuildConfig | None = None,
+        eval_: EvalConfig | None = None,
+        export: ExportConfig | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(input_paths, output_dir, **kwargs)
+        self._preprocessor = preprocessor or DefaultPreprocessor(preprocess)
         self.extraction = extraction
         self.resolution = resolution
         self.build = build
+        self.eval_config = eval_
+        self.export_config = export
+
+    # ── Language support (delegated) ───────────────────────────
+
+    @property
+    def supported_languages(self) -> set[str]:
+        """Languages fully supported by every stage in this pipeline."""
+        return self._preprocessor.supported_languages
+
+    # ── Internal helpers ───────────────────────────────────────
 
     def _load_ontology(self) -> Ontology:
         """Load the ontology from the path given at construction time."""
@@ -115,40 +147,11 @@ class Baseline(Pipeline):
             f"a YAML file at {_DEFAULT_ONTOLOGY_PATH}"
         )
 
+    # ── Stage methods ──────────────────────────────────────────
+
     def preprocess(self) -> list[Document]:
-        docs = load.from_paths(self.input_paths)
-
-        # ── Language gate: reject unsupported documents upfront ──
-        kept, skipped = filter_by_language(docs, self.supported_languages)
-        if skipped:
-            skipped_ids = [d.doc_id for d in skipped]
-            langs = {d.language for d in skipped}
-            print(
-                f"[language] Skipping {len(skipped)} document(s) — "
-                f"languages {sorted(langs)} not supported. "
-                f"Pipeline supports: {sorted(self.supported_languages)}"
-            )
-            print(f"[language] Skipped IDs: {skipped_ids}")
-        docs = kept
-
-        if not docs:
-            print("[preprocess] No supported documents — pipeline stopping.")
-            return []
-
-        docs = clean.normalize(docs)
-        docs = link.normalize_links(docs)
-        docs = quality.filter(docs, min_chars=50, min_words=10)
-        docs = dedup.remove_duplicates(docs, method="minhash", threshold=0.85)
-
-        # Store raw documents for document-to-document relation extraction
-        self._raw_docs = docs
-
-        chunks = chunk.by_sentence(docs, target_tokens=450, overlap_tokens=60)
-        chunks = quality.filter(chunks)
-        chunks = dedup.remove_duplicates(chunks, method="minhash", threshold=0.85)
-
-        print(f"[preprocess] {len(docs)} documents → {len(chunks)} chunks")
-        return chunks
+        """Delegate to the configured preprocessor."""
+        return self._preprocessor.preprocess(self.input_paths)
 
     def build_kg(self, chunks: list[Document]) -> dict[str, Any]:
         ontology = self._load_ontology()
@@ -179,10 +182,14 @@ class Baseline(Pipeline):
             raise ValueError("extraction.mode must be one of: composed, joint")
 
         # ── Document-to-document relation extraction ───────────
-        if ext_cfg.document_relation.enabled and hasattr(self, "_raw_docs"):
+        raw_docs = self._preprocessor.raw_docs
+        if ext_cfg.document_relation.enabled and raw_docs:
             entities, triples = self._extract_document_relations(
-                entities, triples, ext_cfg.document_relation
+                entities, triples, ext_cfg.document_relation, raw_docs=raw_docs
             )
+            # Free raw docs early to avoid holding both raw docs and chunks in RAM
+            if hasattr(self._preprocessor, "free_raw_docs"):
+                self._preprocessor.free_raw_docs()
 
         # ── Add chunk nodes and connect to parent documents ────
         from polygraph.kg_build.extract.document_relation._helpers import (
@@ -272,14 +279,26 @@ class Baseline(Pipeline):
         )
         return {"graph": graph, "entities": resolved, "triples": triples}
 
+    def execute(self) -> None:
+        """Full pipeline, forwarding eval/export configs."""
+        super().execute(
+            eval_config=self.eval_config,
+            export_config=self.export_config,
+        )
+
     def _extract_document_relations(
         self,
         entities: list[dict[str, Any]],
         triples: list[tuple],
         config: DocumentRelationConfig,
+        raw_docs: list[Document] | None = None,
     ) -> tuple[list[dict[str, Any]], list[tuple]]:
         """Run document-to-document relation extraction and merge results."""
         from polygraph.kg_build.extract.document_relation import create_doc_relation_method
+
+        docs = raw_docs or []
+        if not docs:
+            return entities, triples
 
         methods = config.methods
         if len(methods) > 1:
@@ -289,7 +308,7 @@ class Baseline(Pipeline):
         else:
             extractor = create_doc_relation_method(methods[0])
 
-        doc_entities, doc_triples = extractor.extract(self._raw_docs)
+        doc_entities, doc_triples = extractor.extract(docs)
 
         existing_ids = {e["id"] for e in entities}
         for de in doc_entities:

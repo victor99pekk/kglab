@@ -150,9 +150,14 @@ def _get_connection(
     return GraphDatabase.driver(uri, auth=(user, password))
 
 
-def clear_database():
+def clear_database(
+    *,
+    uri: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> None:
     """Delete all nodes and relationships from the Neo4j database."""
-    driver = _get_connection()
+    driver = _get_connection(uri=uri, user=user, password=password)
     with driver.session() as session:
         session.run("MATCH (n) DETACH DELETE n").consume()
         logger.info("Cleared all nodes and relationships from Neo4j")
@@ -334,6 +339,13 @@ def upload_graph(
     Older exports without top-level ``entities`` or ``triples`` fall back to
     their derived graph nodes and edges. Connection arguments override the
     corresponding ``NEO4J_*`` environment variables when provided.
+
+    Args:
+        json_path: Path to ``knowledge_graph.json``.
+        clear: If True, wipe the database before uploading.
+        uri: Neo4j bolt URI (overrides ``NEO4J_URI`` env var).
+        user: Neo4j username (overrides ``NEO4J_USER`` env var).
+        password: Neo4j password (overrides ``NEO4J_PASSWORD`` env var).
     """
     json_path = Path(json_path)
     if not json_path.exists():
@@ -347,6 +359,7 @@ def upload_graph(
     _validate_endpoints(nodes, relationships)
 
     driver = _get_connection(uri=uri, user=user, password=password)
+    # Build a node-type lookup so relationship MATCH can use label-specific indexes
     id_to_type: dict[str, str] = {
         node["id"]: node.get("type", "Entity") for node in nodes if "id" in node
     }

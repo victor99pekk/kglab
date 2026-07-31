@@ -25,6 +25,7 @@ import inspect
 from pathlib import Path
 from typing import Any
 
+from polygraph.preprocess._base import Preprocessor
 from polygraph.preprocess.chunk import SemanticChunker, SentenceChunker, TextChunker
 from polygraph.preprocess.clean import EnglishCleaner, TextCleaner, TextCleanerBackend
 from polygraph.preprocess.dedup import (
@@ -34,6 +35,7 @@ from polygraph.preprocess.dedup import (
     GlobalDeduplicator,
     SemanticDeduplicator,
 )
+from polygraph.preprocess.default import DefaultPreprocessor
 from polygraph.preprocess.link import normalize_links
 from polygraph.preprocess.load import DataLoader
 from polygraph.preprocess.quality import (
@@ -197,10 +199,12 @@ dedup._set(
 __all__ = [
     "DataLoader",
     "Deduplicator",
+    "DefaultPreprocessor",
     "DuplicateAssignment",
     "DuplicateMatch",
     "EnglishCleaner",
     "GlobalDeduplicator",
+    "Preprocessor",
     "QualityFilter",
     "QualityProfiler",
     "QualityProfile",
