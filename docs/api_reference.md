@@ -277,25 +277,59 @@ exporter.to_neo4j("output/kg.json", clear=False)
 
 ## Benchmark Runner (`polygraph.benchmark_pipeline`)
 
+### Direct API (recommended)
+
+```python
+from polygraph.benchmark_pipeline import BenchmarkRunner
+from polygraph.pipelines import Baseline
+
+# Single pipeline run
+runner = BenchmarkRunner(
+    pipeline=Baseline,
+    input_paths=["data/wikipedia/"],
+    output_dir="output/my_exp/",
+)
+result = runner.run()
+
+# Compare two pipelines side by side
+results = BenchmarkRunner.compare(
+    baseline=Baseline,
+    variant=MyPipeline,
+    input_paths=["data/wikipedia/"],
+    output_dir="output/comparison/",
+)
+```
+
+### `BenchmarkRunner`
+
+| Method | Description |
+|---|---|
+| `BenchmarkRunner(pipeline, input_paths, output_dir, ...)` | Direct constructor — no YAML needed |
+| `BenchmarkRunner.from_config(config)` | Create from an `ExperimentConfig` (YAML) |
+| `BenchmarkRunner.compare(baseline, variant, input_paths, output_dir)` | Run two pipelines side by side |
+| `.run()` → `BenchmarkResult` | Execute and return results |
+
+### `BenchmarkResult`
+
+| Property | Type | Description |
+|---|---|---|
+| `.overall_score` | `float` | Overall KG quality (0–1) |
+| `.num_entities` | `int` | Number of entities |
+| `.num_triples` | `int` | Number of triples |
+| `.metrics` | `dict` | Raw metrics dict |
+| `.structural_audit` | `dict` | Ontology compliance audit |
+| `.artifacts` | `dict` | Paths to generated files |
+| `.wall_time_s` | `float` | Elapsed time (via `metrics`) |
+
+### YAML config (for reproducibility)
+
 ```python
 from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
 config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
-runner = BenchmarkRunner(config)
+runner = BenchmarkRunner.from_config(config)
 result = runner.run()
-
-# result.overall_score, result.num_entities, result.num_triples, etc.
 ```
-
-### `ExperimentConfig`
-
-Loaded from a YAML file with sections: `experiment`, `pipeline`, `input`,
-`output`, `dataset`, `ontology`.
-
-### `BenchmarkResult`
-
-Returned by `BenchmarkRunner.run()`. Contains aggregated metrics and paths
-to all output files.
 
 See `experiments/kg/_template/config.yaml` for the full config schema.
 

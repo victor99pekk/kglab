@@ -1,39 +1,45 @@
-"""examples/benchmark_comparison.py — Reproducible experiment comparison.
+"""examples/benchmark_comparison.py — Compare two pipelines side by side.
 
-Demonstrates how to use BenchmarkRunner to run multiple pipeline variants
-from YAML config files and compare results.
+Demonstrates BenchmarkRunner.compare() for direct side-by-side comparison
+without needing YAML config files.
 
 Usage:
     python examples/benchmark_comparison.py
 """
 
-from pathlib import Path
+from polygraph.benchmark_pipeline import BenchmarkRunner
+from polygraph.pipelines import Baseline
 
-from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+# ── Option A: Direct comparison (simplest) ──────────────────────
+print("=" * 60)
+print("Comparing pipelines directly")
+print("=" * 60)
 
-# ── Run two experiments from config files ────────────────────────
-experiments_dir = Path("experiments/kg/")
+results = BenchmarkRunner.compare(
+    baseline=Baseline,
+    variant=Baseline,  # replace with your custom pipeline class
+    input_paths=["data/wikipedia/"],
+    output_dir="output/comparison/",
+)
 
-for exp_dir in sorted(experiments_dir.glob("*")):
-    if not exp_dir.is_dir() or exp_dir.name.startswith("_"):
-        continue
+for label, result in results.items():
+    print(f"\n{label}:")
+    print(f"  Overall score: {result.overall_score:.2f}")
+    print(f"  Num entities:  {result.num_entities}")
+    print(f"  Num triples:   {result.num_triples}")
 
-    config_path = exp_dir / "config.yaml"
-    if not config_path.exists():
-        print(f"  [skip] {exp_dir.name} — no config.yaml")
-        continue
+# ── Option B: Single pipeline run ───────────────────────────────
+print("\n" + "=" * 60)
+print("Running a single pipeline")
+print("=" * 60)
 
-    print(f"\n{'=' * 60}")
-    print(f"Running: {exp_dir.name}")
-    print(f"{'=' * 60}")
+runner = BenchmarkRunner(
+    pipeline=Baseline,
+    input_paths=["data/wikipedia/"],
+    output_dir="output/single_run/",
+)
+result = runner.run()
 
-    config = ExperimentConfig.from_yaml(config_path)
-    runner = BenchmarkRunner(config)
-    result = runner.run()
-
-    print(f"  Overall score:  {result.overall_score:.2f}")
-    print(f"  Num entities:   {result.num_entities}")
-    print(f"  Num triples:    {result.num_triples}")
-    print(f"  Results → {config.output_dir / 'results_summary.json'}")
-
-print("\nAll experiments complete!")
+print(f"\nScore: {result.overall_score:.2f}")
+print(f"Entities: {result.num_entities}")
+print(f"Triples: {result.num_triples}")

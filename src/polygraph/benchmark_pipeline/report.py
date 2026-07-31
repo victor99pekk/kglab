@@ -16,7 +16,15 @@ from typing import Any
 
 @dataclass
 class BenchmarkResult:
-    """Aggregated results from a single benchmark run."""
+    """Aggregated results from a single benchmark run.
+
+    Access the overall quality score directly::
+
+        result = runner.run()
+        print(f"Score: {result.overall_score:.2f}")
+        print(f"Entities: {result.num_entities}")
+        print(f"Triples: {result.num_triples}")
+    """
 
     experiment_name: str
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -37,6 +45,21 @@ class BenchmarkResult:
 
     # Any extra metadata
     config_snapshot: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def overall_score(self) -> float:
+        """Convenience accessor for the overall quality score (0–1)."""
+        return float(self.metrics.get("overall_score", 0.0))
+
+    @property
+    def num_entities(self) -> int:
+        """Number of entities in the KG."""
+        return int(self.metrics.get("num_entities", 0))
+
+    @property
+    def num_triples(self) -> int:
+        """Number of triples (edges) in the KG."""
+        return int(self.metrics.get("num_triples", 0))
 
 
 def write_report(result: BenchmarkResult, output_dir: str | Path) -> Path:

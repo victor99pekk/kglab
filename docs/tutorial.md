@@ -235,18 +235,52 @@ PIPELINE_REGISTRY["my_pipeline"] = MyPipeline
 
 ## 9. Run benchmark experiments
 
-Use `BenchmarkRunner` for reproducible, config-driven experiments:
+Use `BenchmarkRunner` to run experiments and compare pipelines. You can use it
+directly (no YAML required) or with a YAML config for reproducibility.
+
+### Direct API (simplest)
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+from polygraph.benchmark_pipeline import BenchmarkRunner
+from polygraph.pipelines import Baseline
 
-config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
-runner = BenchmarkRunner(config)
+runner = BenchmarkRunner(
+    pipeline=Baseline,
+    input_paths=["data/wikipedia/"],
+    output_dir="output/my_experiment/",
+)
 result = runner.run()
 
 print(f"Overall score: {result.overall_score:.2f}")
 print(f"Num entities:  {result.num_entities}")
 print(f"Num triples:   {result.num_triples}")
+```
+
+### Compare two pipelines
+
+```python
+from polygraph.benchmark_pipeline import BenchmarkRunner
+from polygraph.pipelines import Baseline
+
+results = BenchmarkRunner.compare(
+    baseline=Baseline,
+    variant=MyCustomPipeline,
+    input_paths=["data/wikipedia/"],
+    output_dir="output/comparison/",
+)
+
+for label, r in results.items():
+    print(f"{label}: score={r.overall_score:.2f}, entities={r.num_entities}")
+```
+
+### YAML config (for version-controlled experiments)
+
+```python
+from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+
+config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
+runner = BenchmarkRunner.from_config(config)
+result = runner.run()
 ```
 
 See `experiments/kg/_template/` for an example experiment config.
