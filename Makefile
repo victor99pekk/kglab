@@ -19,6 +19,7 @@ WIKI_MAX_SCAN     ?= 10000
 WIKI_SEED         ?=
 WIKI_STRATEGY     ?= random
 WIKI_TARGET_DEGREE ?= 3.0
+WIKI_EXCLUDE_NS   ?= Help:,Template:
 
 GRAPH         ?= kg/001_baseline
 GRAPH_PATH    ?=
@@ -121,8 +122,9 @@ test:
 
 ## download-wikipedia: Download Wikipedia articles as Polygraph JSONL
 ##   make download-wikipedia WIKI_STRATEGY=degree WIKI_COUNT=20 WIKI_TARGET_DEGREE=3.0
+##   make download-wikipedia WIKI_EXCLUDE_NS=""  # include all namespaces
 download-wikipedia:
-	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN), strategy='$(WIKI_STRATEGY)', target_degree=$(WIKI_TARGET_DEGREE)$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
+	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN), strategy='$(WIKI_STRATEGY)', target_degree=$(WIKI_TARGET_DEGREE), exclude_namespaces=[ns for ns in '$(WIKI_EXCLUDE_NS)'.split(',') if ns]$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
 
 ## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
 enrich-wikipedia:

@@ -26,5 +26,6 @@ result = Data.download(
     max_scan=MAX_SCAN,
     enrich=ENRICH,
     force=FORCE,
+    exclude_namespaces=["Help:", "Template:"],
 )
 print(f"Done: {result}")

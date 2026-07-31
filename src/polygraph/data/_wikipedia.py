@@ -41,6 +41,10 @@ DATASET_URL = "https://huggingface.co/datasets/wikimedia/wikipedia"
 
 REQUEST_DELAY = 0.1  # seconds between Wikipedia API calls
 
+# Wikipedia namespace prefixes to skip during degree expansion.
+# These are meta/administrative pages, not encyclopedic articles.
+_DEFAULT_EXCLUDE_NAMESPACES = ["Help:", "Template:"]
+
 
 # ═══════════════════════════════════════════════════════════════
 # Errors
@@ -194,6 +198,7 @@ def download_wikipedia(
     url_file: str | Path | None = None,
     target_degree: float = 3.0,
     max_articles: int | None = None,
+    exclude_namespaces: list[str] | None = None,
 ) -> int:
     """Download Wikipedia articles and write Polygraph JSONL.
 
@@ -219,6 +224,10 @@ def download_wikipedia(
         target_degree: Target average hyperlink degree (``"degree"`` strategy).
         max_articles: Hard cap on total articles for degree strategy
             (defaults to ``count * 5``).
+        exclude_namespaces: Wikipedia namespace prefixes to skip during
+            degree expansion (e.g., ``["Help:", "Template:"]``). Defaults to
+            ``["Help:", "Wikipedia:", "Template:", "File:", "Category:",
+            "Portal:"]``. Pass an empty list to include all pages.
 
     Returns:
         Number of records written.
@@ -253,6 +262,7 @@ def download_wikipedia(
             min_chars=min_chars,
             target_degree=target_degree,
             max_articles=max_articles,
+            exclude_namespaces=exclude_namespaces,
         )
     else:
         raise ValueError(f"Unknown strategy '{strategy}'. Available: random, specific, degree")
@@ -457,6 +467,7 @@ def _download_degree_targeted(
     min_chars: int,
     target_degree: float,
     max_articles: int | None,
+    exclude_namespaces: list[str] | None = None,
 ) -> int:
     """Grow a connected set of articles to meet a target average hyperlink degree.
 
@@ -467,6 +478,10 @@ def _download_degree_targeted(
        target degree is met or ``max_articles`` is reached.
     """
     import time as _time
+
+    excluded = exclude_namespaces if exclude_namespaces is not None else _DEFAULT_EXCLUDE_NAMESPACES
+    if excluded:
+        logger.info("Excluding Wikipedia namespaces: %s", excluded)
 
     max_articles = max_articles or count * 5
     if target_degree <= 0:
@@ -515,7 +530,7 @@ def _download_degree_targeted(
         candidate_scores: dict[str, int] = {}
         for r in records:
             for title in r.get("_linked_titles", []):
-                if title not in title_to_id:
+                if title not in title_to_id and not _is_excluded(title, excluded):
                     candidate_scores[title] = candidate_scores.get(title, 0) + 1
 
         if not candidate_scores:
@@ -794,6 +809,11 @@ def _close_dataset(dataset: Any) -> None:
 def _article_url(language: str, title: str) -> str:
     slug = quote(title.replace(" ", "_"), safe="()!,:;@&=+$-_.~'")
     return f"https://{language}.wikipedia.org/wiki/{slug}"
+
+
+def _is_excluded(title: str, namespace_prefixes: list[str]) -> bool:
+    """Return True if *title* starts with any excluded namespace prefix."""
+    return any(title.startswith(prefix) for prefix in namespace_prefixes)
 
 
 def _utc_now() -> str:
