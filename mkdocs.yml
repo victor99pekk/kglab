@@ -1,5 +1,6 @@
 site_name: Polygraph
 site_description: Research toolkit for building high-quality knowledge graphs for LLM training
+site_url: https://victor99pekk.github.io/polygraph/
 repo_url: https://github.com/victor99pekk/polygraph
 theme:
   name: material
