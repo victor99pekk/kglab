@@ -19,6 +19,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from polygraph._shared.stage_config import LinkingConfig
 from polygraph.pipelines import PIPELINE_REGISTRY
 
 load_dotenv()
@@ -75,6 +76,12 @@ def main() -> None:
         default=False,
         help="Wipe the Neo4j database before uploading (requires --neo4j).",
     )
+    parser.add_argument(
+        "--linking",
+        action="store_true",
+        default=False,
+        help="Link extracted entities to Wikidata after resolution.",
+    )
     args = parser.parse_args()
 
     # ── Experiment mode (YAML config) ──────────────────────────
@@ -99,6 +106,7 @@ def main() -> None:
     pipeline = pipeline_cls(
         input_paths=[str(p) for p in args.input],
         output_dir=str(args.output),
+        linking=LinkingConfig(enabled=args.linking),
         **pipeline_kwargs,
     )
     pipeline.execute()

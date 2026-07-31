@@ -46,6 +46,7 @@ from polygraph._shared.stage_config import (
     EvalConfig,
     ExportConfig,
     ExtractionConfig,
+    LinkingConfig,
     PreprocessConfig,
     ResolutionConfig,
 )
@@ -114,6 +115,7 @@ class Baseline(Pipeline):
         extraction: ExtractionConfig | None = None,
         resolution: ResolutionConfig | None = None,
         build: BuildConfig | None = None,
+        linking: LinkingConfig | None = None,
         eval_: EvalConfig | None = None,
         export: ExportConfig | None = None,
         **kwargs: Any,
@@ -131,6 +133,7 @@ class Baseline(Pipeline):
         self.extraction = extraction
         self.resolution = resolution
         self.build = build
+        self.linking = linking
         self.eval_config = eval_
         self.export_config = export
 
@@ -282,6 +285,17 @@ class Baseline(Pipeline):
             )
             for triple in triples
         ]
+
+        # ── Entity linking (enrich with external KB IDs) ───────
+        link_cfg = self.linking or LinkingConfig.from_dict(self._config.get("linking"))
+        if link_cfg.enabled:
+            from polygraph.kg_build import link as kg_link
+
+            resolved = kg_link.entities(
+                resolved,
+                method=link_cfg.method,
+                **link_cfg.options,
+            )
 
         # ── Entity → Chunk edges (which chunks each entity came from) ──
         entity_chunk_triples = _entity_chunk_membership_triples(

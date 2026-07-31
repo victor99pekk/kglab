@@ -19,6 +19,7 @@ Tier 2 (stage list): runs user-defined stages in order, skipping disabled
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,8 @@ from polygraph.preprocess._base import Preprocessor
 # Auto-computed from folder structure (mirrors logic previously in
 # pipelines/baseline.py).  Stages with an ``en/`` subdirectory are
 # English-only; stages without language subdirectories are universal.
+
+logger = logging.getLogger(__name__)
 
 _PREPROCESS_ROOT = Path(__file__).parents[1] / "preprocess"
 
@@ -277,6 +280,10 @@ class DefaultPreprocessor(Preprocessor):
             self._extra[method] = opts
             return docs
 
+        elif name == "link":
+            self._link_accumulated_entities(method, opts)
+            return docs
+
         else:
             # Unknown stages pass through — custom Preprocessor subclasses
             # can handle them by overriding _dispatch_stage
@@ -293,6 +300,7 @@ class DefaultPreprocessor(Preprocessor):
                     "chunk",
                     "extract",
                     "extra",
+                    "link",
                 ]
             )
             raise ValueError(f"Unknown preprocessing stage: '{name}'. Known stages: {known}")
@@ -346,6 +354,27 @@ class DefaultPreprocessor(Preprocessor):
             f"(total: {len(self._entities)} entities, {len(self._triples)} triples)"
         )
         return docs
+
+    # ── Entity linking stage ───────────────────────────────────
+
+    def _link_accumulated_entities(self, method: str, opts: dict[str, Any]) -> None:
+        """Link accumulated entities to an external KB in-place.
+
+        Only runs if entities have been extracted during preprocessing
+        (via ``"extract"`` stages).  Enriches ``self._entities`` with
+        ``kb_id`` and ``kb_source`` fields.
+        """
+        if not self._entities:
+            logger.debug("[link] No accumulated entities to link — skipping")
+            return
+
+        from polygraph.kg_build import link as kg_link
+
+        self._entities = kg_link.entities(
+            self._entities,
+            method=method,
+            **opts,
+        )
 
     # ── Memory management ──────────────────────────────────────
 

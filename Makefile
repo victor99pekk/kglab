@@ -9,6 +9,7 @@ OUTPUT     ?= output/baseline
 VARIANT    ?= baseline
 NEO4J      ?= 0
 CLEAR_NEO4J ?= 0
+LINKING    ?= 0
 EXP        ?= kg/001_baseline
 
 WIKI_COUNT        ?= 3
@@ -93,10 +94,11 @@ clean:
 
 ## build-kg: Run the full pipeline (preprocess → build KG → evaluate → export)
 build-kg:
-	@neo4j_flag=""; clear_flag=""; \
+	@neo4j_flag=""; clear_flag=""; linking_flag=""; \
 	if [ "$(NEO4J)" = "1" ]; then neo4j_flag="--neo4j"; fi; \
 	if [ "$(CLEAR_NEO4J)" = "1" ]; then clear_flag="--clear-neo4j"; fi; \
-	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT) $$neo4j_flag $$clear_flag
+	if [ "$(LINKING)" = "1" ]; then linking_flag="--linking"; fi; \
+	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT) $$neo4j_flag $$clear_flag $$linking_flag
 
 ## experiment: Run an experiment from a YAML config file (EXP relative to experiments/)
 experiment:

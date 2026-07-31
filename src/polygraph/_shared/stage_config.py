@@ -298,3 +298,34 @@ class ExportConfig:
             formats=data.get("formats", ["json"]),
             neo4j_clear=data.get("neo4j_clear", False),
         )
+
+
+# ── Entity Linking ─────────────────────────────────────────────
+
+
+@dataclass
+class LinkingConfig:
+    """Entity linking stage configuration.
+
+    Links resolved entities to entries in an external knowledge base
+    (Wikidata, DBpedia, custom taxonomy, etc.).
+    """
+
+    method: str = ""
+    """Registered linker name (e.g. ``"wikidata"``). Required when enabled."""
+
+    enabled: bool = False
+    """Set ``True`` to run linking during the pipeline."""
+
+    options: dict[str, Any] = field(default_factory=dict)
+    """Keyword arguments forwarded to the linker constructor."""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> LinkingConfig:
+        if not data:
+            return cls()
+        return cls(
+            method=data.get("method", ""),
+            enabled=data.get("enabled", False),
+            options=data.get("options", {}),
+        )
