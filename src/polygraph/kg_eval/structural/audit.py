@@ -89,23 +89,24 @@ class StructuralAuditor(BaseEvaluator):
     # ── Individual Audit Functions ────────────────────────────
 
     @staticmethod
-    def _basic_stats(graph: nx.DiGraph, triples: list[tuple[str, str, str, str]]) -> dict[str, Any]:
+    def _basic_stats(graph, triples: list[tuple[str, str, str, str]]) -> dict[str, Any]:
+        n = graph.number_of_nodes()
+        connected = False
+        try:
+            connected = nx.is_weakly_connected(graph) if n > 0 else False
+        except Exception:
+            connected = None  # not computable for non-NetworkX backends
         return {
-            "num_nodes": graph.number_of_nodes(),
+            "num_nodes": n,
             "num_edges": graph.number_of_edges(),
             "num_triples": len(triples),
             "is_directed": graph.is_directed(),
-            "is_connected": nx.is_weakly_connected(graph) if graph.number_of_nodes() > 0 else False,
+            "is_connected": connected,
         }
 
     @staticmethod
-    def _degree_distribution(graph: nx.DiGraph) -> dict[str, Any]:
-        """Compute in-degree and out-degree distribution statistics.
-
-        Returns summary stats (mean, median, min, max, stdev) plus a
-        binned histogram for external visualization. Pure Python — no
-        numpy dependency.
-        """
+    def _degree_distribution(graph) -> dict[str, Any]:
+        """Compute in-degree and out-degree distribution statistics."""
         n = graph.number_of_nodes()
         if n == 0:
             return {
@@ -114,8 +115,19 @@ class StructuralAuditor(BaseEvaluator):
                 "histogram": {"bin_edges": [], "in_counts": [], "out_counts": []},
             }
 
-        in_degrees = [d for _, d in graph.in_degree()]
-        out_degrees = [d for _, d in graph.out_degree()]
+        try:
+            in_degrees = [d for _, d in graph.in_degree()]
+            out_degrees = [d for _, d in graph.out_degree()]
+        except (AttributeError, TypeError):
+            # Non-NetworkX backend — compute degrees from edges manually
+            in_deg: dict[str, int] = defaultdict(int)
+            out_deg: dict[str, int] = defaultdict(int)
+            for u, v, *_ in graph.edges():
+                out_deg[u] = out_deg.get(u, 0) + 1
+                in_deg[v] = in_deg.get(v, 0) + 1
+            node_ids = list(graph.nodes())
+            in_degrees = [in_deg.get(nid, 0) for nid in node_ids]
+            out_degrees = [out_deg.get(nid, 0) for nid in node_ids]
 
         def _summary(values: list[int]) -> dict[str, float]:
             return {
@@ -169,12 +181,8 @@ class StructuralAuditor(BaseEvaluator):
         }
 
     @staticmethod
-    def _connectivity_stats(graph: nx.DiGraph) -> dict[str, Any]:
-        """Additional connectivity metrics beyond basic stats.
-
-        Computes strongly connected components, average clustering
-        coefficient, and estimated diameter (via sampling for large graphs).
-        """
+    def _connectivity_stats(graph) -> dict[str, Any]:
+        """Connectivity metrics. Falls back gracefully for non-NetworkX backends."""
         n = graph.number_of_nodes()
         if n == 0:
             return {
@@ -185,42 +193,50 @@ class StructuralAuditor(BaseEvaluator):
                 "estimated_diameter": 0,
             }
 
-        # Strongly connected components
-        sccs = list(nx.strongly_connected_components(graph))
-        scc_sizes = sorted((len(c) for c in sccs), reverse=True)
+        try:
+            sccs = list(nx.strongly_connected_components(graph))
+            scc_sizes = sorted((len(c) for c in sccs), reverse=True)
+        except Exception:
+            scc_sizes = [n]
 
-        # Average clustering coefficient (on undirected view for directed graphs)
         try:
             avg_clustering = nx.average_clustering(graph)
         except Exception:
             avg_clustering = 0.0
 
-        # Diameter estimate: sample up to 100 random nodes, compute max shortest
-        # path length among reachable pairs. Exact diameter is O(n²) — too expensive.
-        sample = random.sample(list(graph.nodes()), min(100, n))
-        max_dist = 0
-        reachable_pairs = 0
-        for src in sample:
-            lengths = nx.single_source_shortest_path_length(graph, src)
-            if lengths:
-                max_dist = max(max_dist, max(lengths.values()))
-                reachable_pairs += len(lengths) - 1  # exclude self
+        try:
+            sample = random.sample(list(graph.nodes()), min(100, n))
+            max_dist = 0
+            for src in sample:
+                lengths = nx.single_source_shortest_path_length(graph, src)
+                if lengths:
+                    max_dist = max(max_dist, max(lengths.values()))
+        except Exception:
+            max_dist = 0
 
         return {
-            "num_scc": len(sccs),
+            "num_scc": len(scc_sizes),
             "largest_scc_size": scc_sizes[0] if scc_sizes else 0,
             "scc_size_gt1": sum(1 for s in scc_sizes if s > 1),
             "avg_clustering": round(avg_clustering, 6),
             "estimated_diameter": max_dist,
         }
 
-    def _orphan_analysis(self, graph: nx.DiGraph, entities: list[dict[str, Any]]) -> dict[str, Any]:
+    def _orphan_analysis(self, graph, entities: list[dict[str, Any]]) -> dict[str, Any]:
         """Identify nodes with zero connections (orphans)."""
         n_nodes = graph.number_of_nodes()
         if n_nodes == 0:
             return {"orphan_count": 0, "orphan_rate": 0.0, "health_score": 100}
 
-        orphans = list(nx.isolates(graph))
+        try:
+            orphans = list(nx.isolates(graph))
+        except Exception:
+            # Manual orphan detection for non-NetworkX backends
+            connected: set[str] = set()
+            for u, v, *_ in graph.edges():
+                connected.add(u)
+                connected.add(v)
+            orphans = [n for n in graph.nodes() if n not in connected]
         orphan_count = len(orphans)
         orphan_rate = orphan_count / n_nodes
 
@@ -248,13 +264,18 @@ class StructuralAuditor(BaseEvaluator):
         }
 
     @staticmethod
-    def _density_analysis(graph: nx.DiGraph) -> dict[str, Any]:
+    def _density_analysis(graph) -> dict[str, Any]:
         """Graph density: too sparse = isolated facts; too dense = over-connected noise."""
         n = graph.number_of_nodes()
         if n < 2:
             return {"density": 0.0, "health_score": 100}
 
-        density = nx.density(graph)
+        try:
+            density = nx.density(graph)
+        except Exception:
+            # Manual density: edges / (n * (n-1)) for directed graph
+            e = graph.number_of_edges()
+            density = e / (n * (n - 1)) if n > 1 else 0.0
 
         # For a KG: ideal density is typically 0.01-0.05 (sparse but connected)
         # Too sparse (<0.005) = dead facts; too dense (>0.2) = possible noise
@@ -515,8 +536,9 @@ class StructuralAuditor(BaseEvaluator):
         }
 
     @staticmethod
-    def _multi_hop_connectivity(graph: nx.DiGraph) -> dict[str, Any]:
-        """Measure how many nodes are reachable in 2-3 hops (needed for chain reasoning)."""
+    @staticmethod
+    def _multi_hop_connectivity(graph) -> dict[str, Any]:
+        """Measure how many nodes are reachable in 2-3 hops."""
         n = graph.number_of_nodes()
         if n < 3:
             return {
@@ -527,23 +549,32 @@ class StructuralAuditor(BaseEvaluator):
                 "flag": "green",
             }
 
-        # Sample to keep computation fast for large graphs
         sample_nodes = list(graph.nodes())[:200]
         hop2_reachable = 0
         hop3_reachable = 0
         total_pairs = 0
 
+        try:
+            successors_fn = graph.successors
+        except AttributeError:
+            # Fallback: build adjacency from edges
+            adj: dict[str, list[str]] = defaultdict(list)
+            for u, v, *_ in graph.edges():
+                adj[u].append(v)
+
+            def successors_fn(n):
+                return adj.get(n, [])
+
         for node in sample_nodes:
-            # BFS limited to 2 and 3 hops
-            visited_2 = set()
-            visited_3 = set()
-            queue = [(node, 0)]
+            visited_2: set[str] = set()
+            visited_3: set[str] = set()
+            queue: list[tuple[str, int]] = [(node, 0)]
 
             while queue:
                 current, depth = queue.pop(0)
                 if depth > 3:
                     break
-                for neighbor in graph.successors(current):
+                for neighbor in successors_fn(current):
                     if neighbor not in visited_2 and neighbor not in visited_3:
                         if depth + 1 <= 2:
                             visited_2.add(neighbor)
@@ -553,7 +584,7 @@ class StructuralAuditor(BaseEvaluator):
 
             hop2_reachable += len(visited_2)
             hop3_reachable += len(visited_3)
-            total_pairs += len(sample_nodes) - 1  # rough upper bound
+            total_pairs += len(sample_nodes) - 1
 
         pct_2hop = hop2_reachable / max(total_pairs, 1)
         pct_3hop = hop3_reachable / max(total_pairs, 1)

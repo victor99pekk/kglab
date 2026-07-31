@@ -255,11 +255,15 @@ class Baseline(Pipeline):
 
         # ── Build ──────────────────────────────────────────────
         bld_cfg = self.build or BuildConfig.from_dict(self._config.get("build"))
+        build_kwargs: dict[str, Any] = {}
+        if bld_cfg.method == "sqlite":
+            build_kwargs["db_path"] = str(self.output_dir / "knowledge_graph.db")
         graph = build.from_resolved(
             resolved,
             triples,
             method=bld_cfg.method,
             ontology=ontology,
+            **build_kwargs,
         )
 
         print(

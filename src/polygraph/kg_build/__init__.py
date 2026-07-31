@@ -4,7 +4,8 @@ Each pipeline stage is a package. Each selectable method has its own module.
 """
 
 from polygraph.kg_build import build, extract, resolve
-from polygraph.kg_build.build import GraphBuilder
+from polygraph.kg_build.build import GraphBuilder, SQLiteGraphBuilder
+from polygraph.kg_build.build.sqlite import SQLiteGraph
 from polygraph.kg_build.extract import (
     Entity,
     EntityExtractor,
@@ -25,6 +26,8 @@ __all__ = [
     "OntologyRuleRelationExtractor",
     "SimpleExtractor",
     "SpacyExtractor",
+    "SQLiteGraph",
+    "SQLiteGraphBuilder",
     "StructuredLLMRelationExtractor",
     "build",
     "extract",

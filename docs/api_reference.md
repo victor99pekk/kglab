@@ -225,8 +225,26 @@ resolved = resolve.by_embedding(
 ```python
 from polygraph.kg_build import build
 
+# In-memory (default)
 graph = build.from_resolved(resolved, triples, method="networkx", ontology=ontology)
 # Returns: networkx.DiGraph
+
+# File-backed (for large graphs — avoids OOM)
+graph = build.from_resolved(resolved, triples, method="sqlite")
+# Returns: SQLiteGraph (disk-resident, same API as nx.DiGraph)
+```
+
+| Method | Backend | RAM usage | File |
+|---|---|---|---|
+| `"networkx"` | NetworkX | All nodes + edges | None |
+| `"sqlite"` | SQLite | Queried data only | `knowledge_graph.db` |
+
+To use SQLite with a pipeline:
+
+```python
+from polygraph._shared.stage_config import BuildConfig
+
+pipe = Baseline(..., build=BuildConfig(method="sqlite"))
 ```
 
 ---

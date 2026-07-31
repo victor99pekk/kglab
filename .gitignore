@@ -43,6 +43,9 @@ experiments/**/models/
 .DS_Store
 Thumbs.db
 
+# Paper planning (local only)
+paper_motivation.md
+
 # Session artifacts
 saved_sessions/
 .mongo/

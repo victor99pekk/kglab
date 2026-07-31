@@ -83,6 +83,25 @@ pipe.execute()
 
 **Available resolution methods**: `string` (fast, no deps), `embedding` (semantic, needs `sentence-transformers`)
 
+**Available graph backends** (set via `BuildConfig.method`):
+
+| Method | Description |
+|---|---|
+| `"networkx"` | In-memory graph (default, fast but RAM-bound) |
+| `"sqlite"` | File-backed graph (`.db` file, disk-resident, handles large KGs) |
+
+```python
+from polygraph._shared.stage_config import BuildConfig
+
+# For large graphs — avoids OOM by writing to disk
+pipe = Baseline(
+    input_paths=["data/"],
+    output_dir="output/",
+    build=BuildConfig(method="sqlite"),
+)
+pipe.execute()
+```
+
 ---
 
 ## 4. Evaluate KG quality

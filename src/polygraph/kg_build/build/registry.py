@@ -5,6 +5,7 @@ from typing import Any
 
 BUILD_METHODS = {
     "networkx": "polygraph.kg_build.build.networkx:GraphBuilder",
+    "sqlite": "polygraph.kg_build.build.sqlite:SQLiteGraphBuilder",
 }
 
 
