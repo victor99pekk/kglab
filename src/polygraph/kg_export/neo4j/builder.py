@@ -8,7 +8,6 @@ knowledge graph construction where the full graph may not fit in memory.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import re
 from typing import Any
@@ -20,11 +19,32 @@ logger = logging.getLogger(__name__)
 # Characters that are not valid in unquoted Neo4j relationship type identifiers.
 _INVALID_REL_TYPE_CHARS = re.compile(r"[^A-Za-z0-9_]")
 
+_ID_CONSTRAINTS = {
+    "Entity": "polygraph_entity_id",
+    "Chunk": "polygraph_chunk_id",
+    "Document": "polygraph_document_id",
+}
+
 
 def _safe_rel_type(predicate: str) -> str:
     """Map an arbitrary predicate string to a safe Neo4j relationship type."""
     cleaned = _INVALID_REL_TYPE_CHARS.sub("_", predicate.upper()).strip("_")
-    return cleaned or "RELATION"
+    if not cleaned:
+        return "RELATION"
+    if cleaned[0].isdigit():
+        return f"REL_{cleaned}"
+    return cleaned
+
+
+def ensure_schema(session: Any) -> None:
+    """Create stable-ID constraints used by all Neo4j writers."""
+    for label, constraint_name in _ID_CONSTRAINTS.items():
+        session.run(
+            f"""
+            CREATE CONSTRAINT {constraint_name} IF NOT EXISTS
+            FOR (node:{label}) REQUIRE node.id IS UNIQUE
+            """
+        )
 
 
 class Neo4jGraphBuilder:
@@ -47,6 +67,7 @@ class Neo4jGraphBuilder:
         self.ontology = ontology
         self._node_count = 0
         self._edge_count = 0
+        ensure_schema(self.session)
 
     # ── Node helpers ───────────────────────────────────────────────
 
@@ -210,7 +231,7 @@ class Neo4jGraphBuilder:
         target_id: str,
         relationship_type: str,
     ) -> None:
-        """Create a simple structural edge (PART_OF, NEXT, MENTIONS).
+        """Create a simple structural edge (APPEARS_IN, PART_OF, NEXT).
 
         These edges carry no additional properties beyond their type.
         """
@@ -232,9 +253,9 @@ class Neo4jGraphBuilder:
     def remove_document_chunks(self, document_id: str) -> int:
         """Remove all ``:Chunk`` nodes (and their edges) for a given document.
 
-        Uses ``DETACH DELETE`` so that ``MENTIONS``, ``NEXT``, and ``PART_OF``
-        relationships are automatically removed.  ``:Entity`` nodes are left
-        untouched because they may be shared across documents.
+        Uses ``DETACH DELETE`` so that ``APPEARS_IN``, ``NEXT``, and
+        ``PART_OF`` relationships are automatically removed. ``:Entity``
+        nodes are left untouched because they may be shared across documents.
 
         Returns the number of chunks removed.
         """
@@ -253,21 +274,10 @@ class Neo4jGraphBuilder:
         return count
 
     def clear_database(self) -> None:
-        """Delete **every** node, relationship, constraint, and index."""
+        """Delete all graph data while preserving the stable-ID schema."""
         self.session.run("MATCH (n) DETACH DELETE n")
-        # Drop all constraints and indexes so they don't interfere with new builds
-        for record in self.session.run("SHOW CONSTRAINTS"):
-            name = record.get("name", "")
-            if name:
-                with contextlib.suppress(Exception):
-                    self.session.run(f"DROP CONSTRAINT `{name}`")
-        for record in self.session.run("SHOW INDEXES"):
-            name = record.get("name", "")
-            # Don't drop internal indexes (names that look auto-generated)
-            if name and "constraint" not in str(name).lower():
-                with contextlib.suppress(Exception):
-                    self.session.run(f"DROP INDEX `{name}`")
-        logger.info("Cleared all nodes, relationships, constraints, and indexes from Neo4j")
+        ensure_schema(self.session)
+        logger.info("Cleared all nodes and relationships from Neo4j")
 
     @property
     def stats(self) -> dict[str, int]:

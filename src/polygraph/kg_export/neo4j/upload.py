@@ -3,9 +3,15 @@
 import json
 import logging
 import os
+from collections import defaultdict
 from pathlib import Path
+from typing import Any
+
+from polygraph.kg_export.neo4j.builder import _safe_rel_type, ensure_schema
 
 logger = logging.getLogger(__name__)
+
+_STRUCTURAL_RELATIONSHIPS = {"APPEARS_IN", "PART_OF", "NEXT"}
 
 
 def replace_documents(session, document_ids: list[str]) -> None:
@@ -23,7 +29,7 @@ def replace_documents(session, document_ids: list[str]) -> None:
         """
         MATCH (chunk:Chunk)-[:PART_OF]->(document:Document)
         WHERE document.id IN $document_ids
-        OPTIONAL MATCH (chunk)-[:MENTIONS]->(entity:Entity)
+        OPTIONAL MATCH (entity:Entity)-[:APPEARS_IN]->(chunk)
         RETURN collect(DISTINCT chunk.id) AS chunk_ids,
                collect(DISTINCT entity.id) AS entity_ids
         """,
@@ -36,20 +42,18 @@ def replace_documents(session, document_ids: list[str]) -> None:
         # Extracted entity-to-entity relationships are not directly connected
         # to Chunk nodes. Remove replaced chunk IDs from their provenance and
         # delete a relationship only when no other document still supports it.
-        # Evidence text cannot currently be mapped to individual source chunks,
-        # so clear it rather than retain text from the replaced document.
+        # Evidence is retained when other chunks still support the relationship;
+        # the current schema cannot safely assign each sentence to one chunk.
         session.run(
             """
             MATCH ()-[relationship]->()
-            WHERE NOT type(relationship) IN ['PART_OF', 'NEXT', 'MENTIONS']
+            WHERE NOT type(relationship) IN ['APPEARS_IN', 'PART_OF', 'NEXT']
               AND any(chunk_id IN coalesce(relationship.sourceChunkIds, [])
                       WHERE chunk_id IN $chunk_ids)
             WITH relationship,
                  [chunk_id IN coalesce(relationship.sourceChunkIds, [])
                   WHERE NOT chunk_id IN $chunk_ids] AS remaining_chunk_ids
-            SET relationship.sourceChunkIds = remaining_chunk_ids,
-                relationship.evidenceSentences = [],
-                relationship.description = ''
+            SET relationship.sourceChunkIds = remaining_chunk_ids
             WITH relationship, remaining_chunk_ids
             WHERE size(remaining_chunk_ids) = 0
             DELETE relationship
@@ -81,7 +85,7 @@ def replace_documents(session, document_ids: list[str]) -> None:
             """
             MATCH (entity:Entity)
             WHERE entity.id IN $entity_ids
-              AND NOT EXISTS { MATCH (:Chunk)-[:MENTIONS]->(entity) }
+              AND NOT EXISTS { MATCH (entity)-[:APPEARS_IN]->(:Chunk) }
             DETACH DELETE entity
             """,
             entity_ids=entity_ids,
@@ -124,13 +128,18 @@ def replace_documents_atomic(
             raise
 
 
-def _get_connection():
-    """Create and return a Neo4j driver using env vars."""
+def _get_connection(
+    *,
+    uri: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+):
+    """Create a Neo4j driver using explicit values or environment defaults."""
     from neo4j import GraphDatabase
 
-    uri = os.environ.get("NEO4J_URI", "")
-    user = os.environ.get("NEO4J_USER", "")
-    password = os.environ.get("NEO4J_PASSWORD", "")
+    uri = uri or os.environ.get("NEO4J_URI", "")
+    user = user or os.environ.get("NEO4J_USER", "")
+    password = password if password is not None else os.environ.get("NEO4J_PASSWORD", "")
 
     if not uri or not user or not password:
         raise RuntimeError(
@@ -150,114 +159,306 @@ def clear_database():
     driver.close()
 
 
-def upload_graph(json_path: str | Path, clear: bool = False) -> None:
-    """Upload a graph, replacing documents with matching stable IDs."""
+def _canonical_nodes(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return canonical entity records, enriched by graph-only properties.
+
+    Current exports contain both resolved ``entities`` and derived graph nodes.
+    Entity records are authoritative; graph nodes provide computed properties
+    such as PageRank and backward-compatible endpoint placeholders.
+    """
+    graph_nodes = data.get("graph", {}).get("nodes", [])
+    graph_by_id = {
+        node["id"]: dict(node)
+        for node in graph_nodes
+        if isinstance(node, dict) and node.get("id")
+    }
+    if "entities" not in data:
+        return list(graph_by_id.values())
+
+    canonical: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entity in data.get("entities", []):
+        if not isinstance(entity, dict) or not entity.get("id"):
+            continue
+        node_id = str(entity["id"])
+        graph_node = graph_by_id.get(node_id, {})
+        merged = {**graph_node, **entity, "id": node_id}
+        if "importanceScore" in graph_node:
+            merged["importanceScore"] = graph_node["importanceScore"]
+        canonical.append(merged)
+        seen.add(node_id)
+
+    canonical.extend(node for node_id, node in graph_by_id.items() if node_id not in seen)
+    return canonical
+
+
+def _triple_record(triple: Any) -> dict[str, Any]:
+    """Normalize one exported triple dict or positional record."""
+    if isinstance(triple, dict):
+        record = {
+            "source": triple.get("subject", triple.get("source", "")),
+            "predicate": triple.get("predicate", triple.get("type", "")),
+            "target": triple.get("object", triple.get("target", "")),
+            "evidence_sentence": triple.get("evidence_sentence", ""),
+            "source_chunk_id": triple.get("source_chunk_id", ""),
+            "description": triple.get("description", ""),
+        }
+        if triple.get("source_chunk_ids"):
+            record["source_chunk_ids"] = triple["source_chunk_ids"]
+        return record
+
+    if not isinstance(triple, (list, tuple)) or len(triple) < 3:
+        raise ValueError(f"Invalid triple record: {triple!r}")
+    return {
+        "source": triple[0],
+        "predicate": triple[1],
+        "target": triple[2],
+        "evidence_sentence": triple[3] if len(triple) > 3 else "",
+        "source_chunk_id": triple[4] if len(triple) > 4 else "",
+        "description": triple[5] if len(triple) > 5 else "",
+    }
+
+
+def _legacy_edge_records(edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Recover individual relationship records from legacy graph edges."""
+    records: list[dict[str, Any]] = []
+    for edge in edges:
+        source = edge.get("source", "")
+        target = edge.get("target", "")
+        predicates = edge.get("predicates") or [edge.get("type", "related_to")]
+        relation_records = edge.get("relations", [])
+
+        for predicate in predicates:
+            matching = [
+                relation
+                for relation in relation_records
+                if relation.get("predicate") == predicate
+            ]
+            if not matching:
+                records.append(
+                    {
+                        "source": source,
+                        "predicate": predicate,
+                        "target": target,
+                        "evidence_sentence": "",
+                        "source_chunk_ids": edge.get("source_chunk_ids", []),
+                        "description": edge.get("description", ""),
+                    }
+                )
+                continue
+
+            for relation in matching:
+                records.append(
+                    {
+                        "source": source,
+                        "predicate": predicate,
+                        "target": target,
+                        "evidence_sentence": relation.get("evidence_sentence", ""),
+                        "source_chunk_id": relation.get("source_chunk_id", ""),
+                        "description": relation.get("description", ""),
+                    }
+                )
+    return records
+
+
+def _canonical_relationships(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Prefer canonical triples and fall back to legacy graph edges."""
+    if "triples" in data:
+        return [_triple_record(triple) for triple in data.get("triples", [])]
+    return _legacy_edge_records(data.get("graph", {}).get("edges", []))
+
+
+def _validate_endpoints(
+    nodes: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+) -> None:
+    """Reject missing endpoints and structurally invalid relationships."""
+    node_types = {
+        str(node["id"]): str(node.get("type", "Entity"))
+        for node in nodes
+        if node.get("id")
+    }
+    node_ids = set(node_types)
+    missing = sorted(
+        {
+            str(endpoint)
+            for relationship in relationships
+            for endpoint in (relationship.get("source", ""), relationship.get("target", ""))
+            if endpoint and str(endpoint) not in node_ids
+        }
+    )
+    if missing:
+        preview = ", ".join(missing[:5])
+        remainder = len(missing) - 5
+        if remainder > 0:
+            preview += f", and {remainder} more"
+        raise ValueError(f"Relationship endpoint(s) missing from node records: {preview}")
+
+    expected_types = {
+        "APPEARS_IN": ("Entity", "Chunk"),
+        "PART_OF": ("Chunk", "Document"),
+        "NEXT": ("Chunk", "Chunk"),
+    }
+    violations: list[str] = []
+    for relationship in relationships:
+        predicate = _safe_rel_type(str(relationship.get("predicate", "")))
+        expected = expected_types.get(predicate)
+        if expected is None:
+            continue
+        source = str(relationship.get("source", ""))
+        target = str(relationship.get("target", ""))
+        source_type = node_types.get(source, "")
+        target_type = node_types.get(target, "")
+        source_matches = (
+            expected[0] == "Entity" and source_type not in {"Chunk", "Document"}
+        ) or source_type == expected[0]
+        if not source_matches or target_type != expected[1]:
+            violations.append(
+                f"{predicate}: expected {expected[0]}->{expected[1]}, "
+                f"got {source_type}->{target_type} ({source}->{target})"
+            )
+    if violations:
+        raise ValueError(f"Invalid structural relationship(s): {'; '.join(violations[:5])}")
+
+
+def upload_graph(
+    json_path: str | Path,
+    clear: bool = False,
+    *,
+    uri: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> None:
+    """Upload canonical entities and triples from a KG export.
+
+    Older exports without top-level ``entities`` or ``triples`` fall back to
+    their derived graph nodes and edges. Connection arguments override the
+    corresponding ``NEO4J_*`` environment variables when provided.
+    """
     json_path = Path(json_path)
     if not json_path.exists():
         raise FileNotFoundError(f"Graph file not found: {json_path}")
 
-    with open(json_path) as f:
+    with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    graph_data = data.get("graph", {})
-    nodes = graph_data.get("nodes", [])
-    edges = graph_data.get("edges", [])
+    nodes = _canonical_nodes(data)
+    relationships = _canonical_relationships(data)
+    _validate_endpoints(nodes, relationships)
 
-    driver = _get_connection()
-
-    # Build a node-type lookup so relationship MATCH can use label-specific indexes
+    driver = _get_connection(uri=uri, user=user, password=password)
     id_to_type: dict[str, str] = {
         node["id"]: node.get("type", "Entity") for node in nodes if "id" in node
     }
 
-    with driver.session() as session:
-        if clear:
-            logger.info("Clearing existing Neo4j data...")
-            session.run("MATCH (n) DETACH DELETE n")
-        else:
-            replace_documents(
-                session,
-                [node.get("id", "") for node in nodes if node.get("type") == "Document"],
-            )
-
-        # ── Batched node uploads (UNWIND — one network round-trip per BATCH_SIZE) ──
-        logger.info(f"Categorizing {len(nodes)} nodes for batched upload...")
-        chunk_rows: list[dict] = []
-        doc_rows: list[dict] = []
-        entity_rows: list[dict] = []
-
-        for node in nodes:
-            node_type = node.get("type", "Entity")
-            provenance = {
-                key: node[key]
-                for key in (
-                    "title",
-                    "url",
-                    "license",
-                    "source_domain",
-                    "scraped_at",
-                    "crawler",
-                    "content_hash",
-                    "inferred_type",
-                )
-                if node.get(key) not in (None, "")
-            }
-
-            if node_type == "Chunk":
-                source_list = node.get("source", [])
-                source_str = (
-                    source_list[0] if isinstance(source_list, list) and source_list else source_list
-                )
-                chunk_rows.append(
-                    {
-                        "id": node.get("id", ""),
-                        "source": source_str,
-                        "text": node.get("text", ""),
-                        "tokenCount": node.get("tokenCount", 0),
-                        "index": node.get("index", 0),
-                        "type": node_type,
-                        "provenance": provenance,
-                    }
-                )
-            elif node_type == "Document":
-                doc_rows.append(
-                    {
-                        "id": node.get("id", ""),
-                        "name": node.get("name", ""),
-                        "type": node_type,
-                        "description": node.get("description", ""),
-                        "source": node.get("source", []),
-                        "chunk_count": node.get("chunk_count", 0),
-                        "provenance": provenance,
-                    }
-                )
+    try:
+        with driver.session() as session:
+            if clear:
+                logger.info("Clearing existing Neo4j data...")
+                session.run("MATCH (n) DETACH DELETE n")
+                ensure_schema(session)
             else:
-                entity_rows.append(
-                    {
-                        "id": node.get("id", ""),
-                        "name": node.get("name", ""),
-                        "type": node_type,
-                        "description": node.get("description", ""),
-                        "importance_score": node.get("importanceScore", 0.0),
-                        "confidence_score": node.get("confidenceScore", 1.0),
-                        "embedding": node.get("embedding"),
-                    }
+                ensure_schema(session)
+                replace_documents(
+                    session,
+                    [node.get("id", "") for node in nodes if node.get("type") == "Document"],
                 )
 
-        _upload_nodes_batched(session, "Chunk", chunk_rows)
-        _upload_nodes_batched(session, "Document", doc_rows)
-        _upload_nodes_batched(session, "Entity", entity_rows)
+            node_rows = _categorize_nodes(nodes)
+            for label in ("Chunk", "Document", "Entity"):
+                _upload_nodes_batched(session, label, node_rows[label])
 
-        # Create relationships (pre-aggregated in Python, batched with UNWIND)
-        logger.info(f"Uploading {len(edges)} relationships...")
-        _upload_relationships_batched(session, edges, id_to_type)
+            logger.info("Uploading %d relationship records...", len(relationships))
+            _upload_relationships_batched(session, relationships, id_to_type)
+    finally:
+        driver.close()
 
-    driver.close()
-    logger.info(f"Successfully uploaded {len(nodes)} nodes and {len(edges)} edges to Neo4j")
+    logger.info(
+        "Successfully uploaded %d nodes and %d relationship records to Neo4j",
+        len(nodes),
+        len(relationships),
+    )
 
 
 BATCH_SIZE = 5000
-BATCH_SIZE_REL = 200000
+BATCH_SIZE_REL = 20000
+
+_PROVENANCE_KEYS = (
+    "title",
+    "url",
+    "license",
+    "source_domain",
+    "scraped_at",
+    "crawler",
+    "content_hash",
+    "inferred_type",
+)
+
+
+def _categorize_nodes(nodes: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Normalize canonical node records into label-specific upload rows."""
+    categorized: dict[str, list[dict[str, Any]]] = {
+        "Chunk": [],
+        "Document": [],
+        "Entity": [],
+    }
+    for node in nodes:
+        node_type = node.get("type", "Entity")
+        provenance = {
+            key: node[key]
+            for key in _PROVENANCE_KEYS
+            if node.get(key) not in (None, "")
+        }
+
+        if node_type == "Chunk":
+            source = node.get("source", "")
+            if isinstance(source, list):
+                source = source[0] if source else ""
+            categorized["Chunk"].append(
+                {
+                    "id": node.get("id", ""),
+                    "source": source,
+                    "text": node.get("text", ""),
+                    "tokenCount": node.get("tokenCount", 0),
+                    "index": node.get("index", 0),
+                    "type": "Chunk",
+                    "upload_date": node.get("upload_date", ""),
+                    "provenance": provenance,
+                }
+            )
+        elif node_type == "Document":
+            categorized["Document"].append(
+                {
+                    "id": node.get("id", ""),
+                    "name": node.get("name", ""),
+                    "type": "Document",
+                    "description": node.get("description", ""),
+                    "source": node.get("source", []),
+                    "chunk_count": node.get("chunk_count", 0),
+                    "upload_date": node.get("upload_date", ""),
+                    "provenance": provenance,
+                }
+            )
+        else:
+            aliases = node.get("aliases", [])
+            if isinstance(aliases, str):
+                aliases = [aliases] if aliases else []
+            elif not isinstance(aliases, list):
+                aliases = list(aliases) if aliases else []
+            categorized["Entity"].append(
+                {
+                    "id": node.get("id", ""),
+                    "name": node.get("name", ""),
+                    "type": node_type,
+                    "aliases": aliases,
+                    "description": node.get("description", ""),
+                    "importance_score": node.get("importanceScore", 0.0),
+                    "confidence_score": node.get("confidenceScore", 1.0),
+                    "embedding": node.get("embedding"),
+                    "provenance": provenance,
+                }
+            )
+    return categorized
 
 
 def _upload_nodes_batched(session, label: str, rows: list[dict]) -> None:
@@ -274,7 +475,7 @@ def _upload_nodes_batched(session, label: str, rows: list[dict]) -> None:
                 MERGE (n:Chunk {id: item.id})
                 SET n.source = item.source, n.text = item.text,
                     n.tokenCount = item.tokenCount, n.index = item.index,
-                    n.type = item.type
+                    n.type = item.type, n.upload_date = item.upload_date
                 SET n += item.provenance
                 REMOVE n.entityType
                 """,
@@ -287,7 +488,8 @@ def _upload_nodes_batched(session, label: str, rows: list[dict]) -> None:
                 MERGE (n:Document {id: item.id})
                 SET n.name = item.name, n.type = item.type,
                     n.description = item.description, n.source = item.source,
-                    n.chunk_count = item.chunk_count
+                    n.chunk_count = item.chunk_count,
+                    n.upload_date = item.upload_date
                 SET n += item.provenance
                 REMOVE n.entityType
                 """,
@@ -299,10 +501,20 @@ def _upload_nodes_batched(session, label: str, rows: list[dict]) -> None:
                 UNWIND $batch AS item
                 MERGE (n:Entity {id: item.id})
                 SET n.name = item.name, n.type = item.type,
-                    n.description = item.description,
+                    n.description = CASE WHEN item.description <> ''
+                        THEN item.description ELSE coalesce(n.description, '') END,
                     n.importanceScore = item.importance_score,
-                    n.confidenceScore = item.confidence_score,
-                    n.embedding = item.embedding
+                    n.confidenceScore = CASE
+                        WHEN item.confidence_score > coalesce(n.confidenceScore, 0)
+                        THEN item.confidence_score
+                        ELSE coalesce(n.confidenceScore, 0) END,
+                    n.embedding = coalesce(item.embedding, n.embedding),
+                    n.aliases = reduce(
+                        aliases = coalesce(n.aliases, []),
+                        alias IN item.aliases |
+                        CASE WHEN alias IN aliases THEN aliases ELSE aliases + [alias] END
+                    )
+                SET n += item.provenance
                 REMOVE n.entityType
                 """,
                 batch=batch,
@@ -335,78 +547,104 @@ def _neo4j_label(node_type: str) -> str:
     return "Entity"
 
 
-def _upload_relationships_batched(session, edges: list[dict], id_to_type: dict[str, str]) -> None:
-    """Pre-aggregate duplicate relationships in Python, then upload in batches.
-
-    Merges (source, target, predicate) keys in Python so Neo4j only sees each
-    unique edge once per batch — no Cypher ``reduce`` loops, no duplicates.
-    """
-    from collections import defaultdict
-
-    # Aggregate: (source, target, predicate, src_label, tgt_label) → metadata
-    agg: dict[tuple[str, str, str, str, str], dict] = defaultdict(
-        lambda: {"descriptions": set(), "evidence_sentences": set(), "source_chunk_ids": set()}
+def _relationship_buckets(
+    relationships: list[dict[str, Any]],
+    id_to_type: dict[str, str],
+) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
+    """Aggregate one bounded relationship batch by endpoints and predicate."""
+    aggregated: dict[tuple[str, str, str, str, str], dict[str, set[str]]] = defaultdict(
+        lambda: {
+            "descriptions": set(),
+            "evidence_sentences": set(),
+            "source_chunk_ids": set(),
+        }
     )
+    for relationship in relationships:
+        source = str(relationship.get("source", ""))
+        target = str(relationship.get("target", ""))
+        predicate = _safe_rel_type(str(relationship.get("predicate", "")))
+        if not source or not target:
+            continue
 
-    for edge in edges:
-        source = edge.get("source", "")
-        target = edge.get("target", "")
-        predicates = edge.get("predicates", ["related_to"])
         source_label = _neo4j_label(id_to_type.get(source, "Entity"))
         target_label = _neo4j_label(id_to_type.get(target, "Entity"))
+        key = (source, target, predicate, source_label, target_label)
+        metadata = aggregated[key]
 
-        for pred in predicates:
-            relation_records = [r for r in edge.get("relations", []) if r.get("predicate") == pred]
-            key = (source, target, pred, source_label, target_label)
-            for r in relation_records:
-                if r.get("description"):
-                    agg[key]["descriptions"].add(r["description"])
-                if r.get("evidence_sentence"):
-                    agg[key]["evidence_sentences"].add(r["evidence_sentence"])
-                if r.get("source_chunk_id"):
-                    agg[key]["source_chunk_ids"].add(r["source_chunk_id"])
+        if predicate not in _STRUCTURAL_RELATIONSHIPS:
+            source_chunk_ids = relationship.get("source_chunk_ids", [])
+            if isinstance(source_chunk_ids, str):
+                source_chunk_ids = [source_chunk_ids]
+            elif not isinstance(source_chunk_ids, (list, tuple, set)):
+                source_chunk_ids = [source_chunk_ids] if source_chunk_ids else []
+            source_chunk_id = relationship.get("source_chunk_id", "")
+            if source_chunk_id:
+                source_chunk_ids = [*source_chunk_ids, source_chunk_id]
+            metadata["source_chunk_ids"].update(
+                str(chunk_id) for chunk_id in source_chunk_ids if chunk_id
+            )
+            evidence = relationship.get("evidence_sentence", "")
+            if evidence:
+                metadata["evidence_sentences"].add(str(evidence))
+            description = relationship.get("description", "")
+            if description:
+                metadata["descriptions"].add(str(description))
 
-    # Bucket by (src_label, tgt_label) for static MATCH
-    buckets: dict[tuple[str, str], list[dict]] = defaultdict(list)
-    for (source, target, pred, src_label, tgt_label), meta in agg.items():
-        buckets[(src_label, tgt_label)].append(
+    buckets: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for (source, target, predicate, source_label, target_label), metadata in aggregated.items():
+        buckets[(source_label, target_label, predicate)].append(
             {
                 "source": source,
                 "target": target,
-                "predicate": pred,
-                "evidence_sentences": list(meta["evidence_sentences"]),
-                "source_chunk_ids": list(meta["source_chunk_ids"]),
-                "description": list(meta["descriptions"])[0] if meta["descriptions"] else "",
+                "evidence_sentences": sorted(metadata["evidence_sentences"]),
+                "source_chunk_ids": sorted(metadata["source_chunk_ids"]),
+                "description": min(metadata["descriptions"], default=""),
             }
         )
+    return buckets
 
-    total = sum(len(v) for v in buckets.values())
-    uploaded = 0
-    for (src_label, tgt_label), bucket_rows in buckets.items():
-        match_clause = _LABEL_QUERIES.get(
-            (src_label, tgt_label),
-            f"MATCH (a:{src_label} {{id: row.source}}), (b:{tgt_label} {{id: row.target}})",
-        )
-        for offset in range(0, len(bucket_rows), BATCH_SIZE_REL):
-            batch = bucket_rows[offset : offset + BATCH_SIZE_REL]
-            uploaded += len(batch)
-            logger.info(
-                f"  [{src_label}→{tgt_label}] {uploaded - len(batch) + 1}–{uploaded} of {total}"
-            )
 
-            # No Cypher reduce() loops — properties are already final lists
-            query = f"""
-            UNWIND $rows AS row
-            {match_clause}
-            CALL apoc.merge.relationship(a, row.predicate, {{}}, {{}}, b, {{}})
-            YIELD rel
-            SET rel.evidenceSentences = row.evidence_sentences,
-                rel.sourceChunkIds = row.source_chunk_ids,
-                rel.description = CASE WHEN row.description <> ''
-                    THEN row.description ELSE coalesce(rel.description, '') END
-            RETURN count(rel)
-            """
-            session.run(query, rows=batch)
+def _upload_relationships_batched(
+    session,
+    relationships: list[dict[str, Any]],
+    id_to_type: dict[str, str],
+) -> None:
+    """Upload bounded canonical triple batches without requiring APOC."""
+    for offset in range(0, len(relationships), BATCH_SIZE_REL):
+        input_batch = relationships[offset : offset + BATCH_SIZE_REL]
+        buckets = _relationship_buckets(input_batch, id_to_type)
+
+        for (source_label, target_label, predicate), rows in buckets.items():
+            match_clause = _LABEL_QUERIES[(source_label, target_label)]
+            if predicate in _STRUCTURAL_RELATIONSHIPS:
+                query = f"""
+                UNWIND $rows AS row
+                {match_clause}
+                MERGE (a)-[rel:{predicate}]->(b)
+                RETURN count(rel)
+                """
+            else:
+                query = f"""
+                UNWIND $rows AS row
+                {match_clause}
+                MERGE (a)-[rel:{predicate}]->(b)
+                SET rel.evidenceSentences = reduce(
+                        evidence = coalesce(rel.evidenceSentences, []),
+                        sentence IN row.evidence_sentences |
+                        CASE WHEN sentence IN evidence
+                            THEN evidence ELSE evidence + [sentence] END
+                    ),
+                    rel.sourceChunkIds = reduce(
+                        chunks = coalesce(rel.sourceChunkIds, []),
+                        chunk_id IN row.source_chunk_ids |
+                        CASE WHEN chunk_id IN chunks
+                            THEN chunks ELSE chunks + [chunk_id] END
+                    ),
+                    rel.description = CASE WHEN row.description <> ''
+                        THEN row.description ELSE coalesce(rel.description, '') END
+                RETURN count(rel)
+                """
+            session.run(query, rows=rows)
 
 
 def upload_from_output(output_dir: str | Path, clear: bool = False) -> None:
