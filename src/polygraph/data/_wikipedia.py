@@ -226,8 +226,8 @@ def download_wikipedia(
             (defaults to ``count * 5``).
         exclude_namespaces: Wikipedia namespace prefixes to skip during
             degree expansion (e.g., ``["Help:", "Template:"]``). Defaults to
-            ``["Help:", "Wikipedia:", "Template:", "File:", "Category:",
-            "Portal:"]``. Pass an empty list to include all pages.
+            ``["Help:", "Template:"]``. Pass an empty list to include all
+            pages.
 
     Returns:
         Number of records written.
