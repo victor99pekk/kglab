@@ -6,7 +6,7 @@ SHELL   := /bin/bash
 
 INPUT      ?= data/wikipedia/
 OUTPUT     ?=
-VARIANT    ?= baseline
+VARIANT    ?= surface
 NEO4J      ?= 0
 CLEAR_NEO4J ?= 0
 LINKING    ?= 0
@@ -38,8 +38,9 @@ WIKIMEDIA_TOPIC_SUMMARY   := $(WIKIMEDIA_TOPIC_ARTIFACTS)/prepared/summary.json
 	wikimedia-topic-labels wikimedia-topic-labels-validate \
 	wikimedia-topic-labels-download wikimedia-topic-labels-prepare
 
+## help: Show available targets and their descriptions
 help:
-	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=baseline] [EXP=...] [WIKI_COUNT=20]"
+	@echo "Usage: make <target> [INPUT=...] [OUTPUT=...] [VARIANT=surface|semantic] [EXP=...] [WIKI_COUNT=20]"
 	@echo ""
 	@echo "── Setup ────────────────────────────────────────────"
 	@echo "   install           Sync dependencies with uv + download spaCy model"
@@ -61,19 +62,22 @@ help:
 	@echo "   experiment        Run an experiment from a YAML config (set EXP= path)"
 	@echo "   neo4j-upload      Upload a knowledge_graph.json to Neo4j (clears first)"
 	@echo ""
+	@echo "── Pipeline Variants ────────────────────────────────"
+	@echo "   surface           Fast: spaCy sm + string matching resolution"
+	@echo "   semantic          Deep: spaCy lg + embedding-based resolution"
+	@echo ""
 	@echo "── Dev ──────────────────────────────────────────────"
 	@echo "   test              Run the test suite"
 	@echo ""
 	@echo "── Quick Start ──────────────────────────────────────"
 	@echo "   make install                                   # one-time setup"
 	@echo "   make test                                      # verify everything works"
-	@echo "   make build-kg                                  # baseline pipeline (direct)"
+	@echo "   make build-kg                                  # baseline pipeline (default)"
+	@echo "   make build-kg VARIANT=semantic                  # semantic pipeline (recommended)"
 	@echo "   make experiment                                # baseline experiment (001)"
-	@echo "   make experiment EXP=kg/002_llm"
-	@echo "   make neo4j-upload GRAPH=kg/002_llm"
+	@echo "   make neo4j-upload GRAPH_PATH=generated_KGs/KG_0/knowledge_graph.json"
 	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
 	@echo "   make wikipedia-full WIKI_COUNT=50              # download + enrich 50 articles"
-	@echo "   make wikimedia-topic-labels                    # Experiment 002 labels"
 
 # ═══════════════════════════════════════════════════════════
 # Setup

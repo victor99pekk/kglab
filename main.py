@@ -67,7 +67,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--variant",
-        default="baseline",
+        default="surface",
         choices=list(PIPELINE_REGISTRY.keys()),
         help="Pipeline variant to run (ignored when --experiment is used).",
     )

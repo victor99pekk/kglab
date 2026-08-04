@@ -9,7 +9,7 @@ Subclass and implement ``preprocess()`` and ``build_kg_streaming()``.
 
 Usage::
 
-    from polygraph.pipelines._streaming import StreamingPipeline
+    from polygraph.pipelines.streaming import StreamingPipeline
     from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
 
     class MyStreamingPipeline(StreamingPipeline):

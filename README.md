@@ -9,7 +9,7 @@
 
 <p align="right"><sub><small>Image adapted from <a href="https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275">Holten &amp; van Wijk (2009)</a>.</small></sub></p>
 
-🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM
+🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM / 🔍 Graph RAG
 
 A research toolkit for building highly customizable Knowledge-Graph generation pipelines. This repo provides support for using pre-built KG-generation pipelines and for customizing them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc.), as well as knowledge-building stages like entity extraction and resolution. The pipelines are implemented as classes that can be easily benchmarked with pre-defined code. The hope is that this will make it easy for people to use the existing pipelines defined in this repo, modify them, and benchmark the changes with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
 
@@ -35,7 +35,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
 
 Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge**, co-organized by the National Innovation Center (NIC), Meta, and the AI for Vietnam Foundation. Built over 48 hours, it tackled the real-world problem of generating high-quality, fact-grounded training data for LLMs.
 
-The project won the **$5,000 USD Meta Prize** and has since been refactored into a modular research toolkit for studying how knowledge graph quality affects downstream LLM performance.
+The project won the **$5,000 USD Meta Prize** and has since been refactored into a modular research toolkit for studying how knowledge graph quality affects downstream LLM performance — whether through fine-tuning on KG-structured data or through Graph RAG (retrieval-augmented generation over the knowledge graph).
 
 <details>
 <summary><strong>🏆 Hackathon Results</strong></summary>
