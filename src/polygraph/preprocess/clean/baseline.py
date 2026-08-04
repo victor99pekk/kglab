@@ -5,6 +5,7 @@ Exports: TextCleaner, TextCleanerBackend, EnglishCleaner
 
 import logging
 import re
+import unicodedata
 from abc import ABC, abstractmethod
 
 from polygraph._shared import Document, Language
@@ -24,6 +25,16 @@ class EnglishCleaner(TextCleanerBackend):
 
     def clean(self, text: str) -> str:
         text = text.strip()
+        # Normalize Unicode — repair mojibake and canonicalize forms.
+        text = unicodedata.normalize("NFC", text)
+        try:
+            from ftfy import fix_text
+
+            text = fix_text(text)
+        except ImportError:
+            # ftfy is an optional dependency (install [curation] extra).
+            # The base package remains functional without it.
+            pass
         # Normalize line endings while preserving paragraph and line structure.
         # Quality filtering uses line boundaries to identify copied boilerplate.
         text = text.replace("\r\n", "\n").replace("\r", "\n")

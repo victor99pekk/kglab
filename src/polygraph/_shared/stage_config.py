@@ -199,16 +199,16 @@ class PreprocessConfig:
 
     clean_enabled: bool = True
     link_normalize_enabled: bool = True
-    quality_min_chars: int = 50
-    quality_min_words: int = 10
-    doc_dedup_method: str = "minhash"
+    quality_min_chars: int = 200
+    quality_min_words: int = 40
+    doc_dedup_method: str = "layered"
     doc_dedup_threshold: float = 0.85
-    chunk_method: str = "sentence"
+    chunk_method: str = "semantic"
     chunk_target_tokens: int = 450
     chunk_overlap_tokens: int = 60
     chunk_semantic_threshold: float = 0.55
     chunk_semantic_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
-    chunk_dedup_method: str = "minhash"
+    chunk_dedup_method: str = "layered"
     chunk_dedup_threshold: float = 0.85
 
     # ── Tier 2: Explicit stage list ──────────────────────────
@@ -231,18 +231,18 @@ class PreprocessConfig:
         return cls(
             clean_enabled=data.get("clean_enabled", True),
             link_normalize_enabled=data.get("link_normalize_enabled", True),
-            quality_min_chars=data.get("quality_min_chars", 50),
-            quality_min_words=data.get("quality_min_words", 10),
-            doc_dedup_method=data.get("doc_dedup_method", "minhash"),
+            quality_min_chars=data.get("quality_min_chars", 200),
+            quality_min_words=data.get("quality_min_words", 40),
+            doc_dedup_method=data.get("doc_dedup_method", "layered"),
             doc_dedup_threshold=data.get("doc_dedup_threshold", 0.85),
-            chunk_method=data.get("chunk_method", "sentence"),
+            chunk_method=data.get("chunk_method", "semantic"),
             chunk_target_tokens=data.get("chunk_target_tokens", 450),
             chunk_overlap_tokens=data.get("chunk_overlap_tokens", 60),
             chunk_semantic_threshold=data.get("chunk_semantic_threshold", 0.55),
             chunk_semantic_model=data.get(
                 "chunk_semantic_model", "paraphrase-multilingual-MiniLM-L12-v2"
             ),
-            chunk_dedup_method=data.get("chunk_dedup_method", "minhash"),
+            chunk_dedup_method=data.get("chunk_dedup_method", "layered"),
             chunk_dedup_threshold=data.get("chunk_dedup_threshold", 0.85),
         )
 

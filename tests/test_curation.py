@@ -120,6 +120,27 @@ def test_semantic_dedup_logs_embedding_match_without_model_download():
     assert len(deduplicator.last_matches) == 1
 
 
+def test_english_cleaner_works_without_ftfy_installed():
+    """EnglishCleaner remains functional when ftfy is not available."""
+    import sys
+
+    from polygraph.preprocess.clean.en.normalizer import EnglishCleaner
+
+    cleaner = EnglishCleaner()
+
+    # Temporarily hide ftfy to simulate missing dependency
+    ftfy_module = sys.modules.get("ftfy")
+    sys.modules["ftfy"] = None
+    try:
+        result = cleaner.clean("  Hello   world!  ")
+        assert result == "Hello world!"
+    finally:
+        if ftfy_module is not None:
+            sys.modules["ftfy"] = ftfy_module
+        else:
+            sys.modules.pop("ftfy", None)
+
+
 def test_curation_generates_shards_and_reconcilable_artifacts(tmp_path):
     first = tmp_path / "first.jsonl"
     first.write_text(

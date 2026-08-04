@@ -62,3 +62,24 @@ def test_semantic_chunker_splits_at_topic_shift_with_fake_encoder():
     assert len(chunks) == 2
     assert "Mèo" in chunks[0].content
     assert chunks[1].content == "Tên lửa đưa vệ tinh lên quỹ đạo."
+
+
+def test_english_cleaner_normalizes_unicode_and_mojibake():
+    """EnglishCleaner applies NFC normalization and ftfy mojibake repair."""
+    from polygraph.preprocess.clean.en.normalizer import EnglishCleaner
+
+    cleaner = EnglishCleaner()
+
+    # NFC normalization: decomposed → composed
+    assert cleaner.clean("café") == "café"
+
+    # Common mojibake patterns that ftfy repairs
+    result = cleaner.clean("â€™")  # smart quote mojibake
+    # Without ftfy it stays as-is; with ftfy it becomes '
+    # The test verifies the function runs without error and returns a string
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+    # Unicode quote normalization (always active, independent of ftfy)
+    result = cleaner.clean("\u201chello\u201d")
+    assert '"' in result

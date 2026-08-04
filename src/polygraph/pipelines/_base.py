@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
 from polygraph._shared import Document
+from polygraph._shared.run_manifest import RunManifest
 from polygraph._shared.stage_config import EvalConfig, ExportConfig
 
 
@@ -42,6 +45,7 @@ class Pipeline(ABC):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._config = kwargs
+        self._start_time: float | None = None
 
     # ── Abstract stages (must implement) ────────────────────────
 
@@ -180,6 +184,71 @@ class Pipeline(ABC):
 
     # ── Orchestration ───────────────────────────────────────────
 
+    # ── Run manifest ───────────────────────────────────────────
+
+    def _build_run_manifest(self, results_summary: dict[str, Any]) -> Any:
+        """Build the run manifest with all available pipeline configuration.
+
+        Subclasses should override this to populate stage-specific config
+        (``preprocess``, ``extraction``, ``resolution``, etc.) and then
+        call ``super()._build_run_manifest(results_summary)``.
+
+        The base implementation captures pipeline class, input paths,
+        output dir, timing, and results summary.  Stage configs are
+        left empty — subclasses fill them in.
+        """
+
+        duration = time.monotonic() - self._start_time if self._start_time else None
+
+        # Detect run index if using auto-incremented directory
+        run_index: int | None = None
+        dir_name = self.output_dir.name
+        if dir_name.startswith("KG_"):
+            with contextlib.suppress(ValueError):
+                run_index = int(dir_name.split("_", 1)[1])
+
+        return RunManifest(
+            pipeline_class=self.__class__.__name__,
+            input_paths=[str(p) for p in self.input_paths],
+            output_dir=str(self.output_dir),
+            run_index=run_index,
+            run_duration_seconds=duration,
+            results=results_summary,
+        )
+
+    def _write_run_manifest(self, kg_result: dict[str, Any]) -> None:
+        """Build and write ``run_manifest.yaml`` to the output directory."""
+        graph = kg_result.get("graph")
+        entities = kg_result.get("entities", [])
+        triples = kg_result.get("triples", [])
+
+        node_count = graph.number_of_nodes() if hasattr(graph, "number_of_nodes") else 0
+        edge_count = graph.number_of_edges() if hasattr(graph, "number_of_edges") else 0
+
+        # Try to read overall_score from metrics.json if it was already written
+        overall_score = None
+        metrics_path = self.output_dir / "metrics.json"
+        if metrics_path.exists():
+            try:
+                metrics = json.loads(metrics_path.read_text())
+                overall_score = metrics.get("overall_score")
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        results_summary: dict[str, Any] = {
+            "nodes": node_count,
+            "edges": edge_count,
+            "entities": len(entities),
+            "triples": len(triples),
+        }
+        if overall_score is not None:
+            results_summary["overall_score"] = overall_score
+
+        manifest = self._build_run_manifest(results_summary)
+        manifest.dump_yaml(self.output_dir / "run_manifest.yaml")
+
+    # ── Pipeline hash (caching) ─────────────────────────────────
+
     def _pipeline_hash(self) -> str:
         """Content hash of inputs + config — cache key for the full pipeline.
 
@@ -240,6 +309,7 @@ class Pipeline(ABC):
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
         print(f"Output: {self.output_dir}")
+        self._start_time = time.monotonic()
 
         if cache and not force:
             kg_path = self.output_dir / "knowledge_graph.json"
@@ -267,5 +337,6 @@ class Pipeline(ABC):
 
         self.evaluate(kg, config=eval_config)
         self.export(kg, config=export_config)
+        self._write_run_manifest(kg)
 
         print(f"\nDone — results in {self.output_dir}/")

@@ -1,0 +1,22 @@
+{
+  "dataset": "worldbank_countries",
+  "entity_type": "country",
+  "id_column": "country_name",
+  "property_columns": [
+    "country_code",
+    "population",
+    "gdp_usd",
+    "gdp_per_capita_usd",
+    "life_expectancy",
+    "land_area_sqkm",
+    "surface_area_sqkm",
+    "population_density",
+    "gni_per_capita_usd",
+    "unemployment_pct",
+    "internet_users_pct"
+  ],
+  "relation_columns": {
+    "region": "located_in",
+    "income_group": "income_level"
+  }
+}

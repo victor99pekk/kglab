@@ -5,7 +5,7 @@ SHELL   := /bin/bash
 # ═══════════════════════════════════════════════════════════
 
 INPUT      ?= data/wikipedia/
-OUTPUT     ?= output/baseline
+OUTPUT     ?=
 VARIANT    ?= baseline
 NEO4J      ?= 0
 CLEAR_NEO4J ?= 0
@@ -94,11 +94,12 @@ clean:
 
 ## build-kg: Run the full pipeline (preprocess → build KG → evaluate → export)
 build-kg:
-	@neo4j_flag=""; clear_flag=""; linking_flag=""; \
+	@neo4j_flag=""; clear_flag=""; linking_flag=""; output_flag=""; \
 	if [ "$(NEO4J)" = "1" ]; then neo4j_flag="--neo4j"; fi; \
 	if [ "$(CLEAR_NEO4J)" = "1" ]; then clear_flag="--clear-neo4j"; fi; \
 	if [ "$(LINKING)" = "1" ]; then linking_flag="--linking"; fi; \
-	uv run python main.py -i $(INPUT) -o $(OUTPUT) --variant $(VARIANT) $$neo4j_flag $$clear_flag $$linking_flag
+	if [ -n "$(OUTPUT)" ]; then output_flag="-o $(OUTPUT)"; fi; \
+	uv run python main.py -i $(INPUT) $$output_flag --variant $(VARIANT) $$neo4j_flag $$clear_flag $$linking_flag
 
 ## experiment: Run an experiment from a YAML config file (EXP relative to experiments/)
 experiment:

@@ -337,6 +337,60 @@ class Baseline(Pipeline):
             force=force,
         )
 
+    def _build_run_manifest(self, results_summary: dict[str, Any]) -> Any:
+        """Populate the run manifest with all Baseline stage configs.
+
+        Resolves defaults for any config not explicitly passed at construction
+        time so the manifest always captures the effective configuration.
+        """
+        from dataclasses import asdict
+
+        from polygraph._shared.stage_config import (
+            BuildConfig,
+            EvalConfig,
+            ExportConfig,
+            ExtractionConfig,
+            LinkingConfig,
+            ResolutionConfig,
+        )
+
+        manifest = super()._build_run_manifest(results_summary)
+
+        # ── Preprocessing config ──
+        if hasattr(self._preprocessor, "config"):
+            manifest.preprocess = asdict(self._preprocessor.config)
+
+        # ── Extraction config (resolve defaults if not provided) ──
+        ext_cfg = self.extraction or ExtractionConfig.from_dict(self._config.get("extraction"))
+        manifest.extraction = asdict(ext_cfg)
+
+        # ── Resolution config ──
+        res_cfg = self.resolution or ResolutionConfig.from_dict(self._config.get("resolution"))
+        manifest.resolution = asdict(res_cfg)
+
+        # ── Build config ──
+        bld_cfg = self.build or BuildConfig.from_dict(self._config.get("build"))
+        manifest.build = asdict(bld_cfg)
+
+        # ── Linking config ──
+        link_cfg = self.linking or LinkingConfig.from_dict(self._config.get("linking"))
+        manifest.linking = asdict(link_cfg)
+
+        # ── Evaluation config ──
+        eval_cfg = self.eval_config or EvalConfig.from_dict(self._config.get("evaluation"))
+        manifest.evaluation = asdict(eval_cfg)
+
+        # ── Export config ──
+        export_cfg = self.export_config or ExportConfig.from_dict(self._config.get("export"))
+        manifest.export = asdict(export_cfg)
+
+        # ── Ontology path ──
+        ontology_path = self._config.get("ontology_path")
+        if ontology_path:
+            manifest.ontology = {"path": str(ontology_path)}
+
+        return manifest
+
     def _extract_document_relations(
         self,
         entities: list[dict[str, Any]],

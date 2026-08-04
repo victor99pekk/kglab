@@ -19,10 +19,22 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from polygraph._shared.run_manifest import next_run_dir
 from polygraph._shared.stage_config import LinkingConfig
 from polygraph.pipelines import PIPELINE_REGISTRY
 
 load_dotenv()
+
+
+def _resolve_output_dir(output_arg: Path | None) -> Path:
+    """Resolve the output directory for a pipeline run.
+
+    If ``--output`` is explicitly provided, use it as-is (backward compatible).
+    Otherwise, auto-increment under ``generated_KGs/KG_0``, ``generated_KGs/KG_1``, …
+    """
+    if output_arg is not None:
+        return output_arg.resolve()
+    return next_run_dir("generated_KGs").resolve()
 
 
 def main() -> None:
@@ -49,8 +61,9 @@ def main() -> None:
         "--output",
         "-o",
         type=Path,
-        default=Path("output/baseline"),
-        help="Output directory (ignored when --experiment is used).",
+        default=None,
+        help="Output directory.  When omitted, auto-increments under "
+        "generated_KGs/ (KG_0, KG_1, …).  Ignored when --experiment is used.",
     )
     parser.add_argument(
         "--variant",
@@ -103,9 +116,10 @@ def main() -> None:
     if args.ontology:
         pipeline_kwargs["ontology_path"] = str(args.ontology)
 
+    output_dir = _resolve_output_dir(args.output)
     pipeline = pipeline_cls(
         input_paths=[str(p) for p in args.input],
-        output_dir=str(args.output),
+        output_dir=str(output_dir),
         linking=LinkingConfig(enabled=args.linking),
         **pipeline_kwargs,
     )

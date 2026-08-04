@@ -138,6 +138,15 @@ class Deduplicator:
         return kept
 
     def _semantic_dedup(self, documents: list[Document]) -> list[Document]:
+        if len(documents) > self.semantic_max_records:
+            logger.warning(
+                "Semantic dedup skipped: %d records exceeds max_records (%d). "
+                "MinHash results preserved; raise semantic_max_records or use a "
+                "smaller batch for full layered dedup.",
+                len(documents),
+                self.semantic_max_records,
+            )
+            return documents
         records = [
             {"doc_id": str(index), "content": document.content, "quality_score": 0.0}
             for index, document in enumerate(documents)

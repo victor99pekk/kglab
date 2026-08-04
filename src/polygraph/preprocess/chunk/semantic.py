@@ -37,15 +37,11 @@ class SemanticChunker(SentenceChunker):
         if not units:
             return []
         if len(units) == 1:
-            doc.metadata["chunk_index"] = 0
-            doc.metadata["token_count"] = count_tokens(doc.content)
-            return [doc]
+            return [self._make_chunk(doc, doc.content, 0)]
         embeddings = self._encode(units)
         packed = self._pack_semantic_units(units, embeddings)
         if len(packed) == 1:
-            doc.metadata["chunk_index"] = 0
-            doc.metadata["token_count"] = count_tokens(doc.content)
-            return [doc]
+            return [self._make_chunk(doc, doc.content, 0)]
         return [self._make_chunk(doc, text, index) for index, text in enumerate(packed)]
 
     def _encode(self, texts: list[str]) -> Sequence[Sequence[float]]:

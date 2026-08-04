@@ -68,9 +68,7 @@ class TextChunker:
         """Split a single document into chunks."""
         text = doc.content
         if len(text) <= self.chunk_size:
-            doc.metadata["chunk_index"] = 0
-            doc.metadata["token_count"] = count_tokens(text)
-            return [doc]
+            return [self._make_chunk(doc, text, 0)]
 
         chunks: list[Document] = []
         sections = text.split(self.separator)

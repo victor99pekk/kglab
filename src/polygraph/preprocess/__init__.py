@@ -190,7 +190,7 @@ chunk._set(
 
 dedup._set(
     "remove_duplicates",
-    lambda docs, method="minhash", threshold=0.85: (
+    lambda docs, method="layered", threshold=0.85: (
         Deduplicator(method=method, threshold=threshold).deduplicate(docs)
     ),
 )

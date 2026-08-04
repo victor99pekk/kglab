@@ -271,9 +271,7 @@ def test_relationless_entity_still_gets_chunk_membership():
 
     triples = _entity_chunk_membership_triples(entities, {"chunk:one"})
 
-    assert triples == [
-        ("entity:alice", "appears_in", "chunk:one", "", "chunk:one")
-    ]
+    assert triples == [("entity:alice", "appears_in", "chunk:one", "", "chunk:one")]
 
 
 def test_quality_filter_removes_short_docs():
@@ -290,3 +288,76 @@ def test_quality_filter_removes_short_docs():
     qf = QualityFilter(min_chars=40, min_words=5)
     result = qf.filter(docs)
     assert len(result) == 1
+
+
+def test_quality_filter_uses_new_default_thresholds():
+    """Documents below 200 chars / 40 words are rejected at default config."""
+    from polygraph._shared import Document
+    from polygraph._shared.stage_config import PreprocessConfig
+    from polygraph.preprocess.quality import QualityFilter
+
+    cfg = PreprocessConfig()
+    assert cfg.quality_min_chars == 200
+    assert cfg.quality_min_words == 40
+
+    # A document below the new thresholds should be filtered
+    short_doc = Document(
+        content="Short text with only a handful of words.",
+        doc_id="short",
+    )
+
+    qf = QualityFilter(
+        min_chars=cfg.quality_min_chars,
+        min_words=cfg.quality_min_words,
+    )
+    result = qf.filter([short_doc])
+    assert len(result) == 0
+
+
+def test_layered_dedup_combines_minhash_and_semantic():
+    """Layered dedup method chains MinHash → Semantic deduplication."""
+    from polygraph._shared import Document
+    from polygraph.preprocess.dedup import Deduplicator
+
+    docs = [
+        Document(content="Marie Curie discovered radium in 1898.", doc_id="a"),
+        Document(content="Radium was discovered by Marie Curie in 1898.", doc_id="b"),
+        Document(content="The Eiffel Tower is in Paris, France.", doc_id="c"),
+    ]
+
+    # Use fake encoder so we don't download a model
+    dedup = Deduplicator(
+        method="layered",
+        threshold=0.85,
+        semantic_threshold=0.95,
+        semantic_encoder=lambda _texts: [[1.0, 0.0], [0.98, 0.02], [0.0, 1.0]],
+    )
+    result = dedup.deduplicate(docs)
+
+    # "a" and "b" are semantic near-duplicates → one removed
+    # "c" is different → kept
+    kept_ids = {d.doc_id for d in result}
+    assert "c" in kept_ids
+    assert len(result) == 2
+
+
+def test_layered_dedup_skips_semantic_when_too_many_records():
+    """When records exceed max, layered dedup logs a warning and keeps MinHash results."""
+    from polygraph._shared import Document
+    from polygraph.preprocess.dedup import Deduplicator
+
+    # Create more documents than the default semantic_max_records (5000)
+    docs = [
+        Document(content=f"Document number {i} with unique content.", doc_id=str(i))
+        for i in range(10)
+    ]
+
+    dedup = Deduplicator(
+        method="layered",
+        threshold=0.85,
+        semantic_max_records=5,  # artificially low
+    )
+
+    # Should not crash — semantic pass is skipped, MinHash results returned
+    result = dedup.deduplicate(docs)
+    assert len(result) == len(docs)  # all unique docs survive MinHash
