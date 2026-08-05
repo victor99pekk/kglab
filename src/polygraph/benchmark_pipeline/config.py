@@ -46,6 +46,67 @@ class ExperimentConfig:
     build: BuildConfig = field(default_factory=BuildConfig)
     extra: dict[str, Any] = field(default_factory=dict)
 
+    # ── Introspection ───────────────────────────────────────────
+
+    def info(self) -> str:
+        """Return a human-readable summary of this experiment configuration.
+
+        Describes what the experiment tests, which pipeline and dataset
+        it uses, and key hyperparameter choices — useful for quickly
+        understanding an experiment without opening the YAML file.
+
+        Example::
+
+            config = ExperimentConfig.from_yaml("experiments/001_baseline/config.yaml")
+            print(config.info())
+        """
+        lines = [
+            f"Experiment: {self.name}",
+            "─" * (len(self.name) + 12),
+            "",
+            f"Description: {self.description or '(none provided)'}",
+            "",
+            "Pipeline:",
+            f"  Variant:    {self.pipeline_variant}",
+            f"  Extraction: {self.extraction.mode} mode, "
+            f"entity={self.extraction.entity_method}, "
+            f"relation={self.extraction.relation_method}",
+            f"  Resolution: {self.resolution.method} (threshold={self.resolution.threshold})",
+            f"  Build:      {self.build.method}" + (" + GraphML" if self.build.graphml else ""),
+            "",
+            "Input:",
+        ]
+
+        if self.dataset_name:
+            params_str = ", ".join(f"{k}={v}" for k, v in self.dataset_params.items())
+            lines.append(
+                f"  Dataset:    {self.dataset_name}" + (f" ({params_str})" if params_str else "")
+            )
+        if self.input_paths:
+            lines.append("  Paths:      " + ", ".join(str(p) for p in self.input_paths))
+
+        lines.extend(
+            [
+                "",
+                "Output:",
+                f"  Dir:        {self.output_dir}",
+            ]
+        )
+
+        if self.ontology_path:
+            lines.append(f"  Ontology:   {self.ontology_path}")
+
+        lines.extend(
+            [
+                "",
+                "Options:",
+                f"  Neo4j:      upload={self.upload_neo4j}, clear={self.clear_neo4j}",
+                f"  LLM judge:  {self.llm_judge}",
+            ]
+        )
+
+        return "\n".join(lines)
+
     # ── Factory ─────────────────────────────────────────────────
 
     @classmethod

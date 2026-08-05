@@ -118,12 +118,13 @@ def main() -> None:
 
     output_dir = _resolve_output_dir(args.output)
     pipeline = pipeline_cls(
-        input_paths=[str(p) for p in args.input],
-        output_dir=str(output_dir),
         linking=LinkingConfig(enabled=args.linking),
         **pipeline_kwargs,
     )
-    pipeline.execute()
+    pipeline.execute(
+        input_paths=[str(p) for p in args.input],
+        output_dir=str(output_dir),
+    )
 
     if args.neo4j:
         pipeline.upload_to_neo4j(clear=args.clear_neo4j)

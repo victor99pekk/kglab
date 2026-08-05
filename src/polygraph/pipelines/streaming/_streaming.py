@@ -120,16 +120,13 @@ class StreamingPipeline(Pipeline):
 
     def __init__(
         self,
-        input_paths: list[str | Path],
-        output_dir: str | Path,
-        *,
         uri: str | None = None,
         user: str | None = None,
         password: str | None = None,
         clear_db: bool = False,
         **kwargs: Any,
     ) -> None:
-        super().__init__(input_paths, output_dir, **kwargs)
+        super().__init__(**kwargs)
 
         self._neo4j_uri = uri or os.environ.get("NEO4J_URI", "bolt://localhost:7687")
         self._neo4j_user = user or os.environ.get("NEO4J_USER", "neo4j")

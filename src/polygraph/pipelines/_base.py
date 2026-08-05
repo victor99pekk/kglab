@@ -35,15 +35,9 @@ class Pipeline(ABC):
         pipe.export(kg)
     """
 
-    def __init__(
-        self,
-        input_paths: list[str | Path],
-        output_dir: str | Path,
-        **kwargs: Any,
-    ) -> None:
-        self.input_paths = [Path(p) for p in input_paths]
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, **kwargs: Any) -> None:
+        self.input_paths: list[Path] = []
+        self.output_dir: Path = Path(".")
         self._config = kwargs
         self._start_time: float | None = None
 
@@ -290,6 +284,8 @@ class Pipeline(ABC):
 
     def execute(
         self,
+        input_paths: list[str | Path] | None = None,
+        output_dir: str | Path | None = None,
         eval_config: EvalConfig | None = None,
         export_config: ExportConfig | None = None,
         cache: bool = False,
@@ -298,6 +294,9 @@ class Pipeline(ABC):
         """Full pipeline: preprocess → build → evaluate → export.
 
         Args:
+            input_paths: Data files or directories.  Replaces any previously
+                set value on the instance.  Required if not set at construction.
+            output_dir: Where results are written.  Created if it doesn't exist.
             eval_config: Evaluation configuration (optional).
             export_config: Export configuration (optional).
             cache: If True, skip the entire pipeline when
@@ -306,6 +305,11 @@ class Pipeline(ABC):
                 to re-run regardless.
             force: Ignore cache and re-run all stages.
         """
+        if input_paths is not None:
+            self.input_paths = [Path(p) for p in input_paths]
+        if output_dir is not None:
+            self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
         print(f"Output: {self.output_dir}")

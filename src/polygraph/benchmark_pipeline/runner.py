@@ -70,6 +70,56 @@ class BenchmarkRunner:
     artifact paths, and timestamps — everything you need to compare runs.
     """
 
+    @classmethod
+    def help(cls) -> str:
+        """Return a guide to using BenchmarkRunner.
+
+        Covers the two main usage modes (direct and YAML-config),
+        the comparison API, and the difference between whole-pipeline
+        benchmarks and stage-specific benchmarks.
+
+        Example::
+
+            print(BenchmarkRunner.help())
+        """
+        return (
+            "BenchmarkRunner — Whole-Pipeline Benchmarking\n"
+            "==============================================\n"
+            "BenchmarkRunner runs an ENTIRE KG pipeline end-to-end and\n"
+            "collects standardized results (metrics, structural audit,\n"
+            "artifact paths, timestamps).\n\n"
+            "This is different from stage-specific benchmarks\n"
+            "(Benchmark.Dedup, Benchmark.Extraction, etc.) which test\n"
+            "a single pipeline stage against a gold dataset.\n\n"
+            "Two usage modes:\n\n"
+            "  1. Direct (programmatic) — good for quick experiments:\n"
+            "       runner = BenchmarkRunner(\n"
+            "           pipeline=Baseline,\n"
+            '           input_paths=["data/wikipedia/"],\n'
+            '           output_dir="output/my_exp/",\n'
+            "       )\n"
+            "       result = runner.run()\n\n"
+            "  2. YAML config — good for reproducible, version-controlled runs:\n"
+            '       config = ExperimentConfig.from_yaml("experiments/001/config.yaml")\n'
+            "       runner = BenchmarkRunner.from_config(config)\n"
+            "       result = runner.run()\n\n"
+            "Comparison mode (run two pipelines side-by-side):\n"
+            "       results = BenchmarkRunner.compare(\n"
+            "           baseline=Baseline,\n"
+            "           variant=MyPipeline,\n"
+            '           input_paths=["data/wikipedia/"],\n'
+            '           output_dir="output/comparison/",\n'
+            "       )\n\n"
+            "Result output (per run):\n"
+            "  • knowledge_graph.json  — the KG artifact\n"
+            "  • metrics.json          — overall_score, completeness,\n"
+            "                            consistency, duplication, entities, triples\n"
+            "  • results_summary.json  — full BenchmarkResult serialized\n\n"
+            "For stage-specific benchmarks (testing one component against\n"
+            "gold data), see:\n"
+            "  print(Benchmark.help())\n"
+        )
+
     def __init__(
         self,
         pipeline: type[Pipeline] | None = None,
@@ -210,8 +260,6 @@ class BenchmarkRunner:
         pipeline_kwargs.update(self._extra)
 
         pipeline = self._pipeline_cls(
-            input_paths=[str(p) for p in self._input_paths],
-            output_dir=str(output_dir),
             extraction=self._extraction,
             resolution=self._resolution,
             build=self._build,
@@ -220,7 +268,10 @@ class BenchmarkRunner:
         self.pipeline = pipeline
 
         t0 = time.perf_counter()
-        pipeline.execute()
+        pipeline.execute(
+            input_paths=[str(p) for p in self._input_paths],
+            output_dir=str(output_dir),
+        )
         elapsed_s = time.perf_counter() - t0
 
         return self._collect_results(
@@ -272,8 +323,6 @@ class BenchmarkRunner:
         pipeline_kwargs.update(config.extra)
 
         pipeline: Pipeline = pipeline_cls(
-            input_paths=[str(p) for p in config.input_paths],
-            output_dir=str(output_dir),
             extraction=config.extraction,
             resolution=config.resolution,
             build=config.build,
@@ -283,7 +332,10 @@ class BenchmarkRunner:
         # 3. Execute
         self.pipeline = pipeline
         t0 = time.perf_counter()
-        pipeline.execute()
+        pipeline.execute(
+            input_paths=[str(p) for p in config.input_paths],
+            output_dir=str(output_dir),
+        )
         elapsed_s = time.perf_counter() - t0
 
         # 4. Optional Neo4j upload

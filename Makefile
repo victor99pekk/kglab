@@ -145,6 +145,24 @@ download-data:
 wikipedia-full: download-wikipedia enrich-wikipedia
 	@echo "Done — $(WIKI_OUTPUT) ready with hyperlinks"
 
+## benchmarks-data: Download and cache all benchmark gold datasets
+benchmarks-data:
+	uv run python -c "
+from polygraph.data import Data
+datasets = [
+    ('bench_ner',        'benchmarks/data/ner_gold.jsonl'),
+    ('bench_dedup',      'benchmarks/data/dedup_gold.jsonl'),
+    ('bench_resolution', 'benchmarks/data/resolution_gold.jsonl'),
+    ('bench_quality',    'benchmarks/data/quality_gold.jsonl'),
+    ('bench_rag',        'benchmarks/data/rag_gold.jsonl'),
+    ('bench_chunking',   'benchmarks/data/chunking_gold.jsonl'),
+]
+for name, path in datasets:
+    Data.download(name, path=path)
+    print(f'  {name} → {path}')
+print('Done — all benchmark datasets cached')
+"
+
 ## wikimedia-topic-labels-validate: Validate pinned Wikimedia manifest and taxonomy
 wikimedia-topic-labels-validate:
 	uv run $(WIKIMEDIA_TOPIC_TOOL) \

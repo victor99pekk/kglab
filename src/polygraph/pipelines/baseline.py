@@ -108,8 +108,6 @@ class Baseline(Pipeline):
 
     def __init__(
         self,
-        input_paths: list[str | Path],
-        output_dir: str | Path,
         preprocessor: Preprocessor | None = None,
         preprocess: PreprocessConfig | None = None,
         extraction: ExtractionConfig | None = None,
@@ -120,7 +118,7 @@ class Baseline(Pipeline):
         export: ExportConfig | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(input_paths, output_dir, **kwargs)
+        super().__init__(**kwargs)
         # Wire up the preprocessor, passing ontology and extraction config
         # so the "extract" stage can use them during preprocessing.
         if preprocessor is None:
@@ -328,9 +326,17 @@ class Baseline(Pipeline):
             result["extra"] = extra
         return result
 
-    def execute(self, cache: bool = False, force: bool = False) -> None:
-        """Full pipeline, forwarding eval/export configs."""
+    def execute(
+        self,
+        input_paths: list[str | Path] | None = None,
+        output_dir: str | Path | None = None,
+        cache: bool = False,
+        force: bool = False,
+    ) -> None:
+        """Full pipeline, forwarding eval/export configs and paths."""
         super().execute(
+            input_paths=input_paths,
+            output_dir=output_dir,
             eval_config=self.eval_config,
             export_config=self.export_config,
             cache=cache,

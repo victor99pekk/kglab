@@ -1,31 +1,27 @@
 """Benchmark pipeline — run and compare KG generation pipelines.
 
-Wraps any ``Pipeline`` subclass and produces reproducible, self-documenting
-experiment outputs: metrics, graph files, and a ``results_summary.json``.
+Targeted stage benchmarks (each tests one stage with gold data)::
 
-Direct API (no YAML needed)::
+    from polygraph.benchmark_pipeline import Benchmark
+    from polygraph.pipelines import Baseline, Semantic
+    from polygraph._shared.stage_config import PreprocessConfig, ResolutionConfig
 
-    from polygraph.benchmark_pipeline import BenchmarkRunner
-    from polygraph.pipelines import Baseline
-
-    runner = BenchmarkRunner(
-        pipeline=Baseline,
-        input_paths=["data/wikipedia/"],
-        output_dir="output/my_exp/",
-    )
-    result = runner.run()
-    print(result.overall_score, result.num_entities, result.num_triples)
-
-Side-by-side comparison::
-
-    results = BenchmarkRunner.compare(
-        baseline=Baseline,
-        variant=MyPipeline,
-        input_paths=["data/wikipedia/"],
-        output_dir="output/comparison/",
+    result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+        pipelines={
+            "surface": Baseline(),
+            "surface_layered": Baseline(preprocess=PreprocessConfig(doc_dedup_method="layered")),
+            "semantic": Semantic(),
+        }
     )
 
-YAML config (for reproducibility)::
+    result = Benchmark.Resolution(dataset="benchmarks/data/resolution_gold.jsonl").run(
+        pipelines={
+            "string": Baseline(),
+            "embed": Baseline(resolution=ResolutionConfig(method="embedding")),
+        }
+    )
+
+Single pipeline (with YAML config for reproducibility)::
 
     from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
@@ -34,11 +30,13 @@ YAML config (for reproducibility)::
     result = runner.run()
 """
 
+from polygraph.benchmark_pipeline.benchmark import Benchmark
 from polygraph.benchmark_pipeline.config import ExperimentConfig
 from polygraph.benchmark_pipeline.report import BenchmarkResult, write_report
 from polygraph.benchmark_pipeline.runner import BenchmarkRunner
 
 __all__ = [
+    "Benchmark",
     "BenchmarkResult",
     "BenchmarkRunner",
     "ExperimentConfig",

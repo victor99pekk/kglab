@@ -30,11 +30,36 @@ DATASET_REGISTRY = {
         "download": "polygraph.data._wikipedia:download_wikipedia",
         "enrich": "polygraph.data._wikipedia:enrich_wikipedia",
     },
-    # "wikimedia_topic_labels": {
-    #     "description": "Wikimedia article-topic labels from Figshare (Experiment 002)",
-    #     "download": "polygraph.data._wikimedia_topics:download_topic_labels",
-    #     "enrich": None,
-    # },
+    "bench_ner": {
+        "description": "CoNLL-2003 NER benchmark — token-level entity annotations",
+        "download": "polygraph.data._benchmarks:download_conll_ner",
+        "enrich": None,
+    },
+    "bench_dedup": {
+        "description": "DBLP-ACM dedup benchmark — pairwise duplicate labels",
+        "download": "polygraph.data._benchmarks:download_dblp_dedup",
+        "enrich": None,
+    },
+    "bench_resolution": {
+        "description": "T2D entity resolution benchmark — table-row-to-DBpedia clusters",
+        "download": "polygraph.data._benchmarks:download_t2d_resolution",
+        "enrich": None,
+    },
+    "bench_quality": {
+        "description": "TACRED relation extraction benchmark — gold relation triples",
+        "download": "polygraph.data._benchmarks:download_tacred_quality",
+        "enrich": None,
+    },
+    "bench_rag": {
+        "description": "HotpotQA RAG benchmark — multi-hop QA with supporting facts",
+        "download": "polygraph.data._benchmarks:download_hotpotqa_rag",
+        "enrich": None,
+    },
+    "bench_chunking": {
+        "description": "CoNLL-derived chunking benchmark — entity-span boundary integrity",
+        "download": "polygraph.data._benchmarks:download_conll_chunking",
+        "enrich": None,
+    },
 }
 
 __all__ = ["Data", "DATASET_REGISTRY"]

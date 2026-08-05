@@ -20,7 +20,6 @@ Usage::
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from polygraph._shared.stage_config import (
@@ -55,12 +54,7 @@ class Semantic(Baseline):
             for further customization).
     """
 
-    def __init__(
-        self,
-        input_paths: list[str | Path],
-        output_dir: str | Path,
-        **kwargs: Any,
-    ) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         # ── Only override configs the user hasn't explicitly passed ──
         if "extraction" not in kwargs:
             kwargs["extraction"] = ExtractionConfig(
@@ -79,4 +73,4 @@ class Semantic(Baseline):
                 threshold=0.80,
             )
 
-        super().__init__(input_paths, output_dir, **kwargs)
+        super().__init__(**kwargs)
