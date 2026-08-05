@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import zipfile
 from pathlib import Path
 from typing import Any
 from urllib.request import urlretrieve
@@ -175,14 +176,29 @@ def _bio_to_chunks(tokens: list[str], labels: list[str]) -> dict[str, Any]:
 
 
 def download_dblp_dedup(path: str | Path, force: bool = False) -> int:
+    """Download the DBLP-ACM dedup benchmark as ``{text_a, text_b, label}`` records.
+
+    The two mirrors ship different layouts, both of which are handled:
+
+    * **Deepmatcher layout** — a CSV with ``label``/``title_left``/``title_right``
+      columns describing duplicate pairs directly.
+    * **Uni-Leipzig layout** — separate ``DBLP2.csv`` and ``ACM.csv`` tables plus a
+      ``DBLP-ACM_perfectMapping.csv`` of gold duplicate id pairs.  Positive pairs
+      come from the mapping; a balanced, deterministic set of negative pairs is
+      sampled from non-matching records.
+
+    Args:
+        path: Where to write the gold JSONL.
+        force: Re-download even if *path* already has data.
+
+    Returns:
+        Number of gold records written.
+    """
     target = Path(path)
     if _skip_if_cached(target, force):
         return 0
 
-    import csv
-    import io
     import tempfile
-    import zipfile
     from urllib.error import HTTPError, URLError
 
     zip_path: str | None = None
@@ -205,24 +221,145 @@ def download_dblp_dedup(path: str | Path, force: bool = False) -> int:
             "manually at: " + str(target)
         )
 
-    records: list[dict[str, Any]] = []
-    with zipfile.ZipFile(zip_path) as zf:
-        for name in zf.namelist():
-            if name.endswith(".csv"):
-                with zf.open(name) as f:
-                    reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8"))
-                    for row in reader:
-                        lbl = row.get("label", "").lower()
-                        label = "duplicate" if lbl in ("1", "yes", "true") else "not_duplicate"
-                        records.append(
-                            {
-                                "text_a": f"{row.get('title_left', '')}. {row.get('authors_left', '')}.",
-                                "text_b": f"{row.get('title_right', '')}. {row.get('authors_right', '')}.",
-                                "label": label,
-                            }
-                        )
-    os.unlink(zip_path)
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            records = _dblp_acm_records(zf)
+    finally:
+        os.unlink(zip_path)
     return _write_jsonl(target, records)
+
+
+def _dblp_acm_records(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    """Convert a downloaded DBLP-ACM zip into ``{text_a, text_b, label}`` records."""
+    import csv
+    import io
+
+    csv_names = [name for name in zf.namelist() if name.endswith(".csv")]
+    if not csv_names:
+        raise ValueError("DBLP-ACM zip contains no CSV files")
+
+    # Detect layout from the first CSV's header.
+    with zf.open(csv_names[0]) as f:
+        fields = (
+            csv.DictReader(io.TextIOWrapper(f, encoding="utf-8", errors="replace")).fieldnames or []
+        )
+    if "title_left" in fields:
+        return _dblp_acm_deepmatcher_pairs(zf)
+    if any("perfectMapping" in name for name in csv_names):
+        return _dblp_acm_unileipzig_pairs(zf)
+    raise ValueError(
+        "Unrecognized DBLP-ACM format. Expected deepmatcher pairs "
+        "(title_left/title_right) or uni-leipzig tables + perfectMapping."
+    )
+
+
+def _dblp_acm_deepmatcher_pairs(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    """Read ``{text_a, text_b, label}`` pairs from the deepmatcher CSV layout."""
+    import csv
+    import io
+
+    records: list[dict[str, Any]] = []
+    for name in zf.namelist():
+        if not name.endswith(".csv"):
+            continue
+        with zf.open(name) as f:
+            reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8", errors="replace"))
+            if not reader.fieldnames or "title_left" not in reader.fieldnames:
+                continue
+            for row in reader:
+                label = (
+                    "duplicate"
+                    if str(row.get("label", "")).lower() in ("1", "yes", "true")
+                    else "not_duplicate"
+                )
+                records.append(
+                    {
+                        "text_a": f"{row.get('title_left', '')}. {row.get('authors_left', '')}.",
+                        "text_b": f"{row.get('title_right', '')}. {row.get('authors_right', '')}.",
+                        "label": label,
+                    }
+                )
+    return records
+
+
+def _dblp_acm_unileipzig_pairs(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    """Build ``{text_a, text_b, label}`` pairs from the uni-leipzig tables + mapping.
+
+    The zip holds ``DBLP2.csv`` and ``ACM.csv`` (``id,title,authors,venue,year``)
+    plus ``DBLP-ACM_perfectMapping.csv`` (``idDBLP,idACM``) listing gold duplicate
+    pairs.  Every mapping pair becomes a positive example; a balanced set of
+    deterministic negative pairs is sampled from non-matching records.
+    """
+    import csv
+    import io
+    import random
+
+    tables: dict[str, dict[str, dict[str, str]]] = {}
+    mapping: list[tuple[str, str]] = []
+    for name in zf.namelist():
+        if not name.endswith(".csv"):
+            continue
+        with zf.open(name) as f:
+            reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8", errors="replace"))
+            if not reader.fieldnames:
+                continue
+            fields = set(reader.fieldnames)
+            if "perfectMapping" in name:
+                for row in reader:
+                    mapping.append(
+                        (
+                            str(row.get("idDBLP", "")).strip(),
+                            str(row.get("idACM", "")).strip(),
+                        )
+                    )
+            elif {"id", "title", "authors"} <= fields:
+                table: dict[str, dict[str, str]] = {}
+                for row in reader:
+                    table[str(row.get("id", "")).strip()] = {
+                        "title": str(row.get("title", "")).strip(),
+                        "authors": str(row.get("authors", "")).strip(),
+                    }
+                tables[name] = table
+
+    dblp = next((t for n, t in tables.items() if "dblp" in n.lower()), None)
+    acm = next((t for n, t in tables.items() if "acm" in n.lower()), None)
+    if dblp is None or acm is None or not mapping:
+        raise ValueError("Uni-Leipzig DBLP-ACM zip is missing tables or the perfect mapping.")
+
+    def render(record: dict[str, str]) -> str:
+        return f"{record['title']}. {record['authors']}."
+
+    records: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for dblp_id, acm_id in mapping:
+        seen.add((dblp_id, acm_id))
+        left = dblp.get(dblp_id)
+        right = acm.get(acm_id)
+        if left is None or right is None:
+            continue
+        records.append({"text_a": render(left), "text_b": render(right), "label": "duplicate"})
+
+    # Deterministic negative pairs — never sample a gold duplicate pair.
+    rng = random.Random(0)
+    dblp_ids = list(dblp)
+    acm_ids = list(acm)
+    target = len(records)
+    attempts = 0
+    max_attempts = target * 20 + 100
+    while len(records) < target * 2 and attempts < max_attempts:
+        attempts += 1
+        pair = (rng.choice(dblp_ids), rng.choice(acm_ids))
+        if pair in seen:
+            continue
+        seen.add(pair)
+        records.append(
+            {
+                "text_a": render(dblp[pair[0]]),
+                "text_b": render(acm[pair[1]]),
+                "label": "not_duplicate",
+            }
+        )
+    return records
 
 
 # ═══════════════════════════════════════════════════════════════

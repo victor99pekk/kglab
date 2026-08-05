@@ -26,6 +26,9 @@ DATASET_FORMAT = (
     "— each record pairs a raw text with the ground-truth quality decision."
 )
 
+#: Default location for the gold quality dataset when no ``dataset`` is passed.
+_DEFAULT_DATASET = "benchmarks/data/quality_gold.jsonl"
+
 #: Default quality thresholds used when a pipeline exposes no preprocessor config.
 _DEFAULT_MIN_CHARS = 200
 _DEFAULT_MIN_WORDS = 40
@@ -38,7 +41,7 @@ class QualityFilterRunner:
     useful content from garbage (boilerplate, ads, low-information text).
     """
 
-    def __init__(self, dataset: str | Path) -> None:
+    def __init__(self, dataset: str | Path = _DEFAULT_DATASET) -> None:
         self.dataset = Path(dataset)
 
     @classmethod

@@ -21,6 +21,9 @@ from polygraph.data import Data
 from polygraph.kg_build import resolve
 from polygraph.pipelines import Pipeline
 
+#: Default location for the gold resolution dataset when no ``dataset`` is passed.
+_DEFAULT_DATASET = "benchmarks/data/resolution_gold.jsonl"
+
 
 class ResolutionRunner:
     """Benchmark entity resolution quality across pipeline instances.
@@ -31,7 +34,7 @@ class ResolutionRunner:
     Primary metric: cluster F1 (how well clusters match gold groups).
     """
 
-    def __init__(self, dataset: str | Path) -> None:
+    def __init__(self, dataset: str | Path = _DEFAULT_DATASET) -> None:
         self.dataset = Path(dataset)
 
     @classmethod

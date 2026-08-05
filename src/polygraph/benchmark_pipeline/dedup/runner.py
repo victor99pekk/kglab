@@ -38,7 +38,7 @@ class DedupRunner:
     Compares dedup decisions against gold duplicate/non-duplicate labels.
     """
 
-    def __init__(self, dataset: str | Path) -> None:
+    def __init__(self, dataset: str | Path = _DEFAULT_DATASET) -> None:
         self.dataset = Path(dataset)
 
     @classmethod
