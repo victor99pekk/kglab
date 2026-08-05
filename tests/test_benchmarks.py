@@ -397,6 +397,8 @@ def test_dedup_predict_pair_semantic_uses_shared_encoder(
         == "duplicate"
     )
     assert (
-        dedup_mod._predict_pair("completely different text", "unrelated other text", "layered", 0.85)
+        dedup_mod._predict_pair(
+            "completely different text", "unrelated other text", "layered", 0.85
+        )
         == "not_duplicate"
     )
