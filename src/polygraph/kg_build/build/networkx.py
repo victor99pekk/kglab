@@ -194,12 +194,19 @@ class GraphBuilder:
         if not self.ontology:
             return
 
-        ontology_labels = set(self.ontology.entity_types)
+        # The KG always contains three structural node kinds — entities,
+        # documents, and chunks — regardless of the ontology.  Documents and
+        # chunks are not *entity* types, so they are always accepted here.
+        structural_kinds = {"document", "chunk"}
+        ontology_labels = {
+            label.casefold() for label in self.ontology.entity_types
+        } | structural_kinds
         ontology_relations = set(self.ontology.relationship_types)
         node_mismatches = sum(
             1
             for _, data in graph.nodes(data=True)
-            if (label := data.get("type", data.get("label", ""))) and label not in ontology_labels
+            if (label := data.get("type", data.get("label", "")))
+            and label.casefold() not in ontology_labels
         )
         relation_mismatches = sum(
             predicate not in ontology_relations

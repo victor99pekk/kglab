@@ -143,6 +143,47 @@ def test_graph_accepts_valid_structural_relationship_types():
     assert graph.has_edge("entity:alice", "chunk:one")
 
 
+def test_graph_validation_accepts_structural_nodes_and_case_insensitive(caplog):
+    """Document/Chunk structural nodes and case variants never warn.
+
+    Every KG contains document and chunk nodes even though those are not
+    *entity* types in the ontology, and matching is case-insensitive
+    (``Document`` vs an ontology-declared ``DOCUMENT``).
+    """
+    ontology = Ontology(
+        entity_types={
+            "PERSON": {"description": "a person"},
+            "DOCUMENT": {"description": "a document"},
+        }
+    )
+    entities = [
+        {"id": "entity:alice", "name": "Alice", "type": "PERSON"},
+        {"id": "document:one", "name": "doc one", "type": "Document"},
+        {"id": "chunk:one", "name": "chunk one", "type": "Chunk"},
+    ]
+
+    with caplog.at_level("WARNING", logger="polygraph.kg_build.build.networkx"):
+        GraphBuilder(ontology=ontology).build(entities, [])
+
+    assert "not in schema" not in caplog.text
+
+
+def test_graph_validation_warns_for_undeclared_entity_type(caplog):
+    """A genuinely undeclared semantic entity type still warns."""
+    ontology = Ontology(
+        entity_types={"PERSON": {"description": "a person"}},
+    )
+    entities = [
+        {"id": "entity:alice", "name": "Alice", "type": "PERSON"},
+        {"id": "entity:two", "name": "two", "type": "CARDINAL"},
+    ]
+
+    with caplog.at_level("WARNING", logger="polygraph.kg_build.build.networkx"):
+        GraphBuilder(ontology=ontology).build(entities, [])
+
+    assert "node labels not in schema" in caplog.text
+
+
 def test_deduplication_removes_exact_duplicates():
     from polygraph._shared import Document
     from polygraph.preprocess.dedup import Deduplicator
@@ -341,12 +382,16 @@ def test_layered_dedup_combines_minhash_and_semantic():
     assert len(result) == 2
 
 
-def test_layered_dedup_skips_semantic_when_too_many_records():
-    """When records exceed max, layered dedup logs a warning and keeps MinHash results."""
+def test_layered_dedup_raises_when_too_many_records():
+    """When records exceed max, layered dedup raises instead of silently skipping.
+
+    The library fails loudly: the semantic layer is never silently dropped in
+    favor of MinHash-only results.
+    """
     from polygraph._shared import Document
     from polygraph.preprocess.dedup import Deduplicator
 
-    # Create more documents than the default semantic_max_records (5000)
+    # Create more documents than semantic_max_records (5000)
     docs = [
         Document(content=f"Document number {i} with unique content.", doc_id=str(i))
         for i in range(10)
@@ -358,6 +403,5 @@ def test_layered_dedup_skips_semantic_when_too_many_records():
         semantic_max_records=5,  # artificially low
     )
 
-    # Should not crash — semantic pass is skipped, MinHash results returned
-    result = dedup.deduplicate(docs)
-    assert len(result) == len(docs)  # all unique docs survive MinHash
+    with pytest.raises(ValueError, match=r"Semantic dedup cannot run on 10 records"):
+        dedup.deduplicate(docs)

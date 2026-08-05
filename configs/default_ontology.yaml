@@ -36,6 +36,41 @@ entity_types:
     description: "A document, article, web page, or other textual resource"
     example: "https://example.com/article42"
 
+  # ── Extended spaCy NER types ─────────────────────────────────────
+  # The remaining labels the spaCy extractor can emit.  Declaring them
+  # keeps the schema complete so ontology validation never flags a
+  # legitimate spaCy type as out-of-schema.
+  NORP:
+    description: "A nationality, religious, or political group"
+    example: "Buddhists"
+  FAC:
+    description: "A building, airport, highway, or other facility"
+    example: "SFO Airport"
+  LAW:
+    description: "A law, regulation, or legal document"
+    example: "GDPR"
+  LANGUAGE:
+    description: "A named language"
+    example: "Vietnamese"
+  MONEY:
+    description: "A monetary value or currency"
+    example: "$1 million"
+  QUANTITY:
+    description: "A measurement or quantity"
+    example: "500 kilometers"
+  CARDINAL:
+    description: "A numeral that does not fall under another type"
+    example: "two"
+  ORDINAL:
+    description: "An ordinal number"
+    example: "first"
+  TIME:
+    description: "A time of day or period"
+    example: "3:00 PM"
+  PERCENT:
+    description: "A percentage"
+    example: "80%"
+
 # Relationship types optionally specify domain/range entity types.
 # Predicates without domain/range (or with symmetric: true) are treated as
 # symmetric and applicable to any entity-type pair.
