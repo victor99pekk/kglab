@@ -28,6 +28,12 @@ _DEFAULT_DATASET = "benchmarks/data/dedup_gold.jsonl"
 _DEFAULT_METHOD = "layered"
 _DEFAULT_THRESHOLD = 0.85
 
+#: Default sentence-encoder model used by semantic/layered dedup.
+_DEFAULT_SEMANTIC_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+
+#: Process-wide encoder cache — the embedding model loads once per process.
+_MODEL_CACHE: dict[str, Any] = {}
+
 
 class DedupRunner:
     """Benchmark deduplication quality across pipeline instances.
@@ -243,13 +249,39 @@ def _predict_pair(text_a: str, text_b: str, method: str, threshold: float) -> st
     Both texts are deduplicated together; if one is removed as a duplicate,
     the pair is predicted ``"duplicate"``, otherwise ``"not_duplicate"``.
     This mirrors what the pipeline's dedup stage does to the gold corpus.
+
+    For embedding-based methods a process-cached encoder is injected so the
+    model loads once instead of once per pair.
     """
     docs = [
         Document(content=text_a, doc_id="text_a"),
         Document(content=text_b, doc_id="text_b"),
     ]
-    kept = Deduplicator(method=method, threshold=threshold).deduplicate(docs)
+    kwargs: dict[str, Any] = {"method": method, "threshold": threshold}
+    if method in ("semantic", "layered"):
+        kwargs["semantic_encoder"] = _semantic_encoder(_DEFAULT_SEMANTIC_MODEL)
+    kept = Deduplicator(**kwargs).deduplicate(docs)
     return "duplicate" if len(kept) < len(docs) else "not_duplicate"
+
+
+def _semantic_encoder(model_name: str):
+    """Return a cached sentence-encoder callable for *model_name*.
+
+    The embedding model is loaded once per process and shared across every
+    pair/pipeline in the benchmark run.
+    """
+    encoder = _MODEL_CACHE.get(model_name)
+    if encoder is None:
+        encoder = _load_sentence_encoder(model_name)
+        _MODEL_CACHE[model_name] = encoder
+    return encoder
+
+
+def _load_sentence_encoder(model_name: str):
+    """Load a sentence-transformers model and return its ``encode`` callable."""
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(model_name).encode
 
 
 def _score(y_true: list[str], y_pred: list[str]) -> dict[str, float]:

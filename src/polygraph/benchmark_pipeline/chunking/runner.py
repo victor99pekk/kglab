@@ -20,6 +20,7 @@ from polygraph._shared import Document
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
 from polygraph.preprocess import chunk
+from polygraph.preprocess.chunk import SemanticChunker
 
 #: Default location for the gold chunking dataset when no ``dataset`` is passed.
 DEFAULT_CHUNKING_DATASET = "benchmarks/data/chunking_gold.jsonl"
@@ -228,7 +229,23 @@ def _chunk_records(
     method: str,
     options: dict[str, Any],
 ) -> list[list[str]]:
-    """Chunk every gold text with the given method, returning chunk contents."""
+    """Chunk every gold text with the given method, returning chunk contents.
+
+    For ``semantic`` chunking a single model-backed chunker is reused across
+    all records so the embedding model loads once per run instead of once per
+    record.
+    """
+    if method == "semantic":
+        chunker = SemanticChunker(
+            target_tokens=options.get("target_tokens", _DEFAULT_TARGET_TOKENS),
+            overlap_tokens=options.get("overlap_tokens", _DEFAULT_OVERLAP_TOKENS),
+            similarity_threshold=options.get("threshold", _DEFAULT_SEMANTIC_THRESHOLD),
+            model_name=options.get("model", _DEFAULT_SEMANTIC_MODEL),
+        )
+        return [
+            [c.content for c in chunker.chunk([Document(content=record["text"])])]
+            for record in gold
+        ]
     return [_chunk_text(record["text"], method, options) for record in gold]
 
 

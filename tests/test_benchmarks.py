@@ -326,3 +326,77 @@ def test_dblp_deepmatcher_parser(tmp_path: Path) -> None:
 
     labels = [r["label"] for r in records]
     assert labels == ["duplicate", "not_duplicate"]
+
+
+# ── Model reuse (semantic paths must load the model once) ──────
+
+
+def test_chunking_semantic_builds_one_chunker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Semantic chunking must reuse one model-backed chunker per run."""
+    from polygraph.preprocess.chunk import SemanticChunker as RealChunker
+
+    init_count = {"n": 0}
+
+    class SpyChunker(RealChunker):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            init_count["n"] += 1
+            kwargs.setdefault("encoder", lambda texts: [[1.0, 0.0]] * len(texts))
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(chunking_mod, "SemanticChunker", SpyChunker)
+    gold = [
+        {
+            "text": "One sentence about a topic. Two sentences about the same topic.",
+            "chunks": [],
+        }
+        for _ in range(4)
+    ]
+    out = chunking_mod._chunk_records(gold, "semantic", {})
+    assert init_count["n"] == 1, "SemanticChunker must be built once per run"
+    assert len(out) == 4
+
+
+def test_dedup_semantic_encoder_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The embedding model must load once and be shared across pairs."""
+    loads = {"n": 0}
+
+    def fake_encoder(texts):
+        return [[1.0, 0.0]] * len(texts)
+
+    def fake_load(model_name: str):
+        loads["n"] += 1
+        return fake_encoder
+
+    monkeypatch.setattr(dedup_mod, "_load_sentence_encoder", fake_load)
+    dedup_mod._MODEL_CACHE.clear()
+    try:
+        first = dedup_mod._semantic_encoder("some-model")
+        second = dedup_mod._semantic_encoder("some-model")
+        assert first is second
+        assert loads["n"] == 1
+    finally:
+        dedup_mod._MODEL_CACHE.clear()
+
+
+def test_dedup_predict_pair_semantic_uses_shared_encoder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Semantic/layered pairs use the cached encoder (no per-pair model load)."""
+
+    def encode(texts: list[str]) -> list[list[float]]:
+        vectors = {
+            "hello world foo bar": [1.0, 0.0],
+            "completely different text": [0.0, 1.0],
+            "unrelated other text": [0.5, 0.5],
+        }
+        return [vectors.get(t, [0.0, 0.0]) for t in texts]
+
+    monkeypatch.setattr(dedup_mod, "_semantic_encoder", lambda name: encode)
+    assert (
+        dedup_mod._predict_pair("hello world foo bar", "hello world foo bar", "semantic", 0.85)
+        == "duplicate"
+    )
+    assert (
+        dedup_mod._predict_pair("completely different text", "unrelated other text", "layered", 0.85)
+        == "not_duplicate"
+    )
