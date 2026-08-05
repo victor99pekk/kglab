@@ -15,6 +15,10 @@ from polygraph.pipelines.streaming import StreamingPipeline
 #:     from polygraph.pipelines.llm.graphgen import GraphGen
 #:     PIPELINE_REGISTRY["graphgen"] = GraphGen
 PIPELINE_REGISTRY: dict[str, type[Pipeline]] = {
+    # "baseline" is the canonical name used by ExperimentConfig defaults and
+    # the example YAML configs; "surface" is a legacy alias kept for the
+    # comparison tooling (compare_variants / compare_matrix).
+    "baseline": Baseline,
     "surface": Baseline,
     "semantic": Semantic,
 }

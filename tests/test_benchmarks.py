@@ -59,6 +59,19 @@ def test_no_runner_is_a_stub() -> None:
         assert "NotImplementedError" not in src, f"{name}Runner.run is a stub"
 
 
+def test_pipeline_registry_has_baseline_alias() -> None:
+    """'baseline' is the default variant name — it must resolve to Baseline.
+
+    ``ExperimentConfig`` defaults to ``pipeline_variant="baseline"`` and the
+    example YAML configs use ``variant: baseline``, so the registry must know
+    that name (a ``BenchmarkRunner.from_config`` with it used to crash).
+    """
+    from polygraph.pipelines import PIPELINE_REGISTRY, Baseline
+
+    assert PIPELINE_REGISTRY["baseline"] is Baseline
+    assert BenchmarkRunner._resolve_pipeline("baseline") is Baseline
+
+
 # ── Chunking ───────────────────────────────────────────────────
 
 

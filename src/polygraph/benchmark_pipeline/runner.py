@@ -321,6 +321,13 @@ class BenchmarkRunner:
         if config.ontology_path:
             pipeline_kwargs["ontology_path"] = str(config.ontology_path)
         pipeline_kwargs.update(config.extra)
+        # A YAML ``preprocess:`` block arrives as a raw dict via ``extra``;
+        # coerce it to the typed config the pipeline expects.
+        raw_preprocess = pipeline_kwargs.get("preprocess")
+        if isinstance(raw_preprocess, dict):
+            from polygraph._shared.stage_config import PreprocessConfig
+
+            pipeline_kwargs["preprocess"] = PreprocessConfig.from_dict(raw_preprocess)
 
         pipeline: Pipeline = pipeline_cls(
             extraction=config.extraction,
