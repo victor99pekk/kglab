@@ -17,6 +17,10 @@ env/
 .vscode/
 .idea/
 
+# Jupyter notebook artifacts
+.ipynb_checkpoints/
+.virtual_documents/
+
 # Secrets
 .env
 htmlcov/
