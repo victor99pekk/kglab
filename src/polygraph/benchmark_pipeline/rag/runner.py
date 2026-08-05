@@ -206,6 +206,25 @@ def _token_overlap(query: str, text: str) -> int:
     return len(query_tokens & text_tokens)
 
 
+def _chunk_matches(gold: str, chunk: str) -> bool:
+    """Whether a gold supporting chunk aligns with a KG chunk.
+
+    Matches when one normalized text is a substring of the other, or the two
+    share at least 70% of their tokens.  This tolerates KG chunks that merge
+    or split the gold's sentence-level supporting chunks.
+    """
+    if not gold or not chunk:
+        return False
+    if gold in chunk or chunk in gold:
+        return True
+    gold_tokens = set(gold.casefold().split())
+    chunk_tokens = set(chunk.casefold().split())
+    if not gold_tokens or not chunk_tokens:
+        return False
+    overlap = len(gold_tokens & chunk_tokens) / min(len(gold_tokens), len(chunk_tokens))
+    return overlap >= 0.7
+
+
 def _relation_name(triple: Any) -> str:
     """Extract a normalized relation/predicate name from a triple."""
     if isinstance(triple, (tuple, list)) and len(triple) >= 3:
@@ -275,10 +294,12 @@ def _evaluate(
         )
         top_chunks = ranked_chunks[:k]
         if gold_chunks:
-            found = sum(1 for g in gold_chunks if any(g and g in t for t in top_chunks))
+            found = sum(1 for g in gold_chunks if any(_chunk_matches(g, t) for t in top_chunks))
             chunk_recall_at_k += found / len(gold_chunks)
         if top_chunks:
-            supporting = sum(1 for t in top_chunks if any(g and g in t for g in gold_chunks))
+            supporting = sum(
+                1 for t in top_chunks if any(_chunk_matches(g, t) for g in gold_chunks)
+            )
             chunk_precision_at_k += supporting / len(top_chunks)
 
         # Relation path accuracy — every relation in the gold path present in KG.

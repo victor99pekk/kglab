@@ -386,18 +386,70 @@ def download_t2d_resolution(path: str | Path, force: bool = False) -> int:
 
 
 def download_tacred_quality(path: str | Path, force: bool = False) -> int:
-    """TACRED is LDC license-gated — requires manual placement.
+    """Write a small placeholder quality-filter gold dataset.
 
-    Obtain the dataset via LDC (https://catalog.ldc.upenn.edu/LDC2018T24)
-    and place a gold JSONL at the target path with records::
+    The real TACRED benchmark (https://catalog.ldc.upenn.edu/LDC2018T24) is
+    LDC license-gated and cannot be auto-downloaded.  To exercise the
+    benchmark end-to-end (the same pattern as the T2D resolution
+    placeholders), this writes a tiny, clearly synthetic gold set of
+    keep/reject texts.  Replace it with real TACRED records for meaningful
+    numbers — each line is ``{"text": "...", "label": "keep"|"reject"}``.
 
-        {"text": "...", "subject": "...", "object": "...",
-         "relation": "org:founded_by", "label": "known_true"}
+    Args:
+        path: Where to write the gold JSONL.
+        force: Re-download even if *path* already has data.
+
+    Returns:
+        Number of gold records written.
     """
-    raise RuntimeError(
-        "TACRED requires an LDC license and cannot be auto-downloaded. "
-        "Place the gold JSONL at: " + str(path)
+    target = Path(path)
+    if _skip_if_cached(target, force):
+        return 0
+
+    keep = [
+        (
+            "Polygraph is an open-source library for building knowledge graphs "
+            "from unstructured text. It chains configurable stages: loading raw "
+            "documents, cleaning and normalizing the text, filtering low-quality "
+            "content, deduplicating near-identical pages, and splitting the "
+            "remainder into semantically coherent chunks. Each stage exposes a "
+            "small registry of methods so researchers can swap implementations "
+            "and compare results across pipelines."
+        ),
+        (
+            "Entity resolution is the task of deciding whether two mentions refer "
+            "to the same real-world entity. String methods compare surface forms "
+            "directly, while embedding methods compare dense vector representations "
+            "that capture semantic similarity. A good resolver keeps a knowledge "
+            "graph compact by merging duplicates without collapsing genuinely "
+            "distinct concepts into a single node."
+        ),
+        (
+            "Retrieval-augmented generation grounds an LLM's answer in external "
+            "knowledge. A knowledge graph can serve as that source: entities are "
+            "linked to source chunks, so a query that matches an entity retrieves "
+            "the evidence needed to answer accurately. This reduces hallucination "
+            "and makes the model's reasoning traceable to concrete documents."
+        ),
+    ]
+    reject = [
+        "click here for more",
+        "Sign in | Register | Help | Cart",
+        "Privacy Policy Terms of Use About",
+        "Top stories Opinion Sports Business",
+        "Loading... please wait",
+        "© 2026 Example Corp. All rights reserved.",
+    ]
+
+    records = [{"text": text, "label": "keep"} for text in keep]
+    records.extend({"text": text, "label": "reject"} for text in reject)
+    logger.warning(
+        "TACRED is license-gated — writing %d synthetic placeholder records to %s. "
+        "Replace with real data for meaningful quality scores.",
+        len(records),
+        target,
     )
+    return _write_jsonl(target, records)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -406,17 +458,50 @@ def download_tacred_quality(path: str | Path, force: bool = False) -> int:
 
 
 def download_hotpotqa_rag(path: str | Path, force: bool = False) -> int:
+    """Download HotpotQA train as ``{query, answer_entity, supporting_chunks}`` gold.
+
+    HotpotQA's canonical host (curtis.ml.cmu.edu) is frequently offline or
+    extremely slow.  A socket timeout keeps this from hanging; if the
+    download fails, place a gold JSONL manually at *path* with records::
+
+        {"query": "...", "answer_entity": "...", "supporting_chunks": ["..."]}
+
+    Args:
+        path: Where to write the gold JSONL.
+        force: Re-download even if *path* already has data.
+
+    Returns:
+        Number of gold records written.
+
+    Raises:
+        RuntimeError: If the download fails — the message includes the path
+            and schema needed for manual placement.
+    """
     target = Path(path)
     if _skip_if_cached(target, force):
         return 0
 
+    import socket
     import tempfile
 
-    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
-        urlretrieve(HOTPOTQA_URL, tmp.name)
+    socket.setdefaulttimeout(30)
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            urlretrieve(HOTPOTQA_URL, tmp.name)
+    except OSError as exc:
+        raise RuntimeError(
+            "Could not download HotpotQA from "
+            + HOTPOTQA_URL
+            + f" ({exc}). The canonical host is often offline. Place a gold "
+            + "JSONL at: "
+            + str(target)
+            + " with one record per line: {"
+            + '"query": ..., "answer_entity": ..., "supporting_chunks": [...]}'
+        ) from exc
 
     with open(tmp.name, encoding="utf-8") as f:
         data = json.load(f)
+    os.unlink(tmp.name)
 
     records: list[dict[str, Any]] = []
     for item in data:
@@ -437,5 +522,4 @@ def download_hotpotqa_rag(path: str | Path, force: bool = False) -> int:
                 "level": item.get("level", ""),
             }
         )
-    os.unlink(tmp.name)
     return _write_jsonl(target, records)

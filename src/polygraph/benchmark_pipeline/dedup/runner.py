@@ -19,7 +19,7 @@ from typing import Any
 from polygraph._shared import Document
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
-from polygraph.preprocess.dedup import Deduplicator
+from polygraph.preprocess.dedup import Deduplicator, GlobalDeduplicator
 
 #: Default location for the gold dedup dataset when no ``dataset`` is passed.
 _DEFAULT_DATASET = "benchmarks/data/dedup_gold.jsonl"
@@ -89,6 +89,7 @@ class DedupRunner:
         """
         Data.download("bench_dedup", path=str(self.dataset))
         gold = _load_gold(self.dataset)
+        texts = list(dict.fromkeys(t for r in gold for t in (r["text_a"], r["text_b"])))
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
@@ -96,10 +97,25 @@ class DedupRunner:
                 method, threshold = _dedup_config(pipeline)
                 t0 = time.perf_counter()
                 y_true = [record["label"] for record in gold]
-                y_pred = [
-                    _predict_pair(record["text_a"], record["text_b"], method, threshold)
-                    for record in gold
-                ]
+                if method == "exact":
+                    # Exact dedup merges identical content — O(pairs) decision.
+                    y_pred = [
+                        "duplicate" if r["text_a"] == r["text_b"] else "not_duplicate" for r in gold
+                    ]
+                elif method == "minhash":
+                    # One batched MinHash-LSH pass over all texts (matches how
+                    # the pipeline dedups a whole corpus) instead of per-pair runs.
+                    clusters = _dedup_clusters(texts, method, threshold)
+                    y_pred = [
+                        "duplicate"
+                        if any(r["text_a"] in c and r["text_b"] in c for c in clusters)
+                        else "not_duplicate"
+                        for r in gold
+                    ]
+                else:
+                    y_pred = [
+                        _predict_pair(r["text_a"], r["text_b"], method, threshold) for r in gold
+                    ]
                 elapsed_s = time.perf_counter() - t0
 
                 metrics = _score(y_true, y_pred)
@@ -182,6 +198,43 @@ def _dedup_config(pipeline: Pipeline) -> tuple[str, float]:
     if config is None:
         return _DEFAULT_METHOD, _DEFAULT_THRESHOLD
     return config.doc_dedup_method, float(config.doc_dedup_threshold)
+
+
+def _dedup_clusters(texts: list[str], method: str, threshold: float) -> list[set[str]]:
+    """Cluster *texts* into duplicate groups in a single pass.
+
+    Mirrors the pipeline's document dedup: ``"exact"`` merges identical
+    content; ``"minhash"`` merges exact + MinHash-LSH near-duplicates.
+
+    Args:
+        texts: The unique texts to cluster.
+        method: ``"exact"`` or ``"minhash"``.
+        threshold: Similarity threshold (used by minhash).
+
+    Returns:
+        List of clusters, each a set of texts considered duplicates.
+
+    Raises:
+        ValueError: For unsupported methods.
+    """
+    if method == "exact":
+        groups: dict[str, list[str]] = {}
+        for text in texts:
+            groups.setdefault(text, []).append(text)
+        return [set(group) for group in groups.values() if len(group) > 1]
+    if method == "minhash":
+        records = [
+            {"doc_id": str(index), "content": text, "quality_score": 0.0}
+            for index, text in enumerate(texts)
+        ]
+        assignments = GlobalDeduplicator(threshold=threshold).cluster(records)
+        clusters: dict[str, set[str]] = {}
+        for index, text in enumerate(texts):
+            cluster_id = assignments[str(index)].cluster_id
+            if cluster_id:
+                clusters.setdefault(cluster_id, set()).add(text)
+        return list(clusters.values())
+    raise ValueError(f"Unsupported batched dedup method: {method}")
 
 
 def _predict_pair(text_a: str, text_b: str, method: str, threshold: float) -> str:
