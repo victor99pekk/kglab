@@ -138,15 +138,18 @@ def compare_matrix(
 
         if res:
             runner_kwargs["resolution"] = ResolutionConfig(method=res)
-        if chk:
+        if chk or dedup:
             from polygraph._shared.stage_config import PreprocessConfig
 
-            runner_kwargs.setdefault("extra", {})["preprocess"] = PreprocessConfig(chunk_method=chk)
-        if dedup:
-            from polygraph._shared.stage_config import PreprocessConfig
-
+            # Merge chunk + dedup into a single PreprocessConfig so sweeping
+            # both axes doesn't silently overwrite one of the settings.
+            preprocess_kwargs: dict[str, Any] = {}
+            if chk:
+                preprocess_kwargs["chunk_method"] = chk
+            if dedup:
+                preprocess_kwargs["doc_dedup_method"] = dedup
             runner_kwargs.setdefault("extra", {})["preprocess"] = PreprocessConfig(
-                doc_dedup_method=dedup
+                **preprocess_kwargs
             )
 
         runner = BenchmarkRunner(

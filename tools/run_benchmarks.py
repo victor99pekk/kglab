@@ -61,7 +61,7 @@ def _runner_attr(stage: str) -> str:
     return "RAG" if stage == "rag" else stage.capitalize()
 
 
-def _run_stage(stage: str, output_dir: Path) -> dict:
+def _run_stage(stage: str, output_dir: Path, input_paths: list[str] | None = None) -> dict:
     runner_cls = getattr(Benchmark, _runner_attr(stage))
     pipelines = _pipelines_for(stage)
 
@@ -71,7 +71,12 @@ def _run_stage(stage: str, output_dir: Path) -> dict:
     print("=" * 70)
 
     runner = runner_cls()
-    results = runner.run(pipelines=pipelines)
+    if stage == "rag":
+        # RAG builds a KG from input documents — it needs a corpus, unlike
+        # the gold-only stages. Pass --input to provide it.
+        results = runner.run(pipelines=pipelines, input_paths=input_paths)
+    else:
+        results = runner.run(pipelines=pipelines)
 
     for name, metrics in results.items():
         print(f"  {name:<12} {_format(metrics)}")
@@ -100,6 +105,13 @@ def main() -> None:
         default=Path("benchmarks/results"),
         help="Where to write per-stage result JSON.",
     )
+    parser.add_argument(
+        "--input",
+        nargs="+",
+        default=None,
+        help="Input files/dirs for the RAG stage (it builds a KG per pipeline "
+        "from these documents). Other stages score against gold datasets only.",
+    )
     args = parser.parse_args()
 
     selected = args.stage or ALL_STAGES
@@ -107,7 +119,7 @@ def main() -> None:
 
     for stage in selected:
         try:
-            summary[stage] = _run_stage(stage, args.output)
+            summary[stage] = _run_stage(stage, args.output, args.input)
         except NotImplementedError:
             print(f"[skip] {stage} — runner not yet implemented.\n")
         except Exception as exc:
