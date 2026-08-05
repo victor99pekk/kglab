@@ -88,6 +88,7 @@ def compare_matrix(
     resolutions: Sequence[str] | None = None,
     chunkers: Sequence[str] | None = None,
     doc_dedup_methods: Sequence[str] | None = None,
+    chunk_dedup_methods: Sequence[str] | None = None,
     **pipeline_kwargs: Any,
 ) -> dict[str, BenchmarkResult]:
     """Run a full parameter sweep — every combination of variant × configs.
@@ -98,7 +99,10 @@ def compare_matrix(
         output_dir: Root directory — each combination gets a subdirectory.
         resolutions: Resolution methods to sweep (e.g. ``["string", "embedding"]``).
         chunkers: Chunk methods to sweep (e.g. ``["sentence", "semantic"]``).
-        doc_dedup_methods: Dedup methods to sweep (e.g. ``["minhash", "layered"]``).
+        doc_dedup_methods: Document dedup methods to sweep (e.g. ``["minhash", "layered"]``).
+        chunk_dedup_methods: Chunk dedup methods to sweep. When omitted, chunk
+            dedup keeps the pipeline default (``layered``) — pass it explicitly
+            if you want an embedding-free sweep.
         **pipeline_kwargs: Additional args forwarded to ``BenchmarkRunner``.
 
     Returns:
@@ -118,10 +122,15 @@ def compare_matrix(
     res_methods = list(resolutions) if resolutions else [None]  # type: ignore[list-item]
     chk_methods = list(chunkers) if chunkers else [None]  # type: ignore[list-item]
     dedup_methods = list(doc_dedup_methods) if doc_dedup_methods else [None]  # type: ignore[list-item]
+    chunk_dedup_methods = (
+        list(chunk_dedup_methods) if chunk_dedup_methods else [None]  # type: ignore[list-item]
+    )
 
     results: dict[str, BenchmarkResult] = {}
 
-    for variant, res, chk, dedup in product(variants, res_methods, chk_methods, dedup_methods):
+    for variant, res, chk, dedup, chk_dedup in product(
+        variants, res_methods, chk_methods, dedup_methods, chunk_dedup_methods
+    ):
         # Build a descriptive combo name
         parts = [variant]
         if res:
@@ -130,6 +139,8 @@ def compare_matrix(
             parts.append(f"chunk_{chk}")
         if dedup:
             parts.append(f"dedup_{dedup}")
+        if chk_dedup:
+            parts.append(f"chunkdedup_{chk_dedup}")
         combo_name = "__".join(parts)
 
         pipeline_cls = PIPELINE_REGISTRY[variant]
@@ -138,16 +149,18 @@ def compare_matrix(
 
         if res:
             runner_kwargs["resolution"] = ResolutionConfig(method=res)
-        if chk or dedup:
+        if chk or dedup or chk_dedup:
             from polygraph._shared.stage_config import PreprocessConfig
 
             # Merge chunk + dedup into a single PreprocessConfig so sweeping
-            # both axes doesn't silently overwrite one of the settings.
+            # multiple axes doesn't silently overwrite one of the settings.
             preprocess_kwargs: dict[str, Any] = {}
             if chk:
                 preprocess_kwargs["chunk_method"] = chk
             if dedup:
                 preprocess_kwargs["doc_dedup_method"] = dedup
+            if chk_dedup:
+                preprocess_kwargs["chunk_dedup_method"] = chk_dedup
             runner_kwargs.setdefault("extra", {})["preprocess"] = PreprocessConfig(
                 **preprocess_kwargs
             )

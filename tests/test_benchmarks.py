@@ -239,10 +239,12 @@ def test_compare_matrix_merges_chunk_and_dedup(monkeypatch: pytest.MonkeyPatch) 
         input_paths=["data/"],
         chunkers=["sentence"],
         doc_dedup_methods=["minhash"],
+        chunk_dedup_methods=["minhash"],
     )
     preprocess = captured["extra"]["preprocess"]
     assert preprocess.chunk_method == "sentence"
     assert preprocess.doc_dedup_method == "minhash"
+    assert preprocess.chunk_dedup_method == "minhash"
 
 
 # ── Whole-pipeline BenchmarkRunner (fake pipeline) ─────────────
