@@ -11,7 +11,6 @@ Gold dataset format (JSONL)::
 from __future__ import annotations
 
 import json
-import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -21,8 +20,6 @@ from polygraph.data import Data
 from polygraph.kg_build.extract._base import Entity, EntityExtractor
 from polygraph.kg_build.extract.registry import create_entity_method
 from polygraph.pipelines import Pipeline
-
-logger = logging.getLogger(__name__)
 
 #: Default location of the CoNLL-2003-derived NER gold dataset (see ``Data.download``).
 _DEFAULT_DATASET = "benchmarks/data/ner_gold.jsonl"
@@ -79,18 +76,7 @@ class ExtractionRunner:
         gold_records = _load_gold(self.dataset)
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            try:
-                results[name] = _benchmark_pipeline(pipeline, gold_records)
-            except Exception as exc:
-                logger.warning("Extraction benchmark failed for pipeline %r: %s", name, exc)
-                results[name] = {
-                    "precision": 0.0,
-                    "recall": 0.0,
-                    "f1": 0.0,
-                    "type_accuracy": 0.0,
-                    "runtime_seconds": 0.0,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
+            results[name] = _benchmark_pipeline(pipeline, gold_records)
         return results
 
 

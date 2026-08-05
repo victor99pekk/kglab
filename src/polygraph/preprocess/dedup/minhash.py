@@ -64,6 +64,11 @@ class GlobalDeduplicator:
         self.last_matches: list[DuplicateMatch] = []
 
     def cluster(self, records: Sequence[dict[str, object]]) -> dict[str, DuplicateAssignment]:
+        if MinHash is None or MinHashLSH is None:
+            raise ImportError(
+                "MinHash dedup requires 'datasketch'. Install the project's core "
+                "dependencies (datasketch is a required dependency)."
+            )
         parent = list(range(len(records)))
 
         def find(index: int) -> int:
@@ -94,29 +99,14 @@ class GlobalDeduplicator:
                 exact[content_hash] = index
             signatures.append(self._minhash(grams))
 
-        if MinHash is not None and MinHashLSH is not None:
-            lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm)
-            for index, signature in enumerate(signatures):
-                lsh.insert(str(index), signature)
-            for index, signature in enumerate(signatures):
-                for candidate in lsh.query(signature):
-                    candidate_index = int(candidate)
-                    if candidate_index < index:
-                        similarity = self._jaccard(gram_sets[index], gram_sets[candidate_index])
-                        if similarity >= self.threshold:
-                            union(index, candidate_index)
-                            self._record_match(
-                                matches,
-                                records,
-                                index,
-                                candidate_index,
-                                "minhash_jaccard",
-                                similarity,
-                            )
-        else:
-            for index, grams in enumerate(gram_sets):
-                for candidate_index, candidate_grams in enumerate(gram_sets[:index]):
-                    similarity = len(grams & candidate_grams) / max(len(grams | candidate_grams), 1)
+        lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm)
+        for index, signature in enumerate(signatures):
+            lsh.insert(str(index), signature)
+        for index, signature in enumerate(signatures):
+            for candidate in lsh.query(signature):
+                candidate_index = int(candidate)
+                if candidate_index < index:
+                    similarity = self._jaccard(gram_sets[index], gram_sets[candidate_index])
                     if similarity >= self.threshold:
                         union(index, candidate_index)
                         self._record_match(
@@ -124,7 +114,7 @@ class GlobalDeduplicator:
                             records,
                             index,
                             candidate_index,
-                            "ngram_jaccard_fallback",
+                            "minhash_jaccard",
                             similarity,
                         )
 
@@ -138,8 +128,6 @@ class GlobalDeduplicator:
         return self._assignments(records, groups, self.last_matches)
 
     def _minhash(self, shingles: set[str]) -> object:
-        if MinHash is None:
-            return shingles
         signature = MinHash(num_perm=self.num_perm)
         for gram in shingles:
             signature.update(gram.encode("utf-8"))

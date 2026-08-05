@@ -103,32 +103,22 @@ class ChunkingRunner:
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            try:
-                method, options = _chunk_config(pipeline)
-                t0 = time.perf_counter()
-                predicted = _chunk_records(gold, method, options)
-                elapsed_s = time.perf_counter() - t0
+            method, options = _chunk_config(pipeline)
+            t0 = time.perf_counter()
+            predicted = _chunk_records(gold, method, options)
+            elapsed_s = time.perf_counter() - t0
 
-                metrics = _score_all(gold, predicted)
-                metrics["method"] = method
-                metrics["runtime_seconds"] = round(elapsed_s, 4)
-                metrics["n_samples"] = len(gold)
-                metrics["target_tokens"] = options.get(
-                    "target_tokens", options.get("size", _DEFAULT_TARGET_TOKENS)
-                )
-                metrics["overlap_tokens"] = options.get(
-                    "overlap_tokens", options.get("overlap", _DEFAULT_OVERLAP_TOKENS)
-                )
-                results[name] = metrics
-            except Exception as exc:
-                results[name] = {
-                    "method": None,
-                    "precision": 0.0,
-                    "recall": 0.0,
-                    "f1": 0.0,
-                    "runtime_seconds": 0.0,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
+            metrics = _score_all(gold, predicted)
+            metrics["method"] = method
+            metrics["runtime_seconds"] = round(elapsed_s, 4)
+            metrics["n_samples"] = len(gold)
+            metrics["target_tokens"] = options.get(
+                "target_tokens", options.get("size", _DEFAULT_TARGET_TOKENS)
+            )
+            metrics["overlap_tokens"] = options.get(
+                "overlap_tokens", options.get("overlap", _DEFAULT_OVERLAP_TOKENS)
+            )
+            results[name] = metrics
         return results
 
 

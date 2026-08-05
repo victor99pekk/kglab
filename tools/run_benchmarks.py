@@ -130,12 +130,8 @@ def main() -> None:
     summary: dict = {}
 
     for stage in selected:
-        try:
-            summary[stage] = _run_stage(stage, args.output, args.input, args.dataset)
-        except NotImplementedError:
-            print(f"[skip] {stage} — runner not yet implemented.\n")
-        except Exception as exc:
-            print(f"[skip] {stage} — {type(exc).__name__}: {exc}\n")
+        # Fail loudly: a broken stage/pipeline must crash the run so you know.
+        summary[stage] = _run_stage(stage, args.output, args.input, args.dataset)
 
     summary_path = args.output / "benchmark_summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)

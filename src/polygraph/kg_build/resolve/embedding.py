@@ -95,13 +95,10 @@ def resolve_embedding(
     if encoder is not None:
         embeddings = encoder(names)
     else:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError:
-            logger.warning("sentence-transformers unavailable — falling back to string matching")
-            from polygraph.kg_build.resolve.string import resolve_string
+        # No silent degradation: embedding resolution genuinely needs
+        # sentence-transformers, so a missing install must crash loudly.
+        from sentence_transformers import SentenceTransformer
 
-            return resolve_string(entities, threshold)
         model = SentenceTransformer(model_name)
         embeddings = model.encode(names, show_progress_bar=False)
 

@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from polygraph._shared import Document
+from polygraph._shared.stage_config import PreprocessConfig
 from polygraph._shared.types import PreprocessResult
 from polygraph.benchmark_pipeline import Benchmark, BenchmarkResult, BenchmarkRunner
 from polygraph.benchmark_pipeline.chunking import runner as chunking_mod
@@ -376,6 +377,19 @@ def test_dedup_semantic_encoder_is_cached(monkeypatch: pytest.MonkeyPatch) -> No
         assert loads["n"] == 1
     finally:
         dedup_mod._MODEL_CACHE.clear()
+
+
+def test_runner_errors_propagate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A broken pipeline must raise — never silently return zeroed metrics."""
+    monkeypatch.setattr(Data, "download", lambda *a, **k: None)
+    gold = tmp_path / "gold.jsonl"
+    gold.write_text(
+        json.dumps({"text": "hello world foo bar baz.", "chunks": []}) + "\n",
+        encoding="utf-8",
+    )
+    bad = Baseline(preprocess=PreprocessConfig(chunk_method="does_not_exist"))
+    with pytest.raises(ValueError, match="Unknown chunk method"):
+        Benchmark.Chunking(dataset=gold).run(pipelines={"bad": bad})
 
 
 def test_dedup_predict_pair_semantic_uses_shared_encoder(

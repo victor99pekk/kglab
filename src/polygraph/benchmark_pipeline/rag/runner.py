@@ -116,41 +116,26 @@ class RAGRunner:
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            try:
-                if input_paths:
-                    pipeline.input_paths = [Path(p) for p in input_paths]
-                if not pipeline.input_paths:
-                    raise ValueError(f"RAG benchmark needs input_paths for pipeline '{name}'")
+            if input_paths:
+                pipeline.input_paths = [Path(p) for p in input_paths]
+            if not pipeline.input_paths:
+                raise ValueError(f"RAG benchmark needs input_paths for pipeline '{name}'")
 
-                t0 = time.perf_counter()
-                result = pipeline.preprocess()
-                kg = pipeline.build_kg(result)
-                elapsed_s = time.perf_counter() - t0
+            t0 = time.perf_counter()
+            result = pipeline.preprocess()
+            kg = pipeline.build_kg(result)
+            elapsed_s = time.perf_counter() - t0
 
-                chunk_docs = result.chunks if isinstance(result, PreprocessResult) else result
-                metrics = _evaluate(kg, chunk_docs, gold, k=k)
-                metrics["runtime_seconds"] = round(elapsed_s, 4)
-                metrics["n_queries"] = len(gold)
-                # run_benchmarks.py _format() requires precision/recall/f1 keys.
-                metrics["precision"] = metrics["chunk_precision_at_k"]
-                metrics["recall"] = metrics["chunk_recall_at_k"]
-                p, r = metrics["precision"], metrics["recall"]
-                metrics["f1"] = round(2 * p * r / (p + r), 4) if (p + r) else 0.0
-                results[name] = metrics
-            except Exception as exc:
-                results[name] = {
-                    "entity_recall_at_k": 0.0,
-                    "entity_coverage": 0.0,
-                    "chunk_recall_at_k": 0.0,
-                    "chunk_precision_at_k": 0.0,
-                    "relation_path_accuracy": None,
-                    "precision": 0.0,
-                    "recall": 0.0,
-                    "f1": 0.0,
-                    "runtime_seconds": 0.0,
-                    "n_queries": 0,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
+            chunk_docs = result.chunks if isinstance(result, PreprocessResult) else result
+            metrics = _evaluate(kg, chunk_docs, gold, k=k)
+            metrics["runtime_seconds"] = round(elapsed_s, 4)
+            metrics["n_queries"] = len(gold)
+            # run_benchmarks.py _format() requires precision/recall/f1 keys.
+            metrics["precision"] = metrics["chunk_precision_at_k"]
+            metrics["recall"] = metrics["chunk_recall_at_k"]
+            p, r = metrics["precision"], metrics["recall"]
+            metrics["f1"] = round(2 * p * r / (p + r), 4) if (p + r) else 0.0
+            results[name] = metrics
         return results
 
 

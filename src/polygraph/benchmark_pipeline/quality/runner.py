@@ -88,8 +88,8 @@ class QualityFilterRunner:
         Returns:
             ``{name: metrics}`` where metrics holds ``accuracy``,
             ``precision``, ``recall``, ``f1``, ``runtime_seconds`` and the
-            thresholds used.  A pipeline that fails to run is reported as
-            ``{"error": "..."}`` instead of aborting the whole benchmark.
+            thresholds used.  A pipeline that fails raises — failures are
+            never silently reported as zeroed metrics.
         """
         # Ensure the gold dataset is available. ``bench_quality`` (TACRED)
         # is license-gated — ``Data.download`` raises ``RuntimeError`` until
@@ -100,23 +100,19 @@ class QualityFilterRunner:
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            try:
-                min_chars, min_words = _extract_thresholds(pipeline)
+            min_chars, min_words = _extract_thresholds(pipeline)
 
-                t0 = time.perf_counter()
-                y_true = [record["label"] for record in gold]
-                y_pred = [_predict(record["text"], min_chars, min_words) for record in gold]
-                elapsed_s = time.perf_counter() - t0
+            t0 = time.perf_counter()
+            y_true = [record["label"] for record in gold]
+            y_pred = [_predict(record["text"], min_chars, min_words) for record in gold]
+            elapsed_s = time.perf_counter() - t0
 
-                metrics = _score(y_true, y_pred)
-                metrics["runtime_seconds"] = round(elapsed_s, 4)
-                metrics["n_samples"] = len(gold)
-                metrics["quality_min_chars"] = min_chars
-                metrics["quality_min_words"] = min_words
-                results[name] = metrics
-            except Exception as exc:  # noqa: BLE001 — keep benchmarking the rest
-                results[name] = {"error": f"{type(exc).__name__}: {exc}"}
-
+            metrics = _score(y_true, y_pred)
+            metrics["runtime_seconds"] = round(elapsed_s, 4)
+            metrics["n_samples"] = len(gold)
+            metrics["quality_min_chars"] = min_chars
+            metrics["quality_min_words"] = min_words
+            results[name] = metrics
         return results
 
 

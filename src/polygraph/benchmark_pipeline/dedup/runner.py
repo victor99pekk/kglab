@@ -99,47 +99,34 @@ class DedupRunner:
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            try:
-                method, threshold = _dedup_config(pipeline)
-                t0 = time.perf_counter()
-                y_true = [record["label"] for record in gold]
-                if method == "exact":
-                    # Exact dedup merges identical content — O(pairs) decision.
-                    y_pred = [
-                        "duplicate" if r["text_a"] == r["text_b"] else "not_duplicate" for r in gold
-                    ]
-                elif method == "minhash":
-                    # One batched MinHash-LSH pass over all texts (matches how
-                    # the pipeline dedups a whole corpus) instead of per-pair runs.
-                    clusters = _dedup_clusters(texts, method, threshold)
-                    y_pred = [
-                        "duplicate"
-                        if any(r["text_a"] in c and r["text_b"] in c for c in clusters)
-                        else "not_duplicate"
-                        for r in gold
-                    ]
-                else:
-                    y_pred = [
-                        _predict_pair(r["text_a"], r["text_b"], method, threshold) for r in gold
-                    ]
-                elapsed_s = time.perf_counter() - t0
+            method, threshold = _dedup_config(pipeline)
+            t0 = time.perf_counter()
+            y_true = [record["label"] for record in gold]
+            if method == "exact":
+                # Exact dedup merges identical content — O(pairs) decision.
+                y_pred = [
+                    "duplicate" if r["text_a"] == r["text_b"] else "not_duplicate" for r in gold
+                ]
+            elif method == "minhash":
+                # One batched MinHash-LSH pass over all texts (matches how
+                # the pipeline dedups a whole corpus) instead of per-pair runs.
+                clusters = _dedup_clusters(texts, method, threshold)
+                y_pred = [
+                    "duplicate"
+                    if any(r["text_a"] in c and r["text_b"] in c for c in clusters)
+                    else "not_duplicate"
+                    for r in gold
+                ]
+            else:
+                y_pred = [_predict_pair(r["text_a"], r["text_b"], method, threshold) for r in gold]
+            elapsed_s = time.perf_counter() - t0
 
-                metrics = _score(y_true, y_pred)
-                metrics["method"] = method
-                metrics["threshold"] = threshold
-                metrics["runtime_seconds"] = round(elapsed_s, 4)
-                metrics["n_samples"] = len(gold)
-                results[name] = metrics
-            except Exception as exc:
-                results[name] = {
-                    "method": None,
-                    "threshold": None,
-                    "precision": 0.0,
-                    "recall": 0.0,
-                    "f1": 0.0,
-                    "runtime_seconds": 0.0,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
+            metrics = _score(y_true, y_pred)
+            metrics["method"] = method
+            metrics["threshold"] = threshold
+            metrics["runtime_seconds"] = round(elapsed_s, 4)
+            metrics["n_samples"] = len(gold)
+            results[name] = metrics
         return results
 
 
