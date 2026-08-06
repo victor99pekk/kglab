@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared import Document
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
 from polygraph.preprocess import chunk
@@ -85,21 +86,31 @@ class ChunkingRunner:
             "  chunk boundaries against gold boundaries.\n"
         )
 
-    def run(self, pipelines: dict[str, Pipeline]) -> dict[str, Any]:
+    def run(
+        self,
+        pipelines: dict[str, Pipeline],
+        *,
+        max_records: int | None = None,
+    ) -> StageResult:
         """Run chunking benchmark and return metrics per pipeline.
 
         Args:
             pipelines: ``{name: Pipeline}`` dict.  Each pipeline should be
                 fully configured (chunk method, target tokens, etc.) but
                 does not need ``input_paths`` or ``output_dir``.
+            max_records: Cap the number of gold records scored to the
+                first *N* (``None`` scores all of them).  Lets a demo use
+                a slice of the bundled gold without creating custom data.
 
         Returns:
-            ``{pipeline_name: {method, precision, recall, f1,
-            runtime_seconds}}`` — one entry per pipeline, keyed by the
-            name given in ``pipelines``.
+            A ``StageResult`` wrapping ``{pipeline_name: {method, precision,
+            recall, f1, runtime_seconds}}`` — one entry per pipeline, keyed
+            by the name given in ``pipelines``.
         """
         dataset = _resolve_dataset(self.dataset)
         gold = _load_gold(dataset)
+        if max_records is not None:
+            gold = gold[:max_records]
 
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
@@ -119,7 +130,7 @@ class ChunkingRunner:
                 "overlap_tokens", options.get("overlap", _DEFAULT_OVERLAP_TOKENS)
             )
             results[name] = metrics
-        return results
+        return StageResult(stage="chunking", results=results, dataset=dataset)
 
 
 # ── Helpers ─────────────────────────────────────────────────────

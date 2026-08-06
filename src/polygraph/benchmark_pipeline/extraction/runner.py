@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared.stage_config import ExtractionConfig
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.kg_build.extract._base import Entity, EntityExtractor
 from polygraph.kg_build.extract.registry import create_entity_method
@@ -68,16 +69,36 @@ class ExtractionRunner:
             "  Entity-type accuracy — whether the entity type (PER/ORG/LOC/etc.) is correct.\n"
         )
 
-    def run(self, pipelines: dict[str, Pipeline]) -> dict[str, Any]:
-        """Run extraction benchmark and return metrics per pipeline."""
+    def run(
+        self,
+        pipelines: dict[str, Pipeline],
+        *,
+        max_records: int | None = None,
+    ) -> StageResult:
+        """Run extraction benchmark and return metrics per pipeline.
+
+        Args:
+            pipelines: ``{name: Pipeline}`` dict.
+            max_records: Cap the number of gold records scored to the
+                first *N* (``None`` scores all of them).  The bundled
+                CoNLL gold has ~14k records; capping keeps a demo fast
+                while still scoring a slice of the bundled gold.
+
+        Returns:
+            A ``StageResult`` wrapping ``{pipeline_name: {precision, recall,
+            f1, type_accuracy, runtime_seconds, entity_method, mode}}`` — one
+            entry per pipeline, keyed by the name given in ``pipelines``.
+        """
         # Ensure the gold dataset is present (cached download if missing).
         Data.download("bench_ner", path=str(self.dataset))
 
         gold_records = _load_gold(self.dataset)
+        if max_records is not None:
+            gold_records = gold_records[:max_records]
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
             results[name] = _benchmark_pipeline(pipeline, gold_records)
-        return results
+        return StageResult(stage="extraction", results=results, dataset=self.dataset)
 
 
 # ── Helpers ───────────────────────────────────────────────────

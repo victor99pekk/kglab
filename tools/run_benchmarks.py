@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from polygraph._shared.stage_config import PreprocessConfig, ResolutionConfig
-from polygraph.benchmark_pipeline import Benchmark
+from polygraph.benchmark_pipeline import Benchmark, format_stages
 from polygraph.pipelines import Baseline, Semantic
 
 ALL_STAGES = ["dedup", "chunking", "extraction", "resolution", "quality", "rag"]
@@ -50,12 +50,6 @@ def _pipelines_for(stage: str) -> dict:
     return {"surface": surface, "semantic": semantic}
 
 
-def _format(metrics: dict) -> str:
-    f1 = metrics.get("f1")
-    suffix = f" F1={f1:.4f}" if f1 is not None else ""
-    return f"P={metrics['precision']:.4f} R={metrics['recall']:.4f}{suffix}"
-
-
 def _runner_attr(stage: str) -> str:
     """Map stage name to Benchmark attribute (RAG is all-caps)."""
     return "RAG" if stage == "rag" else stage.capitalize()
@@ -83,14 +77,12 @@ def _run_stage(
     else:
         results = runner.run(pipelines=pipelines)
 
-    for name, metrics in results.items():
-        print(f"  {name:<12} {_format(metrics)}")
-
     out = output_dir / f"{stage}_result.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(results, indent=2, default=str))
+    out.write_text(json.dumps(results.to_dict(), indent=2, default=str))
+    print(results)
     print(f"  → {out}\n")
-    return results
+    return results.to_dict()
 
 
 def main() -> None:
@@ -132,6 +124,11 @@ def main() -> None:
     for stage in selected:
         # Fail loudly: a broken stage/pipeline must crash the run so you know.
         summary[stage] = _run_stage(stage, args.output, args.input, args.dataset)
+
+    if len(selected) > 1:
+        # Each stage already rendered its own table above; the combined report
+        # is only added for multi-stage runs so the output stays readable.
+        print(format_stages(summary))
 
     summary_path = args.output / "benchmark_summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)

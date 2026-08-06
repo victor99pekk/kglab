@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
 from polygraph.preprocess.quality import QualityProfiler, QualityThresholds
@@ -77,7 +78,7 @@ class QualityFilterRunner:
             "  Recall — fraction of good texts that were kept.\n"
         )
 
-    def run(self, pipelines: dict[str, Pipeline]) -> dict[str, Any]:
+    def run(self, pipelines: dict[str, Pipeline]) -> StageResult:
         """Run quality filter benchmark and return metrics per pipeline.
 
         Args:
@@ -86,10 +87,11 @@ class QualityFilterRunner:
                 need ``input_paths`` or ``output_dir``.
 
         Returns:
-            ``{name: metrics}`` where metrics holds ``accuracy``,
-            ``precision``, ``recall``, ``f1``, ``runtime_seconds`` and the
-            thresholds used.  A pipeline that fails raises — failures are
-            never silently reported as zeroed metrics.
+            A ``StageResult`` wrapping ``{name: metrics}`` where metrics
+            holds ``accuracy``, ``precision``, ``recall``, ``f1``,
+            ``runtime_seconds`` and the thresholds used.  A pipeline that
+            fails raises — failures are never silently reported as zeroed
+            metrics.
         """
         # Ensure the gold dataset is available. ``bench_quality`` (TACRED)
         # is license-gated — ``Data.download`` raises ``RuntimeError`` until
@@ -113,7 +115,7 @@ class QualityFilterRunner:
             metrics["quality_min_chars"] = min_chars
             metrics["quality_min_words"] = min_words
             results[name] = metrics
-        return results
+        return StageResult(stage="quality", results=results, dataset=self.dataset)
 
 
 # ── Helpers ─────────────────────────────────────────────────────

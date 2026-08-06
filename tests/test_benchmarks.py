@@ -431,3 +431,156 @@ def test_dedup_predict_pair_semantic_uses_shared_encoder(
         )
         == "not_duplicate"
     )
+
+
+# ── Result rendering ───────────────────────────────────────────
+
+
+def test_render_stage_table_lists_pipelines_and_marks_best() -> None:
+    """Tables must be aligned, contain metric headers, and mark the best."""
+    from polygraph.benchmark_pipeline.render import format_stage
+
+    text = format_stage(
+        "chunking",
+        {
+            "sentence": {"precision": 0.5, "recall": 0.5, "f1": 0.5, "runtime_seconds": 1.0},
+            "semantic": {"precision": 0.9, "recall": 0.7, "f1": 0.79, "runtime_seconds": 2.0},
+        },
+    )
+    assert "pipeline" in text and "precision" in text and "recall" in text and "f1" in text
+    assert "sentence" in text and "semantic" in text
+    # Best headline (f1) is marked with a star; the lower one is not.
+    assert "0.790 *" in text
+    assert "0.500 " in text or "0.500" in text
+    assert "* = best f1" in text
+    # Column alignment must stay intact (numeric column right-aligned).
+    lines = [line for line in text.splitlines() if "sentence" in line or "semantic" in line]
+    assert all(" | " in line for line in lines)
+
+
+def test_render_all_six_stages_have_metadata() -> None:
+    from polygraph.benchmark_pipeline.render import STAGE_META, format_stages
+
+    assert set(STAGE_META) == {
+        "dedup",
+        "chunking",
+        "extraction",
+        "resolution",
+        "quality",
+        "rag",
+    }
+    text = format_stages(
+        {
+            "dedup": {
+                "minhash": {"precision": 1.0, "recall": 0.5, "f1": 0.67, "runtime_seconds": 0.1}
+            }
+        }
+    )
+    assert "Dedup" in text and "minhash" in text
+
+
+def test_render_empty_results_does_not_crash() -> None:
+    from polygraph.benchmark_pipeline.render import format_stage
+
+    assert "no results" in format_stage("quality", {})
+
+
+def test_chunking_max_records_scores_a_slice_of_gold(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """max_records caps how many bundled gold records a stage scores."""
+    monkeypatch.setattr(Data, "download", lambda *a, **k: None)
+    gold = tmp_path / "chunking_gold.jsonl"
+    gold.write_text(
+        "\n".join(
+            json.dumps({"text": f"sentence number {i} with entity Alpha.", "chunks": []})
+            for i in range(10)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    metrics = Benchmark.Chunking(dataset=gold).run(
+        pipelines={"p": Baseline(preprocess=PreprocessConfig(chunk_method="sentence"))},
+        max_records=3,
+    )["p"]
+    assert metrics["n_samples"] == 3
+
+
+def test_extraction_max_records_scores_a_slice_of_gold(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """max_records caps the gold records passed to the extraction scorer."""
+    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+
+    monkeypatch.setattr(Data, "download", lambda *a, **k: None)
+    gold = tmp_path / "ner_gold.jsonl"
+    gold.write_text(
+        "\n".join(
+            json.dumps({"text": f"sentence number {i} with entity Alpha.", "entities": []})
+            for i in range(10)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    seen: dict[str, int] = {}
+
+    def spy(pipeline: Pipeline, records: list[dict[str, Any]]) -> dict[str, Any]:
+        seen["n"] = len(records)
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "runtime_seconds": 0.0}
+
+    monkeypatch.setattr(extraction_mod, "_benchmark_pipeline", spy)
+    Benchmark.Extraction(dataset=gold).run(pipelines={"p": Baseline()}, max_records=4)
+    assert seen["n"] == 4
+
+
+# ── StageResult ────────────────────────────────────────────────
+
+
+def test_stage_result_str_renders_the_report() -> None:
+    """print(result) shows the aligned table with the best metric marked."""
+    from polygraph.benchmark_pipeline import StageResult
+
+    result = StageResult(
+        stage="dedup",
+        results={
+            "minhash": {
+                "precision": 1.0,
+                "recall": 0.229,
+                "f1": 0.373,
+                "runtime_seconds": 3.1,
+            }
+        },
+    )
+    text = str(result)
+    assert "Dedup" in text and "precision" in text and "minhash" in text
+    assert "0.373 *" in text
+    # Padded with blank lines so printed results don't run together.
+    assert text.startswith("\n") and text.endswith("\n")
+
+
+def test_stage_result_accessors() -> None:
+    """__getitem__, headline, best_pipeline, to_dict and pipelines work."""
+    from polygraph.benchmark_pipeline import StageResult
+
+    result = StageResult(
+        stage="chunking",
+        results={
+            "a": {"precision": 0.5, "recall": 0.5, "f1": 0.5, "runtime_seconds": 1.0},
+            "b": {"precision": 0.9, "recall": 0.7, "f1": 0.79, "runtime_seconds": 2.0},
+        },
+    )
+    assert result.pipelines == ["a", "b"]
+    assert result["b"]["f1"] == 0.79
+    assert result.headline("b") == 0.79
+    assert result.best_pipeline() == "b"
+    assert result.to_dict() == result.results
+    assert "chunking" in repr(result) and "a" in repr(result)
+
+
+def test_stage_result_is_thin_not_a_dict() -> None:
+    """Deliberately dict-like only via __getitem__ — no Mapping emulation."""
+    from polygraph.benchmark_pipeline import StageResult
+
+    result = StageResult(stage="quality", results={"x": {"accuracy": 1.0}})
+    assert not hasattr(result, "values")
+    assert not hasattr(result, "items")

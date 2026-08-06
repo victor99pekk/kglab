@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared import Document
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
 from polygraph.preprocess.dedup import Deduplicator, GlobalDeduplicator
@@ -80,7 +81,7 @@ class DedupRunner:
             "  F1 — harmonic mean of precision and recall.\n"
         )
 
-    def run(self, pipelines: dict[str, Pipeline]) -> dict[str, Any]:
+    def run(self, pipelines: dict[str, Pipeline]) -> StageResult:
         """Run dedup benchmark and return metrics per pipeline.
 
         Args:
@@ -89,9 +90,9 @@ class DedupRunner:
                 not need ``input_paths`` or ``output_dir``.
 
         Returns:
-            ``{pipeline_name: {method, threshold, precision, recall, f1,
-            runtime_seconds}}`` — one entry per pipeline, keyed by the
-            name given in ``pipelines``.
+            A ``StageResult`` wrapping ``{pipeline_name: {method, threshold,
+            precision, recall, f1, runtime_seconds}}`` — one entry per
+            pipeline, keyed by the name given in ``pipelines``.
         """
         Data.download("bench_dedup", path=str(self.dataset))
         gold = _load_gold(self.dataset)
@@ -127,7 +128,7 @@ class DedupRunner:
             metrics["runtime_seconds"] = round(elapsed_s, 4)
             metrics["n_samples"] = len(gold)
             results[name] = metrics
-        return results
+        return StageResult(stage="dedup", results=results, dataset=self.dataset)
 
 
 # ── Helpers ─────────────────────────────────────────────────────

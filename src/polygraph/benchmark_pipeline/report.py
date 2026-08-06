@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from polygraph.benchmark_pipeline.render import STAGE_META, format_stage
+
 
 @dataclass
 class BenchmarkResult:
@@ -60,6 +62,63 @@ class BenchmarkResult:
     def num_triples(self) -> int:
         """Number of triples (edges) in the KG."""
         return int(self.metrics.get("num_triples", 0))
+
+
+@dataclass
+class StageResult:
+    """Results of benchmarking one pipeline stage against a gold dataset.
+
+    Returned by the stage runners (``Benchmark.Dedup(...).run(...)`` etc.).
+    Wraps the per-pipeline metrics with a readable ``str()`` and a couple of
+    convenience accessors — nothing else::
+
+        result = Benchmark.Dedup(dataset=...).run(pipelines={...})
+        print(result)              # aligned per-pipeline table
+        result.best_pipeline()     # pipeline with the best headline metric
+        result.to_dict()           # plain {pipeline: metrics} dict (JSON-safe)
+    """
+
+    stage: str
+    """Stage name (e.g. ``"dedup"``) — must be a ``render.STAGE_META`` key."""
+
+    results: dict[str, dict[str, Any]]
+    """``{pipeline_name: {metric: value}}`` metrics per pipeline."""
+
+    dataset: Path | None = None
+    """Gold dataset the stage was scored against, if known."""
+
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    """UTC ISO timestamp of when the stage ran."""
+
+    @property
+    def pipelines(self) -> list[str]:
+        """Names of the benchmarked pipelines, in run order."""
+        return list(self.results)
+
+    def __getitem__(self, pipeline: str) -> dict[str, Any]:
+        """Metrics for one pipeline (``result["minhash"]``)."""
+        return self.results[pipeline]
+
+    def headline(self, pipeline: str) -> float | None:
+        """Value of the stage's headline metric (e.g. F1) for *pipeline*."""
+        value = self.results[pipeline].get(STAGE_META[self.stage]["headline"])
+        return float(value) if isinstance(value, int | float) else None
+
+    def best_pipeline(self) -> str:
+        """Name of the pipeline with the best headline metric."""
+        return max(self.pipelines, key=lambda p: self.headline(p) or float("-inf"))
+
+    def to_dict(self) -> dict[str, dict[str, Any]]:
+        """The plain ``{pipeline: metrics}`` dict (JSON-serializable)."""
+        return self.results
+
+    def __repr__(self) -> str:
+        return f"StageResult(stage={self.stage!r}, pipelines={self.pipelines!r})"
+
+    def __str__(self) -> str:
+        # Blank lines before/after so printing several results doesn't run
+        # the tables together.
+        return f"\n{format_stage(self.stage, self.results)}\n"
 
 
 def write_report(result: BenchmarkResult, output_dir: str | Path) -> Path:

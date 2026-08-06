@@ -32,7 +32,8 @@ Single pipeline (with YAML config for reproducibility)::
 
 from polygraph.benchmark_pipeline.benchmark import Benchmark
 from polygraph.benchmark_pipeline.config import ExperimentConfig
-from polygraph.benchmark_pipeline.report import BenchmarkResult, write_report
+from polygraph.benchmark_pipeline.render import format_stage, format_stages
+from polygraph.benchmark_pipeline.report import BenchmarkResult, StageResult, write_report
 from polygraph.benchmark_pipeline.runner import BenchmarkRunner
 
 __all__ = [
@@ -40,5 +41,8 @@ __all__ = [
     "BenchmarkResult",
     "BenchmarkRunner",
     "ExperimentConfig",
+    "StageResult",
+    "format_stage",
+    "format_stages",
     "write_report",
 ]

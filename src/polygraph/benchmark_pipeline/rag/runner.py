@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared.types import PreprocessResult
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.pipelines import Pipeline
 
@@ -88,7 +89,7 @@ class RAGRunner:
         *,
         k: int = _DEFAULT_K,
         max_queries: int = _DEFAULT_MAX_QUERIES,
-    ) -> dict[str, Any]:
+    ) -> StageResult:
         """Run RAG benchmark and return retrieval metrics per pipeline.
 
         Each pipeline is executed on the gold documents, then retrieval
@@ -104,10 +105,10 @@ class RAGRunner:
                 the run while keeping the metric honest.
 
         Returns:
-            ``{pipeline_name: {entity_recall_at_k, entity_coverage,
-            chunk_recall_at_k, chunk_precision_at_k, relation_path_accuracy,
-            precision, recall, f1, runtime_seconds, n_queries}}`` — one
-            entry per pipeline.
+            A ``StageResult`` wrapping ``{pipeline_name: {entity_recall_at_k,
+            entity_coverage, chunk_recall_at_k, chunk_precision_at_k,
+            relation_path_accuracy, precision, recall, f1, runtime_seconds,
+            n_queries}}`` — one entry per pipeline.
         """
         Data.download("bench_rag", path=str(self.dataset))
         gold = _load_gold(self.dataset)
@@ -136,7 +137,7 @@ class RAGRunner:
             p, r = metrics["precision"], metrics["recall"]
             metrics["f1"] = round(2 * p * r / (p + r), 4) if (p + r) else 0.0
             results[name] = metrics
-        return results
+        return StageResult(stage="rag", results=results, dataset=self.dataset)
 
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -212,7 +213,7 @@ def _chunk_matches(gold: str, chunk: str) -> bool:
 
 def _relation_name(triple: Any) -> str:
     """Extract a normalized relation/predicate name from a triple."""
-    if isinstance(triple, (tuple, list)) and len(triple) >= 3:
+    if isinstance(triple, tuple | list) and len(triple) >= 3:
         predicate = triple[1]
     elif isinstance(triple, dict):
         predicate = triple.get("predicate", triple.get("relation", triple.get("type", "")))

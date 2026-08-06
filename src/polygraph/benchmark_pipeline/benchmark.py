@@ -33,6 +33,9 @@ Usage::
             "semantic": Baseline(preprocess=PreprocessConfig(chunk_method="semantic")),
         }
     )
+
+Each ``run(...)`` returns a ``StageResult`` — ``print(result)`` renders a
+readable per-pipeline report.
 """
 
 from polygraph.benchmark_pipeline.chunking import ChunkingRunner

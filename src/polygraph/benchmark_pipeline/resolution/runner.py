@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from polygraph._shared.stage_config import ResolutionConfig
+from polygraph.benchmark_pipeline.report import StageResult
 from polygraph.data import Data
 from polygraph.kg_build import resolve
 from polygraph.pipelines import Pipeline
@@ -73,7 +74,7 @@ class ResolutionRunner:
             "  Pairwise F1 — F1 over all entity pairs (more granular).\n"
         )
 
-    def run(self, pipelines: dict[str, Pipeline]) -> dict[str, Any]:
+    def run(self, pipelines: dict[str, Pipeline]) -> StageResult:
         """Run resolution benchmark and return metrics per pipeline.
 
         Args:
@@ -82,10 +83,10 @@ class ResolutionRunner:
                 does not need ``input_paths`` or ``output_dir``.
 
         Returns:
-            ``{pipeline_name: {method, threshold, precision, recall, f1,
-            pairwise_precision, pairwise_recall, pairwise_f1,
-            runtime_seconds}}`` — one entry per pipeline, keyed by the
-            name given in ``pipelines``.
+            A ``StageResult`` wrapping ``{pipeline_name: {method, threshold,
+            precision, recall, f1, pairwise_precision, pairwise_recall,
+            pairwise_f1, runtime_seconds}}`` — one entry per pipeline, keyed
+            by the name given in ``pipelines``.
         """
         Data.download("bench_resolution", path=str(self.dataset))
         gold = _load_gold(self.dataset)
@@ -103,7 +104,7 @@ class ResolutionRunner:
                 **metrics,
                 "runtime_seconds": time.monotonic() - start,
             }
-        return results
+        return StageResult(stage="resolution", results=results, dataset=self.dataset)
 
 
 def _load_gold(path: str | Path) -> list[set[str]]:
