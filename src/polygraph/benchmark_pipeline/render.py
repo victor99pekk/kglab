@@ -58,8 +58,9 @@ STAGE_META: dict[str, dict[str, Any]] = {
         "columns": ["precision", "recall", "f1", "pairwise_f1", "threshold"],
         "meaning": (
             "Higher F1 = mentions are merged the way the gold clusters group "
-            "them. The bundled gold is placeholder T2D data — supply real gold "
-            "via dataset= or --dataset for meaningful numbers."
+            "them. Smoke test only: the bundled gold is 2 hand-written clusters, "
+            "so this number is not a real measurement — supply real gold via "
+            "dataset= or --dataset."
         ),
     },
     "quality": {
@@ -68,8 +69,9 @@ STAGE_META: dict[str, dict[str, Any]] = {
         "columns": ["accuracy", "precision", "recall", "f1"],
         "meaning": (
             "Higher accuracy = the filter agrees with the gold keep/reject "
-            "labels. Bundled gold is placeholder TACRED data — supply real gold "
-            "via dataset= or --dataset."
+            "labels. Smoke test only: the bundled gold is 9 hand-written records, "
+            "so this number is not a real measurement — supply real gold via "
+            "dataset= or --dataset."
         ),
     },
     "rag": {
