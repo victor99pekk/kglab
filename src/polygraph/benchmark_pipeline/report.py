@@ -118,7 +118,7 @@ class StageResult:
     def __str__(self) -> str:
         # Blank lines before/after so printing several results doesn't run
         # the tables together.
-        return f"\n{format_stage(self.stage, self.results)}\n"
+        return f"\n{format_stage(self.stage, self.results, dataset=self.dataset)}\n"
 
 
 def write_report(result: BenchmarkResult, output_dir: str | Path) -> Path:

@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from polygraph._shared.stage_config import PreprocessConfig, ResolutionConfig
-from polygraph.benchmark_pipeline import Benchmark, format_stages
+from polygraph.benchmark_pipeline import Benchmark, StageResult, format_stages
 from polygraph.pipelines import Baseline, Semantic
 
 ALL_STAGES = ["dedup", "chunking", "extraction", "resolution", "quality", "rag"]
@@ -60,7 +60,7 @@ def _run_stage(
     output_dir: Path,
     input_paths: list[str] | None = None,
     dataset: Path | None = None,
-) -> dict:
+) -> StageResult:
     runner_cls = getattr(Benchmark, _runner_attr(stage))
     pipelines = _pipelines_for(stage)
 
@@ -82,7 +82,7 @@ def _run_stage(
     out.write_text(json.dumps(results.to_dict(), indent=2, default=str))
     print(results)
     print(f"  → {out}\n")
-    return results.to_dict()
+    return results
 
 
 def main() -> None:
@@ -120,15 +120,18 @@ def main() -> None:
 
     selected = args.stage or ALL_STAGES
     summary: dict = {}
+    datasets: dict[str, Path | None] = {}
 
     for stage in selected:
         # Fail loudly: a broken stage/pipeline must crash the run so you know.
-        summary[stage] = _run_stage(stage, args.output, args.input, args.dataset)
+        result = _run_stage(stage, args.output, args.input, args.dataset)
+        summary[stage] = result.to_dict()
+        datasets[stage] = result.dataset
 
     if len(selected) > 1:
         # Each stage already rendered its own table above; the combined report
         # is only added for multi-stage runs so the output stays readable.
-        print(format_stages(summary))
+        print(format_stages(summary, datasets=datasets))
 
     summary_path = args.output / "benchmark_summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
