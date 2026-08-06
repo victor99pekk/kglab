@@ -31,8 +31,23 @@ DATASET_REGISTRY = {
         "enrich": "polygraph.data._wikipedia:enrich_wikipedia",
     },
     "bench_ner": {
-        "description": "CoNLL-2003 NER benchmark — token-level entity annotations",
+        "description": "CoNLL-2003 NER benchmark — TRAIN split (not a held-out evaluation)",
         "download": "polygraph.data._benchmarks:download_conll_ner",
+        "enrich": None,
+    },
+    "bench_ner_test": {
+        "description": "CoNLL-2003 NER benchmark — TEST split (held-out, literature-comparable)",
+        "download": "polygraph.data._benchmarks:download_conll_ner_test",
+        "enrich": None,
+    },
+    "bench_ner_wikiann": {
+        "description": "wikiann NER benchmark — Wikipedia-derived, PER/ORG/LOC (TEST split)",
+        "download": "polygraph.data._benchmarks:download_wikiann_ner",
+        "enrich": None,
+    },
+    "bench_ner_fewnerd": {
+        "description": "FewNERD NER benchmark — coarse fine-grained types (TEST split)",
+        "download": "polygraph.data._benchmarks:download_fewnerd_ner",
         "enrich": None,
     },
     "bench_dedup": {

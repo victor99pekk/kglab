@@ -13,6 +13,7 @@ from urllib.request import urlretrieve
 logger = logging.getLogger(__name__)
 
 CONLL_TRAIN_URL = "https://raw.githubusercontent.com/synalp/NER/master/corpus/CoNLL-2003/eng.train"
+CONLL_TEST_URL = "https://raw.githubusercontent.com/synalp/NER/master/corpus/CoNLL-2003/eng.testb"
 # DBLP-ACM has no stable single host — try these mirrors in order.
 DBLP_ACM_MIRRORS = [
     "https://dbs.uni-leipzig.de/file/DBLP-ACM.zip",
@@ -42,20 +43,41 @@ def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> int:
 
 
 def download_conll_ner(path: str | Path, force: bool = False) -> int:
-    target = Path(path)
+    """Download the CoNLL-2003 TRAIN split as NER gold (``bench_ner``)."""
+    return _download_conll(CONLL_TRAIN_URL, Path(path), force)
+
+
+def download_conll_ner_test(path: str | Path, force: bool = False) -> int:
+    """Download the CoNLL-2003 TEST split as NER gold (``bench_ner_test``).
+
+    The official held-out test split (``eng.testb``) is what published NER
+    numbers (spaCy ~0.85, BERT-NER ~0.91) are reported on. Same format and
+    parser as the train gold, so it is scored identically.
+    """
+    return _download_conll(CONLL_TEST_URL, Path(path), force)
+
+
+def _download_conll(url: str, target: Path, force: bool) -> int:
+    """Download a CoNLL-2003 split and write it as entity-span JSONL gold."""
     if _skip_if_cached(target, force):
         return 0
 
     import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-        urlretrieve(CONLL_TRAIN_URL, tmp.name)
+        urlretrieve(url, tmp.name)
+    records = _parse_conll(tmp.name)
+    os.unlink(tmp.name)
+    return _write_jsonl(target, records)
 
+
+def _parse_conll(path: str) -> list[dict[str, Any]]:
+    """Parse a CoNLL-2003 BIO-tagged file into entity-span records."""
     records: list[dict[str, Any]] = []
     tokens: list[str] = []
     labels: list[str] = []
 
-    with open(tmp.name, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("-DOCSTART-"):
@@ -69,9 +91,64 @@ def download_conll_ner(path: str | Path, force: bool = False) -> int:
                 labels.append(parts[3])
         if tokens:
             records.append(_bio_to_entities(" ".join(tokens), tokens, labels))
+    return records
 
-    os.unlink(tmp.name)
-    return _write_jsonl(target, records)
+
+def _bio_records_from_hf(ds: Any, tag_field: str) -> list[dict[str, Any]]:
+    """Convert a HuggingFace token-level NER dataset into entity-span records.
+
+    ``ds`` must expose ``tokens`` and an integer ``ner_tags``-style field whose
+    ``feature.names`` maps ids to IOB2 labels.
+    """
+    names = ds.features[tag_field].feature.names
+    records: list[dict[str, Any]] = []
+    for example in ds:
+        labels = [names[i] for i in example[tag_field]]
+        records.append(_bio_to_entities(" ".join(example["tokens"]), example["tokens"], labels))
+    return records
+
+
+def download_wikiann_ner(path: str | Path, force: bool = False) -> int:
+    """Download the wikiann (English, TEST split) NER gold (``bench_ner_wikiann``).
+
+    Free, Wikipedia-derived NER with three broad types (PER/ORG/LOC) — a good
+    held-out benchmark for broad entity extractors (spaCy's PERSON/GPE/LOC/ORG
+    map onto it via the benchmark's label aliases).
+    """
+    target = Path(path)
+    if _skip_if_cached(target, force):
+        return 0
+    from datasets import load_dataset
+    from huggingface_hub import hf_hub_download
+
+    # ``wikiann`` is a no-namespace repo; datasets>=5 cannot parse its URI, so
+    # fetch the English test parquet directly and load it as a local dataset.
+    parquet = hf_hub_download("wikiann", "en/test-00000-of-00001.parquet", repo_type="dataset")
+    ds = load_dataset("parquet", data_files={"test": parquet}, split="test")
+    return _write_jsonl(target, _bio_records_from_hf(ds, "ner_tags"))
+
+
+def download_fewnerd_ner(path: str | Path, force: bool = False) -> int:
+    """Download the FewNERD coarse-type NER gold (``bench_ner_fewnerd``).
+
+    FewNERD is gated on the HuggingFace Hub: accept its license at
+    ``https://huggingface.co/datasets/fewnerd`` and set ``HF_TOKEN``. Until
+    then this raises ``RuntimeError``, like the other license-gated golds.
+    """
+    target = Path(path)
+    if _skip_if_cached(target, force):
+        return 0
+    from datasets import load_dataset
+
+    try:
+        ds = load_dataset("fewnerd", split="test")
+    except Exception as exc:
+        raise RuntimeError(
+            "FewNERD is license-gated on the HuggingFace Hub: accept the license "
+            "at https://huggingface.co/datasets/fewnerd, set HF_TOKEN, and retry. "
+            f"({type(exc).__name__}: {exc})"
+        ) from exc
+    return _write_jsonl(target, _bio_records_from_hf(ds, "coarse_ner_tags"))
 
 
 def _bio_to_entities(text: str, tokens: list[str], labels: list[str]) -> dict[str, Any]:

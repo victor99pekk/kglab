@@ -43,10 +43,13 @@ STAGE_META: dict[str, dict[str, Any]] = {
     "extraction": {
         "title": "Extraction — NER spans vs gold entities",
         "headline": "f1",
-        "columns": ["precision", "recall", "f1", "type_accuracy", "n_samples"],
+        "columns": ["precision", "recall", "f1", "type_accuracy", "n_scored", "n_samples"],
         "meaning": (
-            "Higher F1 = extracted entity spans match the gold annotations; "
-            "type_accuracy is how often the predicted type is also correct."
+            "Higher F1 = extracted NER spans match the gold annotations. Only "
+            "labels in the chosen gold's schema are scored (n_scored shows how "
+            "many predictions counted); type_accuracy is how often the type is "
+            "also correct. Pick the gold that fits your extractor — "
+            "print(Benchmark.Extraction.golds())."
         ),
     },
     "resolution": {

@@ -433,6 +433,63 @@ def test_dedup_predict_pair_semantic_uses_shared_encoder(
     )
 
 
+# ── Extraction benchmark family ───────────────────────────────
+
+
+def test_extraction_golds_registered() -> None:
+    """The extraction benchmark exposes a pick-your-gold family (test splits)."""
+    from polygraph.data import DATASET_REGISTRY
+
+    for key in ("bench_ner_test", "bench_ner_wikiann", "bench_ner_fewnerd"):
+        assert key in DATASET_REGISTRY
+
+    text = Benchmark.Extraction.golds()
+    assert "bench_ner_test" in text
+    assert "bench_ner_wikiann" in text
+    assert "bench_ner_fewnerd" in text
+    assert "TEST split" in text
+
+
+def test_span_metrics_is_schema_scoped_with_aliases() -> None:
+    """Labels outside the gold's set are not scored; aliases normalize names."""
+    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+
+    allowed = {"PER", "ORG", "MISC"}
+    gold = [(0, 3, "ORG", "IBM"), (10, 13, "PER", "Amy")]
+    predicted = [
+        (0, 3, "ORG", "IBM"),  # TP, type OK
+        (10, 13, "PERSON", "Amy"),  # TP (PERSON -> PER via alias), type OK
+        (5, 8, "PERSON", "Bob"),  # FP (wrong span)
+        (0, 3, "CONCEPT", "stuff"),  # outside schema -> dropped
+        (20, 25, "DATE", "today"),  # outside schema -> dropped
+    ]
+    m = extraction_mod._span_metrics(gold, predicted, allowed, extraction_mod.NER_LABEL_ALIASES)
+
+    assert m["precision"] == pytest.approx(2 / 3, abs=1e-4)
+    assert m["recall"] == 1.0
+    assert m["type_accuracy"] == 1.0
+    assert m["n_predicted"] == 5
+    assert m["n_scored"] == 3
+    assert m["n_dropped"] == 2
+
+
+def test_span_metrics_aggregates_per_record() -> None:
+    """The same span in different records counts as separate true positives."""
+    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+
+    gold = [(0, 2, "ORG", "EU")]
+    predicted = [(0, 2, "ORG", "EU")]
+    counts = [
+        extraction_mod._count_record(gold, predicted, {"ORG"}, None),
+        extraction_mod._count_record(gold, predicted, {"ORG"}, None),
+        extraction_mod._count_record(gold, [], {"ORG"}, None),
+    ]
+    m = extraction_mod._aggregate_metrics(counts)
+    assert m["recall"] == pytest.approx(2 / 3, abs=1e-4)
+    assert m["precision"] == 1.0
+    assert m["n_scored"] == 2
+
+
 # ── Result rendering ───────────────────────────────────────────
 
 
@@ -524,7 +581,9 @@ def test_extraction_max_records_scores_a_slice_of_gold(
     )
     seen: dict[str, int] = {}
 
-    def spy(pipeline: Pipeline, records: list[dict[str, Any]]) -> dict[str, Any]:
+    def spy(
+        pipeline: Pipeline, records: list[dict[str, Any]], allowed_types: set[str]
+    ) -> dict[str, Any]:
         seen["n"] = len(records)
         return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "runtime_seconds": 0.0}
 

@@ -25,6 +25,49 @@ from polygraph.pipelines import Pipeline
 #: Default location of the CoNLL-2003-derived NER gold dataset (see ``Data.download``).
 _DEFAULT_DATASET = "benchmarks/data/ner_gold.jsonl"
 
+#: Gold-side label normalization — reconciles common label-name variants
+#: (e.g. spaCy's OntoNotes ``"PERSON"`` vs CoNLL ``"PER"``) to a canonical
+#: set before scoring. Defined once here, not per extractor: new extractors
+#: need nothing; each gold's own label set decides what is scored.
+NER_LABEL_ALIASES: dict[str, str] = {
+    "PERSON": "PER",
+    "GPE": "LOC",
+    "LOC": "LOC",
+    "NORP": "MISC",
+    "ORG": "ORG",
+    "FAC": "MISC",
+    "PRODUCT": "MISC",
+    "EVENT": "MISC",
+    "WORK_OF_ART": "MISC",
+    "LAW": "MISC",
+    "LANGUAGE": "MISC",
+}
+
+#: Available extraction gold datasets — pick the one matching your extractor's
+#: schema. Keys are ``Data.download`` names; prefer TEST splits for evaluation.
+EXTRACTION_GOLDS: dict[str, dict[str, Any]] = {
+    "bench_ner": {
+        "description": "CoNLL-2003 NER — TRAIN split (in-library default; not a held-out evaluation).",
+        "types": "PER / LOC / ORG / MISC",
+        "fits": "extractors emitting PER/LOC/ORG/MISC (e.g. BERT-NER, Flair CoNLL)",
+    },
+    "bench_ner_test": {
+        "description": "CoNLL-2003 NER — TEST split (held-out; what published numbers use).",
+        "types": "PER / LOC / ORG / MISC",
+        "fits": "extractors emitting PER/LOC/ORG/MISC",
+    },
+    "bench_ner_wikiann": {
+        "description": "wikiann (English) NER — Wikipedia-derived, TEST split.",
+        "types": "PER / ORG / LOC",
+        "fits": "broad 3-type extractors; spaCy PERSON/GPE/LOC/ORG via aliases",
+    },
+    "bench_ner_fewnerd": {
+        "description": "FewNERD NER — coarse fine-grained types, TEST split (gated on HF: accept license + set HF_TOKEN).",
+        "types": "PER / ORG / LOC / ART / BUILDING / EVENT / PRODUCT / OTHER",
+        "fits": "fine-grained extractors (coarse-level comparison)",
+    },
+}
+
 
 class ExtractionRunner:
     """Benchmark entity extraction quality across pipeline instances.
@@ -69,6 +112,26 @@ class ExtractionRunner:
             "  Entity-type accuracy — whether the entity type (PER/ORG/LOC/etc.) is correct.\n"
         )
 
+    @classmethod
+    def golds(cls) -> str:
+        """List the available extraction gold datasets and which extractor each fits.
+
+        Each entry is a ``Data.download`` key: fetch it with
+        ``Data.download("<key>", path=...)`` and pass the path as ``dataset=``.
+        Prefer the TEST-split golds for real evaluation — training-split golds
+        are not held-out.
+        """
+        lines = [
+            "Extraction gold datasets — pick the one matching your extractor:",
+            "  fetch: Data.download('<key>', path=...)   then   Benchmark.Extraction(dataset=path)",
+        ]
+        for key, info in EXTRACTION_GOLDS.items():
+            lines.append(f"\n  {key}")
+            lines.append(f"    {info['description']}")
+            lines.append(f"    types: {info['types']}")
+            lines.append(f"    fits:  {info['fits']}")
+        return "\n".join(lines)
+
     def run(
         self,
         pipelines: dict[str, Pipeline],
@@ -95,9 +158,12 @@ class ExtractionRunner:
         gold_records = _load_gold(self.dataset)
         if max_records is not None:
             gold_records = gold_records[:max_records]
+        # The gold's own label set defines the schema — predictions whose
+        # (aliased) label is not one of these are outside the gold and not scored.
+        allowed_types = {g[2] for record in gold_records for g in _gold_spans(record)}
         results: dict[str, Any] = {}
         for name, pipeline in pipelines.items():
-            results[name] = _benchmark_pipeline(pipeline, gold_records)
+            results[name] = _benchmark_pipeline(pipeline, gold_records, allowed_types)
         return StageResult(stage="extraction", results=results, dataset=self.dataset)
 
 
@@ -209,30 +275,60 @@ def _resolve_spans(
     return spans
 
 
-def _span_metrics(
+def _count_record(
     gold: list[tuple[int, int, str, str]],
     predicted: list[tuple[int, int, str, str]],
-) -> dict[str, float]:
-    """Compute span-level precision / recall / F1 (CoNLL-style micro-average).
+    allowed_types: set[str],
+    aliases: dict[str, str] | None = None,
+) -> dict[str, int]:
+    """Count TP/FP/FN/type matches for ONE record's gold and predicted spans.
 
-    A prediction is a true positive when its ``(start, end)`` matches a gold
-    span. ``type_accuracy`` reports how often matched spans also agree on the
-    entity type.
+    Only predictions whose (aliased) label is in the gold's label set are
+    scored — labels outside it (noun-phrase ``CONCEPT``s, dates, ...) are
+    neither true nor false positives. A span match counts as a true positive
+    even when the type differs; only ``type_accuracy`` penalizes that.
+
+    Spans are record-relative — the same ``(start, end)`` recurs across
+    records (e.g. many articles start with "EU") — so matching happens per
+    record; callers aggregate counts with ``_aggregate_metrics``.
     """
+    aliases = aliases or {}
     gold_by_span = {(g[0], g[1]): g for g in gold}
     matched_gold: set[tuple[int, int]] = set()
     tp = 0
     type_correct = 0
+    n_scored = 0
 
     for start, end, label, _name in predicted:
+        mapped = aliases.get(label, label)
+        if mapped not in allowed_types:
+            continue
+        n_scored += 1
         if (start, end) in gold_by_span and (start, end) not in matched_gold:
             tp += 1
             matched_gold.add((start, end))
-            if label == gold_by_span[(start, end)][2]:
+            if mapped == gold_by_span[(start, end)][2]:
                 type_correct += 1
 
-    fp = len(predicted) - tp
-    fn = len(gold) - len(matched_gold)
+    return {
+        "tp": tp,
+        "fp": n_scored - tp,
+        "fn": len(gold) - len(matched_gold),
+        "type_correct": type_correct,
+        "n_predicted": len(predicted),
+        "n_scored": n_scored,
+        "n_dropped": len(predicted) - n_scored,
+    }
+
+
+def _aggregate_metrics(records: list[dict[str, int]]) -> dict[str, Any]:
+    """Sum per-record counts into micro-averaged P/R/F1 + transparency keys."""
+    tp = sum(r["tp"] for r in records)
+    fp = sum(r["fp"] for r in records)
+    fn = sum(r["fn"] for r in records)
+    type_correct = sum(r["type_correct"] for r in records)
+    n_predicted = sum(r["n_predicted"] for r in records)
+    n_scored = sum(r["n_scored"] for r in records)
 
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
@@ -244,30 +340,42 @@ def _span_metrics(
         "recall": round(recall, 4),
         "f1": round(f1, 4),
         "type_accuracy": round(type_accuracy, 4),
+        "n_predicted": n_predicted,
+        "n_scored": n_scored,
+        "n_dropped": n_predicted - n_scored,
     }
+
+
+def _span_metrics(
+    gold: list[tuple[int, int, str, str]],
+    predicted: list[tuple[int, int, str, str]],
+    allowed_types: set[str] | None = None,
+    aliases: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Metrics for a single record (convenience; used by tests)."""
+    allowed = allowed_types or {g[2] for g in gold}
+    return _aggregate_metrics([_count_record(gold, predicted, allowed, aliases)])
 
 
 def _benchmark_pipeline(
     pipeline: Pipeline,
     gold_records: list[dict[str, Any]],
+    allowed_types: set[str],
 ) -> dict[str, Any]:
     """Run one pipeline's entity extraction over the gold corpus and score it."""
     config = _extraction_config(pipeline)
     extractor = _entity_extractor(config)
 
     t0 = time.perf_counter()
-    all_gold: list[tuple[int, int, str, str]] = []
-    all_predicted: list[tuple[int, int, str, str]] = []
+    counts: list[dict[str, int]] = []
     for record in gold_records:
         text = str(record.get("text", ""))
         gold = _gold_spans(record)
-        all_gold.extend(gold)
-        all_predicted.extend(
-            _resolve_spans(extractor.extract(text), text, {(g[0], g[1]) for g in gold})
-        )
+        predicted = _resolve_spans(extractor.extract(text), text, {(g[0], g[1]) for g in gold})
+        counts.append(_count_record(gold, predicted, allowed_types, NER_LABEL_ALIASES))
     elapsed_s = time.perf_counter() - t0
 
-    metrics = _span_metrics(all_gold, all_predicted)
+    metrics = _aggregate_metrics(counts)
     metrics["runtime_seconds"] = round(elapsed_s, 4)
     metrics["entity_method"] = config.entity_method
     metrics["mode"] = config.mode
