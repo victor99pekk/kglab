@@ -7,14 +7,14 @@ For programmatic use, import ``polygraph.data.Data`` instead.
 Usage::
 
     # Random articles (default)
-    python tools/data_retrieval/download_wikipedia_random.py --count 50
+    python tools/data_retrieval/download_wikipedia.py --count 50
 
     # Specific articles from URLs
-    python tools/data_retrieval/download_wikipedia_random.py \\
+    python tools/data_retrieval/download_wikipedia.py \\
         --strategy specific --urls "https://en.wikipedia.org/wiki/Alan_Turing" ...
 
     # Degree-targeted
-    python tools/data_retrieval/download_wikipedia_random.py \\
+    python tools/data_retrieval/download_wikipedia.py \\
         --strategy degree --count 50 --target-degree 5.0
 """
 

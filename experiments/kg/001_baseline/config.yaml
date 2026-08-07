@@ -26,11 +26,12 @@ input:
   paths:
     - "data/wikipedia/"
   dataset:
-    name: "wikipedia_random"
+    name: "wikipedia"
     params:
-      count: 2
-      strategy: "degree"
-      target_degree: 1
+      sampler:
+        type: "degree"
+        count: 2
+        target_degree: 1
 
 neo4j:
   upload: false

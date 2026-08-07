@@ -61,9 +61,11 @@ input:
   # Supported dataset names: see Data.list()
   #
   # dataset:
-  #   name: "wikipedia_random"
+  #   name: "wikipedia"
   #   params:
-  #     count: 100
+  #     sampler:
+  #       type: "random"
+  #       count: 100
   #     language: "en"
 
 # ── Output ──────────────────────────────────────────────────────────────────

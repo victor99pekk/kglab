@@ -7,8 +7,8 @@ Usage:
     # Direct pipeline usage (backward compatible)
     python main.py                                              # Baseline pipeline
     python main.py --variant baseline --input data/my_corpus/   # Custom input
-    python main.py --neo4j                                      # Upload to Neo4j
-    python main.py --neo4j --clear-neo4j                        # Wipe then upload
+    python main.py --neo4j                                      # Stream directly into Neo4j
+    python main.py --neo4j --clear-neo4j                        # Wipe Neo4j then stream
     python main.py --ontology configs/my_ontology.yaml          # Custom ontology
 
 Create custom pipelines in src/polygraph/pipelines/
@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from polygraph._shared.run_manifest import next_run_dir
 from polygraph._shared.stage_config import LinkingConfig
+from polygraph.kg_eval import evaluate_kg
 from polygraph.pipelines import PIPELINE_REGISTRY
 
 load_dotenv()
@@ -81,13 +82,13 @@ def main() -> None:
         "--neo4j",
         action="store_true",
         default=False,
-        help="Upload the exported KG to Neo4j after the pipeline completes.",
+        help="Stream the KG directly into Neo4j while building (no in-memory graph).",
     )
     parser.add_argument(
         "--clear-neo4j",
         action="store_true",
         default=False,
-        help="Wipe the Neo4j database before uploading (requires --neo4j).",
+        help="Wipe the Neo4j database before streaming (requires --neo4j).",
     )
     parser.add_argument(
         "--linking",
@@ -115,19 +116,24 @@ def main() -> None:
     pipeline_kwargs: dict = {}
     if args.ontology:
         pipeline_kwargs["ontology_path"] = str(args.ontology)
+    if args.neo4j:
+        # Stream the KG directly into Neo4j during the build — no in-memory
+        # graph, and the returned graph_store is a live Neo4jGraphStore.
+        pipeline_kwargs["graph_store_backend"] = "neo4j"
+        pipeline_kwargs["graph_store_options"] = {"clear": args.clear_neo4j}
 
     output_dir = _resolve_output_dir(args.output)
     pipeline = pipeline_cls(
         linking=LinkingConfig(enabled=args.linking),
         **pipeline_kwargs,
     )
-    pipeline.execute(
+    kg = pipeline.execute(
         input_paths=[str(p) for p in args.input],
         output_dir=str(output_dir),
     )
 
-    if args.neo4j:
-        pipeline.upload_to_neo4j(clear=args.clear_neo4j)
+    # Evaluation is external to the pipeline — score the built KG here.
+    evaluate_kg(kg, output_dir=output_dir)
 
 
 if __name__ == "__main__":

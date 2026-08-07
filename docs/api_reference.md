@@ -58,13 +58,17 @@ to create variants.
 | Method | Signature | Description |
 |---|---|---|
 | `__init__` | `(input_paths, output_dir, **kwargs)` | Set up input/output paths |
-| `preprocess()` | `() -> list[Document]` | **Abstract.** Raw files → clean chunks. |
-| `build_kg(chunks)` | `(list[Document]) -> dict` | **Abstract.** Chunks → KG dict with `graph`, `entities`, `triples`. |
-| `evaluate(kg, llm_client=None)` | `(dict, callable?) -> dict` | Run quality metrics. Pass `llm_client` for accuracy eval. |
-| `export(kg)` | `(dict) -> None` | Export to JSON (and GraphML if `graphml=True` in config). |
-| `upload_to_neo4j(clear=False)` | `(bool) -> None` | Upload exported KG JSON to Neo4j. |
+| `preprocess()` | `() -> list[Document] \| PreprocessResult` | **Abstract.** Raw files → clean chunks (may carry pre-extracted entities/triples). |
+| `build_kg(chunks)` | `(list[Document] \| PreprocessResult) -> dict` | **Abstract.** Chunks → KG dict with `graph`, `entities`, `triples`. |
+| `export(kg, config=None)` | `(dict, ExportConfig?) -> None` | Export per `ExportConfig.formats` (JSON default; GraphML/Neo4j opt-in). |
+| `upload_to_graph_db(backend="neo4j", clear=False)` | `(str, bool) -> None` | Upload exported KG JSON to a graph DB (Neo4j only). |
+| `upload_to_neo4j(clear=False)` | `(bool) -> None` | Alias for `upload_to_graph_db(backend="neo4j")`. |
 | `generate_training_data(kg, chunks)` | `(dict, list[Document]) -> None` | Generate QA pairs for LLM fine-tuning. |
-| `execute()` | `() -> None` | Full pipeline: preprocess → build → evaluate → export. |
+| `execute(input_paths=None, output_dir=None, export_config=None, cache=False, force=False)` | `(...) -> dict` | Full pipeline: preprocess → build → export. Returns the built KG. |
+
+> **Evaluation is not part of `Pipeline`.** Pipelines only build + export.
+> Score the returned KG with `polygraph.kg_eval.evaluate_kg(kg, output_dir=...)`,
+> or use `BenchmarkRunner`, which evaluates automatically.
 
 ---
 
@@ -86,6 +90,15 @@ Baseline(
     build=BuildConfig(method="networkx", graphml=False),
 )
 ```
+
+### `Semantic` / `StreamingPipeline`
+
+Additional bundled variants:
+
+- `Semantic(input_paths=..., output_dir=...)` — Baseline with semantic chunking/resolution defaults.
+- `StreamingPipeline(...)` — memory-bounded, disk-backed pipeline for large corpora.
+
+`PIPELINE_REGISTRY` already maps `"baseline"`, `"surface"` (legacy alias), and `"semantic"`.
 
 ---
 
@@ -134,6 +147,23 @@ PIPELINE_REGISTRY["my_variant"] = MyPipeline
 | `method` | `str` | `"networkx"` | Graph construction backend |
 | `graphml` | `bool` | `False` | Also export GraphML |
 
+### `PreprocessConfig` / `PreprocessStage`
+
+Tiered preprocessing control:
+
+- **Tier 1 knobs**: `clean_enabled`, `link_normalize_enabled`, `quality_min_chars` (200), `quality_min_words` (40), `doc_dedup_method` (`"layered"`), `doc_dedup_threshold` (0.85), `chunk_method` (`"semantic"`), `chunk_target_tokens` (450), `chunk_overlap_tokens` (60), `chunk_dedup_method`, `chunk_dedup_threshold`.
+- **Tier 2** — explicit `stages=[PreprocessStage("load"), PreprocessStage("chunk", "semantic", options={...}), ...]` (overrides knobs).
+
+`PreprocessStage(name, method="default", enabled=True, options={})` — one named pipeline step.
+
+### `EvalConfig` / `ExportConfig` / `LinkingConfig`
+
+| Config | Fields | Default |
+|---|---|---|
+| `EvalConfig` | `quality_enabled`, `structural_enabled`, `accuracy_enabled` | `True, True, False` |
+| `ExportConfig` | `formats` (`"json"`, `"graphml"`, `"neo4j"`), `neo4j_clear` | `["json"], False` |
+| `LinkingConfig` | `method`, `enabled`, `options` | `"", False, {}` |
+
 ---
 
 ## Pre-processing (`polygraph.preprocess`)
@@ -166,15 +196,23 @@ Each stage is a callable namespace. Available methods per stage:
 
 | Function | Description |
 |---|---|
-| `dedup.remove_duplicates(docs, method, threshold)` | Remove near-duplicate documents. Methods: `"minhash"`, `"exact"`, `"semantic"`. |
+| `dedup.remove_duplicates(docs, method="layered", threshold=0.85)` | Remove near-duplicate documents. Methods: `"layered"` (default), `"minhash"`, `"semantic"`. |
 
 ### `chunk`
 
 | Function | Description |
 |---|---|
-| `chunk.by_sentence(docs, target_tokens, overlap_tokens)` | Split by sentence boundaries |
-| `chunk.by_fixed(docs, chunk_size, overlap)` | Split by fixed token count |
-| `chunk.by_semantic(docs, target_tokens, overlap_tokens)` | Split at semantic boundaries |
+| `chunk.by_sentence(docs, target_tokens=450, overlap_tokens=60)` | Split by sentence boundaries |
+| `chunk.by_fixed(docs, size=500, overlap=100)` | Split by fixed token count |
+| `chunk.by_semantic(docs, target_tokens=450, overlap_tokens=60)` | Split at semantic boundaries |
+
+### `link`
+
+| Function | Description |
+|---|---|
+| `link.normalize_links(docs)` | Normalize hyperlink markup in documents |
+
+Also available: `load.stream(paths)` (streaming loader) and the class API — `DataLoader`, `TextCleaner`, `QualityFilter`, `Deduplicator`, `SentenceChunker`, `SemanticChunker`, `TextChunker`, `Preprocessor`, `DefaultPreprocessor`.
 
 ---
 
@@ -220,6 +258,16 @@ resolved = resolve.by_embedding(
 )
 ```
 
+### `link.entities()`
+
+```python
+from polygraph.kg_build import link
+
+linked = link.entities(resolved, method="wikidata")  # adds kb_id / kb_source
+```
+
+Registry: `LINKER_REGISTRY`; base contract: `EntityLinker` (`linker.link(entity)`). Add backends via `LINKER_REGISTRY["my_kb"] = MyLinker`.
+
 ### `build.from_resolved()`
 
 ```python
@@ -252,11 +300,18 @@ pipe = Baseline(..., build=BuildConfig(method="sqlite"))
 ## KG Evaluation (`polygraph.kg_eval`)
 
 ```python
-from polygraph.kg_eval import metrics, structural
+from polygraph.kg_eval import metrics, structural, evaluate_kg
 from polygraph.kg_eval.metrics import AccuracyEvaluator
 
+# One-shot: quality + structural, writes metrics.json
+# (this is what BenchmarkRunner uses after pipeline.execute())
+report = evaluate_kg(kg, output_dir="output/")
+
+# Or compose the pieces yourself:
 # Basic quality metrics (no LLM needed)
 report = metrics.evaluate(graph, entities, triples)
+# Attribute coverage score (no LLM)
+metrics.completeness(entities)
 
 # Structural audit (ontology compliance, connectivity, etc.)
 audit = structural.run(graph, entities, triples, ontology_path="configs/default_ontology.yaml")
@@ -280,6 +335,7 @@ ge.export(graph, entities, triples, output_dir, formats=["json", "graphml", "neo
 # Function API — one call per format
 exporter.to_json(graph, entities, triples, "output/kg.json")
 exporter.to_graphml(graph, "output/kg.graphml")
+exporter.to_neo4j("output/kg.json", clear=False)  # alias for to_graph_db(backend="neo4j")
 
 # Graph database upload (Neo4j is the only currently supported backend)
 exporter.to_graph_db("output/kg.json", backend="neo4j", clear=False)
@@ -329,14 +385,6 @@ runner = BenchmarkRunner(
     output_dir="output/my_exp/",
 )
 result = runner.run()
-
-# Compare two pipelines side by side
-results = BenchmarkRunner.compare(
-    baseline=Baseline,
-    variant=MyPipeline,
-    input_paths=["data/wikipedia/"],
-    output_dir="output/comparison/",
-)
 ```
 
 ### `BenchmarkRunner`
@@ -345,7 +393,6 @@ results = BenchmarkRunner.compare(
 |---|---|
 | `BenchmarkRunner(pipeline, input_paths, output_dir, ...)` | Direct constructor — no YAML needed |
 | `BenchmarkRunner.from_config(config)` | Create from an `ExperimentConfig` (YAML) |
-| `BenchmarkRunner.compare(baseline, variant, input_paths, output_dir)` | Run two pipelines side by side |
 | `.run()` → `BenchmarkResult` | Execute and return results |
 
 ### `BenchmarkResult`
@@ -358,7 +405,18 @@ results = BenchmarkRunner.compare(
 | `.metrics` | `dict` | Raw metrics dict |
 | `.structural_audit` | `dict` | Ontology compliance audit |
 | `.artifacts` | `dict` | Paths to generated files |
-| `.wall_time_s` | `float` | Elapsed time (via `metrics`) |
+
+### `Benchmark` (stage benchmarks)
+
+```python
+from polygraph.benchmark_pipeline import Benchmark
+
+result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+    pipelines={"baseline": Baseline(), "semantic": Semantic()}
+)
+```
+
+Stages: `Dedup`, `Resolution`, `Chunking`, `Extraction`, `Quality`, `RAG`. Pass **any number of pipelines** to `pipelines={...}` to compare them head-to-head (this is the replacement for the removed `BenchmarkRunner.compare`). Runners return `StageResult` (`.best_pipeline()`, `.to_dict()`); helpers: `write_report()`, `format_stage(s)`.
 
 ### YAML config (for reproducibility)
 
@@ -377,10 +435,37 @@ See `experiments/kg/_template/config.yaml` for the full config schema.
 ## Data Download (`polygraph.data`)
 
 ```python
-from polygraph.data import Data
+from polygraph.data import Data, DegreeSampler, RandomSampler, SpecificSampler
 
-Data.download("wikipedia_random", path="data/wikipedia/articles.jsonl", enrich=True)
+Data.list()                                                            # available datasets
+Data.download("wikipedia", sampler=RandomSampler(count=20))
+Data.download("wikipedia", path="data/wikipedia/articles.jsonl", force=False)
+Data.download("wikipedia", sampler=SpecificSampler(urls=[...]))
+Data.download("wikipedia", sampler=DegreeSampler(count=50, target_degree=5.0))
+Data.enrich("wikipedia", input_path="data/wikipedia/articles.jsonl")
 ```
+
+`Data.download("wikipedia", ...)` samples articles via a sampler object:
+`RandomSampler` (reservoir-samples from HuggingFace, default), `SpecificSampler`
+(explicit URLs or a URL file), or `DegreeSampler` (grows a connected, link-rich
+set to a target average hyperlink degree). Shared options — `language`, `snapshot`,
+`append` — stay at the top level. Downloads are automatically enriched with
+outgoing Wikipedia hyperlinks; `Data.enrich(...)` re-enriches an existing file.
+
+`Data.info(name)` returns dataset metadata. `DATASET_REGISTRY` holds all entries: Wikipedia + NER/dedup/resolution/quality/chunking/RAG benchmarks.
+
+---
+
+## Fine-tuning & Models
+
+```python
+from polygraph.finetune.dataset import QADatasetGenerator
+
+gen = QADatasetGenerator(language="en", seed=42, max_hops=3, test_split=0.2)
+pairs = gen.generate_from_kg(graph, entities, triples)  # {split: [QA pairs]}
+```
+
+`polygraph.models` provides pluggable model backends (node classification, entity resolution) via `polygraph.models.registry`.
 
 ---
 
@@ -397,10 +482,15 @@ from polygraph.kg_build.extract import Entity
 | `name` | `str` | Entity surface form |
 | `label` | `str` | Entity type (e.g. `"PERSON"`) |
 | `mentions` | `list[str]` | All text mentions |
+| `attributes` | `dict` | Arbitrary entity attributes |
 | `confidence` | `float` | Extraction confidence (0–1) |
 | `description` | `str` | Optional description |
 | `source` | `str` | Source chunk ID |
 | `embedding` | `list[float] \| None` | Vector embedding (if computed) |
+| `node_id` | `str` | Optional explicit node ID |
+| `source_chunk_ids` | `list[str]` | Chunks that mention this entity |
+
+Properties: `.id` (resolved node ID), `.aliases` (normalized mentions), `.displayName`.
 
 ### `EntityExtractor` (ABC)
 

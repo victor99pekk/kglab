@@ -2,10 +2,10 @@
 
 .. code-block:: python
 
-    from polygraph.data import Data
+    from polygraph.data import Data, RandomSampler
 
     Data.list()
-    Data.download("wikipedia_random", path="data/wikipedia/", count=100, enrich=True)
+    Data.download("wikipedia", path="data/wikipedia/", sampler=RandomSampler(count=100))
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ class Data:
         """Return metadata for a supported dataset.
 
         Args:
-            name: Dataset short name (e.g., ``"wikipedia_random"``).
+            name: Dataset short name (e.g., ``"wikipedia"``).
 
         Returns:
             Dict with ``name``, ``description``, ``has_enrich``, ``has_download``.
@@ -69,38 +69,42 @@ class Data:
     @staticmethod
     def download(
         name: str,
-        path: str | Path,
-        enrich: bool = False,
+        path: str | Path | None = None,
         force: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Download (and optionally enrich) a supported dataset.
+        """Download a supported dataset and always run its enrichment step.
 
-        By default, skips download if *path* already exists and is non-empty.
-        Set ``force=True`` to always re-download.
+        By default, skips download if the target path already exists and is
+        non-empty.  Set ``force=True`` to always re-download.  When the
+        dataset supports enrichment (e.g., Wikipedia hyperlinks), it is run
+        after every call — enrichment itself is cached and skips records that
+        already contain the enrichment fields.
 
         Args:
-            name: Dataset short name (e.g., ``"wikipedia_random"``).
-            path: Output path for the downloaded JSONL file.
-            enrich: If ``True``, run the enrichment step after download.
-            force: If ``True``, re-download even if *path* already has data.
+            name: Dataset short name (e.g., ``"wikipedia"``).
+            path: Output path for the downloaded JSONL file.  Defaults to
+                ``data/{name}.jsonl``.
+            force: If ``True``, re-download even if the file already has data.
             **kwargs: Passed to the dataset-specific download function
-                      (e.g., ``count=100`` for ``wikipedia_random"``).
+                      (e.g., ``sampler=RandomSampler(count=100)`` for
+                      ``"wikipedia"``).  ``language`` and ``delay`` are also
+                      forwarded to the enrichment step when supported.
 
         Returns:
             Dict with ``dataset``, ``path``, ``cached`` (``True`` if skipped),
             ``downloaded`` (record count, if not cached), and ``enriched``
-            (record count, only when ``enrich=True``).
+            (record count, only for datasets that support enrichment).
 
         Raises:
             ValueError: If the dataset name is unknown.
         """
 
         entry = _resolve(name)
-        result: dict[str, Any] = {"dataset": name, "path": str(path)}
+        target = Path(path) if path is not None else Path("data") / f"{name}.jsonl"
+        result: dict[str, Any] = {"dataset": name, "path": str(target)}
 
         # Cache check: skip if file already has data (unless forced)
-        target = Path(path)
         if not force and _file_has_records(target):
             result["cached"] = True
             result["downloaded"] = 0
@@ -109,21 +113,20 @@ class Data:
             )
         else:
             download_fn = _import_fn(entry["download"])
-            count = download_fn(path=path, **kwargs)
+            count = download_fn(path=target, **kwargs)
             result["downloaded"] = count
             result["cached"] = False
 
-        if enrich and entry.get("enrich"):
+        # Enrichment always runs when the dataset supports it (cached internally).
+        if entry.get("enrich"):
             enrich_fn = _import_fn(entry["enrich"])
             # Only pass kwargs that the enrich function accepts
             enrich_kwargs: dict[str, Any] = {}
             for key in ("language", "delay"):
                 if key in kwargs:
                     enrich_kwargs[key] = kwargs[key]
-            enriched = enrich_fn(input_path=path, force=force, **enrich_kwargs)
+            enriched = enrich_fn(input_path=target, force=force, **enrich_kwargs)
             result["enriched"] = enriched
-        elif enrich and not entry.get("enrich"):
-            raise ValueError(f"Dataset '{name}' does not support enrichment.")
 
         return result
 
@@ -142,7 +145,7 @@ class Data:
         re-enrich.
 
         Args:
-            name: Dataset short name (e.g., ``"wikipedia_random"``).
+            name: Dataset short name (e.g., ``"wikipedia"``).
             input_path: Path to the existing JSONL file.
             output_path: Where to write enriched output (defaults to overwriting input).
             force: If ``True``, re-enrich even if records already have links.

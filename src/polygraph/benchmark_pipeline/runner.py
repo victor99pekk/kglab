@@ -1,4 +1,4 @@
-"""Benchmark runner — run pipelines and compare results.
+"""Benchmark runner — run a pipeline and collect standardized results.
 
 Simple usage (no YAML needed)::
 
@@ -13,25 +13,14 @@ Simple usage (no YAML needed)::
     result = runner.run()
     print(f"Score: {result.overall_score:.2f}")
 
-Compare two pipelines::
-
-    from polygraph.benchmark_pipeline import BenchmarkRunner
-    from polygraph.pipelines import Baseline
-
-    results = BenchmarkRunner.compare(
-        baseline=Baseline,
-        variant=MyPipeline,
-        input_paths=["data/wikipedia/"],
-        output_dir="output/comparison/",
-    )
-    print(f"Baseline: {results['baseline'].overall_score:.2f}")
-    print(f"Variant:  {results['variant'].overall_score:.2f}")
-
 YAML config (for reproducibility)::
 
     config = ExperimentConfig.from_yaml("experiments/001_baseline/config.yaml")
     runner = BenchmarkRunner.from_config(config)
     result = runner.run()
+
+To compare pipelines, pass multiple ones into a stage benchmark
+(``Benchmark.<Stage>.run(pipelines={...})``) instead.
 """
 
 from __future__ import annotations
@@ -74,9 +63,9 @@ class BenchmarkRunner:
     def help(cls) -> str:
         """Return a guide to using BenchmarkRunner.
 
-        Covers the two main usage modes (direct and YAML-config),
-        the comparison API, and the difference between whole-pipeline
-        benchmarks and stage-specific benchmarks.
+        Covers the two main usage modes (direct and YAML-config)
+        and the difference between whole-pipeline benchmarks and
+        stage-specific benchmarks.
 
         Example::
 
@@ -103,13 +92,6 @@ class BenchmarkRunner:
             '       config = ExperimentConfig.from_yaml("experiments/001/config.yaml")\n'
             "       runner = BenchmarkRunner.from_config(config)\n"
             "       result = runner.run()\n\n"
-            "Comparison mode (run two pipelines side-by-side):\n"
-            "       results = BenchmarkRunner.compare(\n"
-            "           baseline=Baseline,\n"
-            "           variant=MyPipeline,\n"
-            '           input_paths=["data/wikipedia/"],\n'
-            '           output_dir="output/comparison/",\n'
-            "       )\n\n"
             "Result output (per run):\n"
             "  • knowledge_graph.json  — the KG artifact\n"
             "  • metrics.json          — overall_score, completeness,\n"
@@ -173,60 +155,6 @@ class BenchmarkRunner:
         runner.pipeline = None
         return runner
 
-    # ── Comparison ──────────────────────────────────────────────
-
-    @staticmethod
-    def compare(
-        baseline: type[Pipeline],
-        variant: type[Pipeline],
-        input_paths: list[str | Path],
-        output_dir: str | Path = "output/comparison",
-        *,
-        baseline_kwargs: dict[str, Any] | None = None,
-        variant_kwargs: dict[str, Any] | None = None,
-    ) -> dict[str, BenchmarkResult]:
-        """Run two pipelines side by side and return both results.
-
-        Args:
-            baseline: The reference pipeline class (e.g. ``Baseline``).
-            variant: The new pipeline class to compare against baseline.
-            input_paths: Shared input data for both pipelines.
-            output_dir: Parent directory — each pipeline gets a subdirectory.
-            baseline_kwargs: Extra kwargs for the baseline pipeline constructor.
-            variant_kwargs: Extra kwargs for the variant pipeline constructor.
-
-        Returns:
-            Dict with keys ``"baseline"`` and ``"variant"``, each mapping to
-            the respective ``BenchmarkResult``.
-
-        Example::
-
-            results = BenchmarkRunner.compare(
-                baseline=Baseline,
-                variant=LLMPipeline,
-                input_paths=["data/wikipedia/"],
-                output_dir="output/llm_vs_baseline/",
-            )
-            improvement = results["variant"].overall_score - results["baseline"].overall_score
-            print(f"LLM pipeline improved score by {improvement:+.2f}")
-        """
-        base_dir = Path(output_dir)
-        results: dict[str, BenchmarkResult] = {}
-
-        for label, cls, kwargs in [
-            ("baseline", baseline, baseline_kwargs or {}),
-            ("variant", variant, variant_kwargs or {}),
-        ]:
-            runner = BenchmarkRunner(
-                pipeline=cls,
-                input_paths=[str(p) for p in input_paths],
-                output_dir=base_dir / label,
-                **kwargs,
-            )
-            results[label] = runner.run()
-
-        return results
-
     # ── Public API ──────────────────────────────────────────────
 
     def run(self) -> BenchmarkResult:
@@ -259,20 +187,25 @@ class BenchmarkRunner:
             pipeline_kwargs["ontology_path"] = str(self._ontology_path)
         pipeline_kwargs.update(self._extra)
 
-        pipeline = self._pipeline_cls(
-            extraction=self._extraction,
-            resolution=self._resolution,
-            build=self._build,
-            **pipeline_kwargs,
-        )
+        # Typed stage configs — an ``extra`` key wins if provided, otherwise
+        # fall back to the runner-level config (avoids duplicate kwargs).
+        pipeline_kwargs.setdefault("extraction", self._extraction)
+        pipeline_kwargs.setdefault("resolution", self._resolution)
+        pipeline_kwargs.setdefault("build", self._build)
+
+        pipeline = self._pipeline_cls(**pipeline_kwargs)
         self.pipeline = pipeline
 
         t0 = time.perf_counter()
-        pipeline.execute(
+        kg = pipeline.execute(
             input_paths=[str(p) for p in self._input_paths],
             output_dir=str(output_dir),
         )
         elapsed_s = time.perf_counter() - t0
+
+        # Evaluation is external to pipelines — score the built KG here so
+        # every variant is measured identically.
+        self._evaluate_and_write(kg, output_dir)
 
         return self._collect_results(
             output_dir=output_dir,
@@ -306,10 +239,14 @@ class BenchmarkRunner:
                 dataset_path = dataset_path / "articles.jsonl"
 
             params = dict(config.dataset_params)
+            sampler_cfg = params.pop("sampler", None)
+            if sampler_cfg is not None:
+                from polygraph.data import sampler_from_config
+
+                params["sampler"] = sampler_from_config(sampler_cfg)
             Data.download(
                 config.dataset_name,
                 path=str(dataset_path),
-                enrich=True,
                 **params,
             )
 
@@ -329,23 +266,27 @@ class BenchmarkRunner:
 
             pipeline_kwargs["preprocess"] = PreprocessConfig.from_dict(raw_preprocess)
 
-        pipeline: Pipeline = pipeline_cls(
-            extraction=config.extraction,
-            resolution=config.resolution,
-            build=config.build,
-            **pipeline_kwargs,
-        )
+        # Typed stage configs — an ``extra`` key wins if provided, otherwise
+        # fall back to the runner-level config (avoids duplicate kwargs).
+        pipeline_kwargs.setdefault("extraction", config.extraction)
+        pipeline_kwargs.setdefault("resolution", config.resolution)
+        pipeline_kwargs.setdefault("build", config.build)
+
+        pipeline: Pipeline = pipeline_cls(**pipeline_kwargs)
 
         # 3. Execute
         self.pipeline = pipeline
         t0 = time.perf_counter()
-        pipeline.execute(
+        kg = pipeline.execute(
             input_paths=[str(p) for p in config.input_paths],
             output_dir=str(output_dir),
         )
         elapsed_s = time.perf_counter() - t0
 
-        # 4. Optional Neo4j upload
+        # 4. Evaluate (external to the pipeline) and write metrics.json
+        self._evaluate_and_write(kg, output_dir)
+
+        # 5. Optional Neo4j upload
         neo4j_uploaded = False
         if config.upload_neo4j:
             pipeline.upload_to_neo4j(clear=config.clear_neo4j)
@@ -360,6 +301,19 @@ class BenchmarkRunner:
         )
 
     # ── Shared result collection ────────────────────────────────
+
+    def _evaluate_and_write(self, kg: dict[str, Any] | None, output_dir: Path) -> None:
+        """Score the built KG and write ``metrics.json``.
+
+        Delegates to ``polygraph.kg_eval.evaluate_kg`` — pipelines only
+        build + export, the runner measures.  Pipelines without an
+        in-memory graph (e.g. Neo4j-backed streaming) have nothing to
+        score here; if they wrote their own ``metrics.json``, it is
+        respected.
+        """
+        from polygraph.kg_eval import evaluate_kg
+
+        evaluate_kg(kg, output_dir=output_dir)
 
     def _collect_results(
         self,

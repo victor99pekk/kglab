@@ -39,6 +39,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import networkx as nx
+
 from polygraph._shared import Document, Ontology
 from polygraph._shared.stage_config import (
     BuildConfig,
@@ -50,7 +52,16 @@ from polygraph._shared.stage_config import (
     PreprocessConfig,
     ResolutionConfig,
 )
-from polygraph.kg_build import build, extract, resolve
+from polygraph.kg_build import build, build_kg_into, extract, resolve
+from polygraph.kg_build.build.writer import NetworkXGraphWriter
+from polygraph.kg_export.graph_store import (
+    GraphStore,
+    Neo4jGraphStore,
+    NetworkXGraphStore,
+    SQLiteGraphStore,
+    create_graph_store,
+)
+from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
 from polygraph.pipelines._base import Pipeline
 from polygraph.preprocess import DefaultPreprocessor
 from polygraph.preprocess._base import Preprocessor
@@ -116,6 +127,9 @@ class Baseline(Pipeline):
         linking: LinkingConfig | None = None,
         eval_: EvalConfig | None = None,
         export: ExportConfig | None = None,
+        graph_store_backend: str | None = None,
+        graph_store_options: dict[str, Any] | None = None,
+        graph_store: GraphStore | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -134,6 +148,9 @@ class Baseline(Pipeline):
         self.linking = linking
         self.eval_config = eval_
         self.export_config = export
+        self.graph_store_backend = graph_store_backend
+        self.graph_store_options = graph_store_options or {}
+        self._target_store = graph_store
 
     # ── Language support (delegated) ───────────────────────────
 
@@ -162,15 +179,39 @@ class Baseline(Pipeline):
         """Delegate to the configured preprocessor."""
         return self._preprocessor.preprocess(self.input_paths)
 
-    def build_kg(self, chunks: list[Document] | Any) -> dict[str, Any]:
+    def build_kg(
+        self,
+        chunks: list[Document] | Any,
+        *,
+        existing_store: GraphStore | None = None,
+        graph_store: GraphStore | None = None,
+    ) -> dict[str, Any]:
         """Build the knowledge graph from chunks or a PreprocessResult.
 
         If ``chunks`` is a ``PreprocessResult`` and contains pre-extracted
         entities/triples, extraction is skipped and those are used directly.
+
+        Args:
+            existing_store: Optional ``GraphStore`` of an existing KG to
+                continue building on top of (new content is merged in).
+            graph_store: Optional pre-configured ``GraphStore`` to build into
+                and return — e.g. ``Neo4jGraphStore(uri=..., user=..., ...)``
+                so connection credentials are set once instead of per-call
+                ``graph_store_options``.
+
+        Returns:
+            Dict with ``graph``, ``entities``, ``triples``, and
+            ``graph_store`` (in-memory ``NetworkXGraphStore`` by default).
         """
         from polygraph._shared.types import PreprocessResult
 
         ontology = self._load_ontology()
+        existing_store = (
+            existing_store if existing_store is not None else getattr(self, "_existing_store", None)
+        )
+        target_store = (
+            graph_store if graph_store is not None else getattr(self, "_target_store", None)
+        )
         ext_cfg = self.extraction or ExtractionConfig.from_dict(self._config.get("extraction"))
 
         # ── Unpack PreprocessResult if provided ────────────────
@@ -306,25 +347,239 @@ class Baseline(Pipeline):
 
         # ── Build ──────────────────────────────────────────────
         bld_cfg = self.build or BuildConfig.from_dict(self._config.get("build"))
-        build_kwargs: dict[str, Any] = {}
-        if bld_cfg.method == "sqlite":
-            build_kwargs["db_path"] = str(self.output_dir / "knowledge_graph.db")
-        graph = build.from_resolved(
-            resolved,
-            triples,
-            method=bld_cfg.method,
-            ontology=ontology,
-            **build_kwargs,
-        )
+        backend = self.graph_store_backend
+        if backend in (None, "auto"):
+            if isinstance(target_store, Neo4jGraphStore):
+                backend = "neo4j"
+            else:
+                backend = "sqlite" if bld_cfg.method == "sqlite" else "networkx"
+
+        if backend == "neo4j":
+            # Stream the KG directly into Neo4j — no in-memory graph.
+            graph, store, neo4j_stats = self._build_kg_streaming_neo4j(
+                chunks, resolved, triples, target_store=target_store
+            )
+            print(
+                f"[build_kg] streamed {len(resolved)} entities / {len(triples)} triples "
+                f"to Neo4j ({neo4j_stats.get('nodes_written', 0)} nodes, "
+                f"{neo4j_stats.get('edges_written', 0)} edges)"
+            )
+        else:
+            if bld_cfg.method == "sqlite":
+                # SQLite remains a dedicated batch backend (file-backed).
+                build_kwargs: dict[str, Any] = {}
+                build_kwargs["db_path"] = str(self.output_dir / "knowledge_graph.db")
+                graph = build.from_resolved(
+                    resolved,
+                    triples,
+                    method="sqlite",
+                    ontology=ontology,
+                    **build_kwargs,
+                )
+            else:
+                # One shared build path for every backend: write through a
+                # GraphWriter via build_kg_into.  Chunk/Document nodes and
+                # PART_OF/NEXT edges are derived from `chunks`; only entity
+                # nodes and semantic/APPEARS_IN triples are passed in.
+                writer = NetworkXGraphWriter(ontology=ontology)
+                build_kg_into(
+                    writer,
+                    chunks,
+                    [e for e in resolved if e.get("type") not in ("Chunk", "Document")],
+                    [t for t in triples if t[1] not in ("part_of", "next")],
+                )
+                graph = writer.graph
+
+            # Continue building on top of an existing KG when one is provided.
+            if existing_store is not None:
+                if bld_cfg.method == "sqlite":
+                    raise NotImplementedError(
+                        "existing_store is currently supported for the default "
+                        "in-memory backend only (build method 'networkx')."
+                    )
+                graph = self._merge_existing_graph(graph, existing_store)
+
+            # Expose the built graph through the storage-agnostic GraphStore.
+            store = self._build_graph_store(graph, bld_cfg.method, resolved, triples)
+            neo4j_stats = None
 
         print(
             f"[build_kg] {len(entities)} entities → {len(resolved)} resolved, "
-            f"{graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges"
+            f"{graph.number_of_nodes() if graph is not None else 0} nodes, "
+            f"{graph.number_of_edges() if graph is not None else 0} edges"
         )
         result: dict[str, Any] = {"graph": graph, "entities": resolved, "triples": triples}
         if extra:
             result["extra"] = extra
+        if neo4j_stats is not None:
+            result["neo4j_stats"] = neo4j_stats
+
+        self._graph_store = store
+        result["graph_store"] = store
         return result
+
+    # ── GraphStore helpers ─────────────────────────────────────
+
+    def _build_graph_store(
+        self,
+        graph: Any,
+        method: str,
+        entities: list[dict[str, Any]],
+        triples: list[tuple],
+    ) -> GraphStore:
+        """Create the ``GraphStore`` for the built graph.
+
+        The storage backend is controlled by ``graph_store_backend``:
+
+        * ``None`` (default) — match the build method: in-memory
+          ``NetworkXGraphStore``, or ``SQLiteGraphStore`` for sqlite builds.
+        * ``"networkx"`` — in-memory representation (the built graph).
+        * ``"sqlite"`` — file-backed store (requires ``build.method="sqlite"``).
+        * ``"json"`` / ``"graphml"`` — export to a file and read it back.
+
+        ``"neo4j"`` is handled separately by ``_build_kg_streaming_neo4j``,
+        which streams the graph directly into Neo4j during the build stage.
+        """
+        backend = self.graph_store_backend
+        dict(self.graph_store_options)
+
+        if backend in (None, "auto"):
+            backend = "sqlite" if method == "sqlite" else "networkx"
+
+        if backend == "networkx":
+            return NetworkXGraphStore(graph)
+        if backend == "sqlite":
+            if method != "sqlite":
+                raise ValueError(
+                    "graph_store_backend='sqlite' requires build.method='sqlite' "
+                    "(an in-memory graph cannot back a SQLiteGraphStore)."
+                )
+            return SQLiteGraphStore(graph)
+        if backend == "json":
+            path = self._export_graph_file(graph, entities, triples, "json")
+            return create_graph_store("json", path=path)
+        if backend == "graphml":
+            path = self._export_graph_file(graph, entities, triples, "graphml")
+            return create_graph_store("graphml", path=path)
+        raise ValueError(
+            f"Unknown graph_store_backend '{backend}'. "
+            "Available: networkx, sqlite, neo4j, json, graphml"
+        )
+
+    def _build_kg_streaming_neo4j(
+        self,
+        chunks: list[Document],
+        resolved: list[dict[str, Any]],
+        triples: list[tuple],
+        target_store: GraphStore | None = None,
+    ) -> tuple[None, GraphStore, dict[str, int]]:
+        """Stream the KG directly into Neo4j — no in-memory graph.
+
+        Writes through the same shared ``build_kg_into`` routine used by the
+        in-memory path, but via ``Neo4jGraphBuilder``.  Chunk/Document nodes
+        and ``PART_OF`` / ``NEXT`` edges are derived from ``chunks``; only
+        entity nodes and semantic / ``APPEARS_IN`` triples are passed in.
+
+        Connection credentials come from ``target_store`` (a pre-configured
+        ``Neo4jGraphStore``) when provided, otherwise from
+        ``graph_store_options``.
+
+        Returns:
+            ``(graph=None, graph_store, stats)`` — the graph lives in Neo4j.
+        """
+        from polygraph.kg_export.neo4j.upload import _get_connection
+
+        options = dict(self.graph_store_options)
+        clear = bool(options.pop("clear", False))
+
+        # Reuse the credentials of a pre-configured store (set once), so the
+        # pipeline caller never repeats uri/user/password as arguments.
+        if isinstance(target_store, Neo4jGraphStore):
+            connection: dict[str, Any] = {
+                "uri": target_store.uri,
+                "user": target_store.user,
+                "password": target_store.password,
+            }
+        else:
+            connection = options
+
+        entity_nodes = [e for e in resolved if e.get("type") not in ("Chunk", "Document")]
+        semantic_triples = [t for t in triples if t[1] not in ("part_of", "next")]
+
+        driver = _get_connection(**connection)
+        stats: dict[str, int] = {}
+        try:
+            with driver.session() as session:
+                builder = Neo4jGraphBuilder(session, ontology=self._load_ontology())
+                if clear:
+                    builder.clear_database()
+                build_kg_into(builder, chunks, entity_nodes, semantic_triples)
+                stats = builder.stats
+        finally:
+            driver.close()
+
+        store: GraphStore = (
+            target_store
+            if isinstance(target_store, Neo4jGraphStore)
+            else create_graph_store("neo4j", **connection)
+        )
+        return None, store, stats
+
+    def _export_graph_file(
+        self,
+        graph: Any,
+        entities: list[dict[str, Any]],
+        triples: list[tuple],
+        fmt: str,
+    ) -> Path:
+        """Export the built graph to ``output_dir`` (JSON or GraphML)."""
+        from polygraph.kg_export.json.exporter import GraphExporter
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        GraphExporter().export(graph, entities, triples, output_dir=self.output_dir, formats=[fmt])
+        suffix = "json" if fmt == "json" else "graphml"
+        return self.output_dir / f"knowledge_graph.{suffix}"
+
+    def _merge_existing_graph(self, graph: Any, existing_store: GraphStore) -> Any:
+        """Merge a newly built graph onto an existing KG from a ``GraphStore``.
+
+        The existing graph is materialised (``to_networkx()``) and the new
+        nodes and edges are merged in — combining edge predicates, evidence
+        sentences, source chunks, and weights instead of duplicating edges.
+        """
+        existing = existing_store.to_networkx()
+        if not isinstance(existing, nx.DiGraph):
+            raise TypeError(
+                "existing_store must materialise to an nx.DiGraph "
+                "(e.g. NetworkXGraphStore or JSONGraphStore) to continue building."
+            )
+
+        for node, data in graph.nodes(data=True):
+            if node in existing:
+                existing.nodes[node].update(data)
+            else:
+                existing.add_node(node, **data)
+
+        for u, v, data in graph.edges(data=True):
+            if existing.has_edge(u, v):
+                edge = existing.edges[u, v]
+                for pred in data.get("predicates", []):
+                    if pred not in edge.get("predicates", []):
+                        edge["predicates"] = edge.get("predicates", []) + [pred]
+                edge["weight"] = len(edge.get("predicates", []))
+                for key in ("source_texts", "source_chunk_ids"):
+                    for item in data.get(key, []):
+                        if item not in edge.get(key, []):
+                            edge[key] = edge.get(key, []) + [item]
+                for rel in data.get("relations", []):
+                    if rel not in edge.get("relations", []):
+                        edge["relations"] = edge.get("relations", []) + [rel]
+                if data.get("description") and not edge.get("description"):
+                    edge["description"] = data["description"]
+            else:
+                existing.add_edge(u, v, **data)
+
+        return existing
 
     def execute(
         self,
@@ -332,12 +587,42 @@ class Baseline(Pipeline):
         output_dir: str | Path | None = None,
         cache: bool = False,
         force: bool = False,
-    ) -> None:
-        """Full pipeline, forwarding eval/export configs and paths."""
-        super().execute(
+        existing_store: GraphStore | None = None,
+        graph_store_backend: str | None = None,
+        graph_store_options: dict[str, Any] | None = None,
+        graph_store: GraphStore | None = None,
+    ) -> dict[str, Any]:
+        """Full pipeline, forwarding export config and paths.
+
+        Args:
+            existing_store: An existing ``GraphStore`` to continue building
+                on top of — new nodes/edges are merged into it instead of
+                starting from an empty graph.
+            graph_store_backend: Storage backend for the returned
+                ``"graph_store"``: ``None`` (auto, default), ``"networkx"``,
+                ``"sqlite"``, ``"neo4j"``, ``"json"``, or ``"graphml"``.
+                Overrides the constructor value for this run.
+            graph_store_options: Extra kwargs for the store backend (e.g.
+                ``uri`` / ``user`` / ``password`` / ``clear`` for Neo4j).
+            graph_store: A pre-configured ``GraphStore`` to build into and
+                return (e.g. ``Neo4jGraphStore(uri=..., user=..., ...)``) so
+                connection credentials are set once instead of per-call.
+
+        Returns:
+            The built KG dict (see ``Pipeline.execute``) — including
+            ``"graph_store"`` (in-memory ``NetworkXGraphStore`` by default).
+        """
+        if existing_store is not None:
+            self._existing_store = existing_store
+        if graph_store is not None:
+            self._target_store = graph_store
+        if graph_store_backend is not None:
+            self.graph_store_backend = graph_store_backend
+        if graph_store_options is not None:
+            self.graph_store_options = graph_store_options
+        return super().execute(
             input_paths=input_paths,
             output_dir=output_dir,
-            eval_config=self.eval_config,
             export_config=self.export_config,
             cache=cache,
             force=force,

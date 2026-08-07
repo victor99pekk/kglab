@@ -22,6 +22,11 @@ WIKI_STRATEGY     ?= random
 WIKI_TARGET_DEGREE ?= 3.0
 WIKI_EXCLUDE_NS   ?= Help:,Template:
 
+# Expands to ", seed=<N>" when WIKI_SEED is set, otherwise to nothing.
+# (The comma must live in a variable — it terminates the $(if ...) arguments.)
+COMMA := ,
+WIKI_SEED_ARG = $(if $(WIKI_SEED),$(COMMA) seed=$(WIKI_SEED),)
+
 GRAPH         ?= kg/001_baseline
 GRAPH_PATH    ?=
 
@@ -47,7 +52,7 @@ help:
 	@echo "   clean             Remove generated output folders"
 	@echo ""
 	@echo "── Data ─────────────────────────────────────────────"
-	@echo "   download-wikipedia  Download random Wikipedia articles as JSONL"
+	@echo "   download-wikipedia  Download + enrich Wikipedia articles as JSONL"
 	@echo "   enrich-wikipedia    Add outgoing hyperlinks to existing Wikipedia JSONL"
 	@echo "   wikipedia-full      Download + enrich Wikipedia articles in one step"
 	@echo ""
@@ -60,7 +65,11 @@ help:
 	@echo "── Pipeline ─────────────────────────────────────────"
 	@echo "   build-kg          Run the full pipeline (preprocess → build KG → evaluate → export)"
 	@echo "   experiment        Run an experiment from a YAML config (set EXP= path)"
-	@echo "   neo4j-upload      Upload a knowledge_graph.json to Neo4j (clears first)"
+	@echo "   neo4j-upload      Upload an existing knowledge_graph.json to Neo4j (clears first)"
+	@echo ""
+	@echo "── Neo4j ────────────────────────────────────────────"
+	@echo "   make build-kg NEO4J=1              # stream the KG directly into Neo4j while building"
+	@echo "   make build-kg NEO4J=1 CLEAR_NEO4J=1  # wipe Neo4j first, then stream"
 	@echo ""
 	@echo "── Pipeline Variants ────────────────────────────────"
 	@echo "   surface           Fast: spaCy sm + string matching resolution"
@@ -74,10 +83,11 @@ help:
 	@echo "   make test                                      # verify everything works"
 	@echo "   make build-kg                                  # baseline pipeline (default)"
 	@echo "   make build-kg VARIANT=semantic                  # semantic pipeline (recommended)"
+	@echo "   make build-kg NEO4J=1                           # stream directly into Neo4j"
 	@echo "   make experiment                                # baseline experiment (001)"
 	@echo "   make neo4j-upload GRAPH_PATH=generated_KGs/KG_0/knowledge_graph.json"
-	@echo "   make download-wikipedia WIKI_COUNT=50          # download 50 articles"
-	@echo "   make wikipedia-full WIKI_COUNT=50              # download + enrich 50 articles"
+	@echo "   make download-wikipedia WIKI_COUNT=50          # download + enrich 50 articles"
+	@echo "   make wikipedia-full WIKI_COUNT=50              # same as download-wikipedia (always enriches)"
 
 # ═══════════════════════════════════════════════════════════
 # Setup
@@ -131,37 +141,39 @@ test:
 ##   make download-wikipedia WIKI_STRATEGY=degree WIKI_COUNT=20 WIKI_TARGET_DEGREE=3.0
 ##   make download-wikipedia WIKI_EXCLUDE_NS=""  # include all namespaces
 download-wikipedia:
-	uv run python -c "from polygraph.data import Data; Data.download('wikipedia_random', path='$(WIKI_OUTPUT)', count=$(WIKI_COUNT), language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', max_scan=$(WIKI_MAX_SCAN), strategy='$(WIKI_STRATEGY)', target_degree=$(WIKI_TARGET_DEGREE), exclude_namespaces=[ns for ns in '$(WIKI_EXCLUDE_NS)'.split(',') if ns]$(if $(WIKI_SEED), seed=$(WIKI_SEED)))"
+	uv run python -c "from polygraph.data import Data, RandomSampler, SpecificSampler, DegreeSampler; \
+	sampler = DegreeSampler(count=$(WIKI_COUNT), target_degree=$(WIKI_TARGET_DEGREE), max_scan=$(WIKI_MAX_SCAN)$(WIKI_SEED_ARG), exclude_namespaces=[ns for ns in '$(WIKI_EXCLUDE_NS)'.split(',') if ns]) if '$(WIKI_STRATEGY)' == 'degree' else (SpecificSampler() if '$(WIKI_STRATEGY)' == 'specific' else RandomSampler(count=$(WIKI_COUNT), max_scan=$(WIKI_MAX_SCAN)$(WIKI_SEED_ARG))); \
+	Data.download('wikipedia', path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', sampler=sampler)"
 
 ## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
 enrich-wikipedia:
-	uv run python -c "from polygraph.data import Data; Data.enrich('wikipedia_random', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
+	uv run python -c "from polygraph.data import Data; Data.enrich('wikipedia', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
 
 ## download-data: Download Wikipedia data (edit values in tools/data_retrieval/download_data.py)
 download-data:
 	uv run python tools/data_retrieval/download_data.py
 
-## wikipedia-full: Download random articles + enrich with hyperlinks
-wikipedia-full: download-wikipedia enrich-wikipedia
+## wikipedia-full: Download + enrich Wikipedia articles (download always enriches)
+wikipedia-full: download-wikipedia
 	@echo "Done — $(WIKI_OUTPUT) ready with hyperlinks"
 
 ## benchmarks-data: Download and cache all benchmark gold datasets
 benchmarks-data:
 	uv run python -c "
-from polygraph.data import Data
-datasets = [
-    ('bench_ner',        'benchmarks/data/ner_gold.jsonl'),
-    ('bench_dedup',      'benchmarks/data/dedup_gold.jsonl'),
-    ('bench_resolution', 'benchmarks/data/resolution_gold.jsonl'),
-    ('bench_quality',    'benchmarks/data/quality_gold.jsonl'),
-    ('bench_rag',        'benchmarks/data/rag_gold.jsonl'),
-    ('bench_chunking',   'benchmarks/data/chunking_gold.jsonl'),
-]
-for name, path in datasets:
-    Data.download(name, path=path)
-    print(f'  {name} → {path}')
-print('Done — all benchmark datasets cached')
-"
+	from polygraph.data import Data
+	datasets = [
+	    ('bench_ner',        'benchmarks/data/ner_gold.jsonl'),
+	    ('bench_dedup',      'benchmarks/data/dedup_gold.jsonl'),
+	    ('bench_resolution', 'benchmarks/data/resolution_gold.jsonl'),
+	    ('bench_quality',    'benchmarks/data/quality_gold.jsonl'),
+	    ('bench_rag',        'benchmarks/data/rag_gold.jsonl'),
+	    ('bench_chunking',   'benchmarks/data/chunking_gold.jsonl'),
+	]
+	for name, path in datasets:
+	    Data.download(name, path=path)
+	    print(f'  {name} → {path}')
+	print('Done — all benchmark datasets cached')
+	"
 
 ## wikimedia-topic-labels-validate: Validate pinned Wikimedia manifest and taxonomy
 wikimedia-topic-labels-validate:

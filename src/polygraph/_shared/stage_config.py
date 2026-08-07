@@ -252,11 +252,11 @@ class PreprocessConfig:
 
 @dataclass
 class EvalConfig:
-    """Evaluation stage configuration.
+    """Evaluation configuration (recorded in run manifests).
 
     Controls which evaluation passes run after KG construction.
-    Accuracy evaluation requires an LLM client — pass one to
-    ``Pipeline.evaluate(llm_client=...)``.
+    Evaluation itself is external to pipelines — see
+    ``polygraph.kg_eval.evaluate_kg``.
     """
 
     quality_enabled: bool = True

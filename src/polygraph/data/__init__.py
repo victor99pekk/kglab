@@ -11,13 +11,19 @@ Adding a new dataset:
 
 Usage::
 
-    from polygraph.data import Data
+    from polygraph.data import Data, RandomSampler
 
     Data.list()
-    Data.download("wikipedia_random", path="data/wikipedia/", count=100, enrich=True)
+    Data.download("wikipedia", path="data/wikipedia/", sampler=RandomSampler(count=100))
 """
 
 from polygraph.data._api import Data
+from polygraph.data._wikipedia import (
+    DegreeSampler,
+    RandomSampler,
+    SpecificSampler,
+    sampler_from_config,
+)
 
 #: Supported datasets.  Each key is a short name, value is a dict with:
 #:
@@ -25,8 +31,8 @@ from polygraph.data._api import Data
 #: * ``download`` — ``"module.path:function_name"`` for downloading
 #: * ``enrich`` — ``"module.path:function_name"`` for enrichment (or ``None``)
 DATASET_REGISTRY = {
-    "wikipedia_random": {
-        "description": "Random Wikipedia articles from HuggingFace wikimedia/wikipedia",
+    "wikipedia": {
+        "description": "Wikipedia articles from HuggingFace wikimedia/wikipedia — sampler picks how to sample",
         "download": "polygraph.data._wikipedia:download_wikipedia",
         "enrich": "polygraph.data._wikipedia:enrich_wikipedia",
     },
@@ -77,4 +83,11 @@ DATASET_REGISTRY = {
     },
 }
 
-__all__ = ["Data", "DATASET_REGISTRY"]
+__all__ = [
+    "Data",
+    "DATASET_REGISTRY",
+    "RandomSampler",
+    "SpecificSampler",
+    "DegreeSampler",
+    "sampler_from_config",
+]

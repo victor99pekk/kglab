@@ -303,21 +303,19 @@ print(f"Num entities:  {result.num_entities}")
 print(f"Num triples:   {result.num_triples}")
 ```
 
-### Compare two pipelines
+### Compare pipelines with a benchmark test
+
+Every benchmark test accepts multiple pipelines and scores them side by side:
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner
+from polygraph.benchmark_pipeline import Benchmark
 from polygraph.pipelines import Baseline
 
-results = BenchmarkRunner.compare(
-    baseline=Baseline,
-    variant=MyCustomPipeline,
-    input_paths=["data/wikipedia/"],
-    output_dir="output/comparison/",
+result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+    pipelines={"baseline": Baseline(), "my_pipeline": MyCustomPipeline()},
 )
-
-for label, r in results.items():
-    print(f"{label}: score={r.overall_score:.2f}, entities={r.num_entities}")
+print(result)                  # aligned per-pipeline table
+print(result.best_pipeline())  # pipeline with the best score
 ```
 
 ### YAML config (for version-controlled experiments)

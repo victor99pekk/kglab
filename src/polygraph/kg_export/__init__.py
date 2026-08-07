@@ -13,12 +13,17 @@ Function API:
     # Backward-compatible alias
     exporter.to_neo4j("output/knowledge_graph.json", clear=False)
 
+    # Storage-agnostic graph interaction (read side)
+    store = create_graph_store("neo4j")  # or networkx / sqlite / json / graphml
+    store.number_of_nodes()
+
 Class API:
-    from polygraph.kg_export import GraphExporter
+    from polygraph.kg_export import GraphExporter, GraphStore, create_graph_store
 """
 
 from types import SimpleNamespace
 
+from polygraph.kg_export.graph_store import GraphStore, create_graph_store
 from polygraph.kg_export.json.exporter import GraphExporter
 
 # ── Function API ────────────────────────────────────────────────
@@ -70,4 +75,4 @@ exporter.to_graphml = _to_graphml
 exporter.to_graph_db = _to_graph_db
 exporter.to_neo4j = _to_neo4j
 
-__all__ = ["GraphExporter", "exporter"]
+__all__ = ["GraphExporter", "GraphStore", "create_graph_store", "exporter"]

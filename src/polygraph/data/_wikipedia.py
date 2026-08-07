@@ -22,6 +22,7 @@ import re
 import signal
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,132 @@ REQUEST_DELAY = 0.1  # seconds between Wikipedia API calls
 # Wikipedia namespace prefixes to skip during degree expansion.
 # These are meta/administrative pages, not encyclopedic articles.
 _DEFAULT_EXCLUDE_NAMESPACES = ["Help:", "Template:"]
+
+
+# ═══════════════════════════════════════════════════════════════
+# Samplers
+# ═══════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class RandomSampler:
+    """Reservoir-sample ``count`` random articles from HuggingFace.
+
+    Args:
+        count: Number of articles to sample.
+        seed: Reservoir-sampling seed (random if ``None``).
+        max_scan: Maximum streamed rows to inspect.
+        min_chars: Skip articles shorter than this character count.
+    """
+
+    count: int = 20
+    seed: int | None = None
+    max_scan: int = DEFAULT_MAX_SCAN
+    min_chars: int = 200
+
+    def __post_init__(self) -> None:
+        if self.count < 1:
+            raise ValueError("count must be positive")
+        if self.max_scan < 1:
+            raise ValueError("max_scan must be positive")
+        if self.min_chars < 0:
+            raise ValueError("min_chars must be non-negative")
+
+
+@dataclass(frozen=True)
+class SpecificSampler:
+    """Fetch articles from an explicit list of Wikipedia URLs.
+
+    Args:
+        urls: List of Wikipedia article URLs.
+        url_file: Path to a text file with one URL per line.
+    """
+
+    urls: list[str] | None = None
+    url_file: str | Path | None = None
+
+
+@dataclass(frozen=True)
+class DegreeSampler:
+    """Grow a connected set of articles to a target average hyperlink degree.
+
+    Args:
+        count: Number of articles to sample.
+        target_degree: Target average hyperlink degree.
+        max_articles: Hard cap on total articles (defaults to ``count * 5``).
+        exclude_namespaces: Wikipedia namespace prefixes to skip during degree
+            expansion (e.g., ``["Help:", "Template:"]``).  Defaults to
+            ``["Help:", "Wikipedia:", "Template:", "File:", "Category:",
+            "Portal:"]``.  Pass an empty list to include all pages.
+        seed: Reservoir-sampling seed for the seed set (random if ``None``).
+        max_scan: Maximum streamed rows to inspect for the seed set.
+        min_chars: Skip articles shorter than this character count.
+    """
+
+    count: int = 20
+    target_degree: float = 3.0
+    max_articles: int | None = None
+    exclude_namespaces: list[str] | None = None
+    seed: int | None = None
+    max_scan: int = DEFAULT_MAX_SCAN
+    min_chars: int = 200
+
+    def __post_init__(self) -> None:
+        if self.count < 2:
+            raise ValueError("count must be at least 2 for degree sampling")
+        if self.target_degree <= 0:
+            raise ValueError("target_degree must be positive")
+        if self.max_scan < 1:
+            raise ValueError("max_scan must be positive")
+        if self.min_chars < 0:
+            raise ValueError("min_chars must be non-negative")
+        if self.max_articles is not None and self.max_articles < self.count:
+            raise ValueError("max_articles must be >= count")
+
+
+#: Union of all built-in Wikipedia samplers.
+Sampler = RandomSampler | SpecificSampler | DegreeSampler
+
+
+_SAMPLER_REGISTRY: dict[str, type[Sampler]] = {
+    "random": RandomSampler,
+    "specific": SpecificSampler,
+    "degree": DegreeSampler,
+}
+
+
+def sampler_from_config(sampler_cfg: str | dict[str, Any] | Sampler) -> Sampler:
+    """Build a Wikipedia sampler from a config block.
+
+    Accepts a sampler instance (returned unchanged), a strategy name string
+    (``"random"``, ``"specific"``, ``"degree"``), or a dict with a ``type``
+    key plus the sampler's fields::
+
+        sampler_from_config("degree")
+        sampler_from_config({"type": "degree", "count": 50, "target_degree": 5.0})
+
+    Useful for YAML-driven configs (e.g. ``BenchmarkRunner``).
+
+    Raises:
+        ValueError: If the sampler type is unknown.
+        TypeError: If the config is neither a name, dict, nor sampler instance.
+    """
+    if isinstance(sampler_cfg, RandomSampler | SpecificSampler | DegreeSampler):
+        return sampler_cfg
+    if isinstance(sampler_cfg, str):
+        sampler_cfg = {"type": sampler_cfg}
+    if not isinstance(sampler_cfg, dict):
+        raise TypeError(
+            "sampler config must be a name, dict, or sampler instance — "
+            f"got {type(sampler_cfg).__name__}"
+        )
+    sampler_type = sampler_cfg.get("type", "random")
+    if sampler_type not in _SAMPLER_REGISTRY:
+        raise ValueError(
+            f"Unknown sampler '{sampler_type}'. Available: {', '.join(sorted(_SAMPLER_REGISTRY))}"
+        )
+    fields = {key: value for key, value in sampler_cfg.items() if key != "type"}
+    return _SAMPLER_REGISTRY[sampler_type](**fields)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -186,102 +313,71 @@ class HuggingFaceWikipediaClient:
 
 def download_wikipedia(
     path: str | Path,
-    count: int = 20,
+    sampler: Sampler | None = None,
     language: str = "en",
     snapshot: str = DEFAULT_SNAPSHOT,
-    seed: int | None = None,
-    max_scan: int = DEFAULT_MAX_SCAN,
-    min_chars: int = 200,
     append: bool = False,
-    strategy: str = "random",
-    urls: list[str] | None = None,
-    url_file: str | Path | None = None,
-    target_degree: float = 3.0,
-    max_articles: int | None = None,
-    exclude_namespaces: list[str] | None = None,
 ) -> int:
     """Download Wikipedia articles and write Polygraph JSONL.
 
-    Supports three strategies:
+    The ``sampler`` argument controls *how* articles are picked:
 
-    * ``"random"`` — reservoir-sample from HuggingFace (default).
-    * ``"specific"`` — fetch articles from a list of URLs or a file of URLs.
-    * ``"degree"`` — grow a connected set of articles to hit a target
+    * :class:`RandomSampler` — reservoir-sample from HuggingFace (default).
+    * :class:`SpecificSampler` — fetch articles from a list of URLs or a file of URLs.
+    * :class:`DegreeSampler` — grow a connected set of articles to hit a target
       average hyperlink degree.
+
+    Each sampler is a small config object with only the fields its strategy
+    needs, so irrelevant options can't be passed silently.
 
     Args:
         path: Output JSONL file path.
-        count: Number of articles to download.
+        sampler: How to sample articles.  Defaults to ``RandomSampler()``.
         language: Wikipedia language code (e.g., ``"en"``).
-        snapshot: HuggingFace dataset snapshot (for ``"random"`` strategy).
-        seed: Reservoir-sampling seed (random if ``None``).
-        max_scan: Maximum streamed rows to inspect.
-        min_chars: Skip articles shorter than this character count.
+        snapshot: HuggingFace dataset snapshot (used by ``RandomSampler`` and
+            ``DegreeSampler``).
         append: Append to existing file (skip already-present IDs).
-        strategy: ``"random"``, ``"specific"``, or ``"degree"``.
-        urls: List of Wikipedia article URLs (required for ``"specific"``).
-        url_file: Path to a text file with one URL per line (``"specific"``).
-        target_degree: Target average hyperlink degree (``"degree"`` strategy).
-        max_articles: Hard cap on total articles for degree strategy
-            (defaults to ``count * 5``).
-        exclude_namespaces: Wikipedia namespace prefixes to skip during
-            degree expansion (e.g., ``["Help:", "Template:"]``). Defaults to
-            ``["Help:", "Wikipedia:", "Template:", "File:", "Category:",
-            "Portal:"]``. Pass an empty list to include all pages.
 
     Returns:
         Number of records written.
+
+    Raises:
+        TypeError: If ``sampler`` is not a ``RandomSampler``, ``SpecificSampler``,
+            or ``DegreeSampler``.
     """
-    if strategy == "random":
+    if sampler is None:
+        sampler = RandomSampler()
+    if isinstance(sampler, RandomSampler):
         return _download_random(
             path=path,
-            count=count,
+            sampler=sampler,
             language=language,
             snapshot=snapshot,
-            seed=seed,
-            max_scan=max_scan,
-            min_chars=min_chars,
             append=append,
         )
-    elif strategy == "specific":
-        return _download_specific(
-            path=path,
-            urls=urls,
-            url_file=url_file,
-            language=language,
-            append=append,
-        )
-    elif strategy == "degree":
+    if isinstance(sampler, SpecificSampler):
+        return _download_specific(path=path, sampler=sampler, append=append)
+    if isinstance(sampler, DegreeSampler):
         return _download_degree_targeted(
             path=path,
-            count=count,
+            sampler=sampler,
             language=language,
             snapshot=snapshot,
-            seed=seed,
-            max_scan=max_scan,
-            min_chars=min_chars,
-            target_degree=target_degree,
-            max_articles=max_articles,
-            exclude_namespaces=exclude_namespaces,
         )
-    else:
-        raise ValueError(f"Unknown strategy '{strategy}'. Available: random, specific, degree")
+    raise TypeError(
+        "sampler must be a RandomSampler, SpecificSampler, or DegreeSampler — "
+        f"got {type(sampler).__name__}"
+    )
 
 
 def _download_random(
     path: str | Path,
-    count: int,
+    sampler: RandomSampler,
     language: str,
     snapshot: str,
-    seed: int | None,
-    max_scan: int,
-    min_chars: int,
     append: bool,
 ) -> int:
     """Reservoir-sample random articles from HuggingFace (original behaviour)."""
-    if count < 1:
-        raise ValueError("count must be positive")
-
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     existing_ids = _existing_ids(output) if append and output.exists() else set()
@@ -289,21 +385,23 @@ def _download_random(
     client = HuggingFaceWikipediaClient(
         language=language,
         snapshot=snapshot,
-        seed=seed,
-        max_scan=max_scan,
+        seed=sampler.seed,
+        max_scan=sampler.max_scan,
     )
-    candidates = client.fetch_random(count, min_chars=min_chars, excluded_ids=existing_ids)
+    candidates = client.fetch_random(
+        sampler.count, min_chars=sampler.min_chars, excluded_ids=existing_ids
+    )
 
     records = []
     for record in candidates:
         if record["id"] not in existing_ids:
             existing_ids.add(record["id"])
             records.append(record)
-        if len(records) == count:
+        if len(records) == sampler.count:
             break
-    if len(records) < count:
+    if len(records) < sampler.count:
         raise HuggingFaceDownloadError(
-            f"downloaded {len(records)} new articles; wanted {count}. "
+            f"downloaded {len(records)} new articles; wanted {sampler.count}. "
             "Increase --max-scan or use a different --seed."
         )
 
@@ -384,19 +482,17 @@ def _fetch_article_text(title: str, language: str = "en") -> dict[str, Any] | No
 
 def _download_specific(
     path: str | Path,
-    urls: list[str] | None,
-    url_file: str | Path | None,
-    language: str,
+    sampler: SpecificSampler,
     append: bool,
 ) -> int:
     """Download articles from a list of Wikipedia URLs or a URL file."""
-    if urls:
-        url_list = urls
-    elif url_file:
-        url_list = Path(url_file).read_text(encoding="utf-8").strip().splitlines()
+    if sampler.urls:
+        url_list = sampler.urls
+    elif sampler.url_file:
+        url_list = Path(sampler.url_file).read_text(encoding="utf-8").strip().splitlines()
     else:
         raise ValueError(
-            "strategy='specific' requires either 'urls' (list of URLs) or "
+            "SpecificSampler requires either 'urls' (list of URLs) or "
             "'url_file' (path to a text file with one URL per line)."
         )
 
@@ -459,15 +555,9 @@ def _download_specific(
 
 def _download_degree_targeted(
     path: str | Path,
-    count: int,
+    sampler: DegreeSampler,
     language: str,
     snapshot: str,
-    seed: int | None,
-    max_scan: int,
-    min_chars: int,
-    target_degree: float,
-    max_articles: int | None,
-    exclude_namespaces: list[str] | None = None,
 ) -> int:
     """Grow a connected set of articles to meet a target average hyperlink degree.
 
@@ -479,15 +569,17 @@ def _download_degree_targeted(
     """
     import time as _time
 
-    excluded = exclude_namespaces if exclude_namespaces is not None else _DEFAULT_EXCLUDE_NAMESPACES
+    excluded = (
+        sampler.exclude_namespaces
+        if sampler.exclude_namespaces is not None
+        else _DEFAULT_EXCLUDE_NAMESPACES
+    )
     if excluded:
         logger.info("Excluding Wikipedia namespaces: %s", excluded)
 
-    max_articles = max_articles or count * 5
-    if target_degree <= 0:
-        raise ValueError("target_degree must be positive")
-    if count < 2:
-        raise ValueError("Need at least 2 articles for degree calculation")
+    count = sampler.count
+    target_degree = sampler.target_degree
+    max_articles = sampler.max_articles or count * 5
 
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -497,10 +589,10 @@ def _download_degree_targeted(
     client = HuggingFaceWikipediaClient(
         language=language,
         snapshot=snapshot,
-        seed=seed,
-        max_scan=max_scan,
+        seed=sampler.seed,
+        max_scan=sampler.max_scan,
     )
-    records = client.fetch_random(seed_count, min_chars=min_chars)
+    records = client.fetch_random(seed_count, min_chars=sampler.min_chars)
 
     # Phase 2: enrich to discover links
     for record in records:

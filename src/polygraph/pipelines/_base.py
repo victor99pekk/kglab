@@ -8,11 +8,14 @@ import json
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from polygraph._shared import Document
 from polygraph._shared.run_manifest import RunManifest
-from polygraph._shared.stage_config import EvalConfig, ExportConfig
+from polygraph._shared.stage_config import ExportConfig
+
+if TYPE_CHECKING:
+    from polygraph.kg_export.graph_store import GraphStore
 
 
 class Pipeline(ABC):
@@ -31,8 +34,8 @@ class Pipeline(ABC):
         # — or —
         result = pipe.preprocess()
         kg = pipe.build_kg(result)
-        pipe.evaluate(kg)
         pipe.export(kg)
+        # evaluation is external: polygraph.kg_eval.evaluate_kg(kg)
     """
 
     def __init__(self, **kwargs: Any) -> None:
@@ -40,6 +43,17 @@ class Pipeline(ABC):
         self.output_dir: Path = Path(".")
         self._config = kwargs
         self._start_time: float | None = None
+        self._graph_store: GraphStore | None = None
+
+    @property
+    def graph_store(self) -> GraphStore | None:
+        """A ``GraphStore`` for the most recently built KG, or ``None``.
+
+        Lets downstream code keep querying the built graph (counts, lookups,
+        traversal, search) without knowing how it is stored.  Populated by
+        ``build_kg`` in pipeline subclasses (e.g. ``Baseline``).
+        """
+        return self._graph_store
 
     # ── Abstract stages (must implement) ────────────────────────
 
@@ -62,46 +76,6 @@ class Pipeline(ABC):
 
     # ── Default stages (override optional) ──────────────────────
 
-    def evaluate(
-        self,
-        kg: dict[str, Any],
-        llm_client: Any = None,
-        config: EvalConfig | None = None,
-    ) -> dict[str, Any]:
-        """Evaluate KG quality. Default: basic metrics + structural audit.
-
-        Args:
-            kg: Dict with ``graph``, ``entities``, ``triples`` keys.
-            llm_client: Optional LLM callable for accuracy evaluation.
-                When provided, also runs semantic accuracy and triple
-                classification checks. Provider-agnostic — any
-                ``(prompt: str) -> str`` callable works.
-            config: Evaluation configuration. If ``None``, runs quality
-                and structural evaluation (the default). Pass
-                ``EvalConfig(accuracy_enabled=True)`` to also run
-                accuracy checks with an LLM.
-        """
-        from polygraph.kg_eval import metrics, structural
-        from polygraph.kg_eval.metrics import AccuracyEvaluator
-
-        cfg = config or EvalConfig()
-        report: dict[str, Any] = {}
-
-        if cfg.quality_enabled:
-            report.update(metrics.evaluate(kg["graph"], kg["entities"], kg["triples"]))
-
-        if cfg.structural_enabled:
-            report["structural_audit"] = structural.run(kg["graph"], kg["entities"], kg["triples"])
-
-        if cfg.accuracy_enabled and llm_client is not None:
-            accuracy_eval = AccuracyEvaluator(llm_client=llm_client)
-            report["accuracy"] = accuracy_eval.evaluate(kg["graph"], kg["entities"], kg["triples"])
-
-        path = self.output_dir / "metrics.json"
-        path.write_text(json.dumps(report, indent=2, default=str))
-        print(f"[evaluate] overall_score={report.get('overall_score', 0):.2f} → {path}")
-        return report
-
     def export(self, kg: dict[str, Any], config: ExportConfig | None = None) -> None:
         """Export KG to configured formats.
 
@@ -112,6 +86,12 @@ class Pipeline(ABC):
         from polygraph.kg_export import exporter
 
         cfg = config or ExportConfig()
+
+        # No in-memory graph (e.g. streaming directly into Neo4j) — there is
+        # nothing to serialise to file formats.
+        if kg.get("graph") is None:
+            print("[export] no in-memory graph (stored in the backend) — skipping file export")
+            return
 
         for fmt in cfg.formats:
             if fmt == "json":
@@ -161,20 +141,25 @@ class Pipeline(ABC):
         """Upload the exported KG JSON to Neo4j (backward-compatible alias)."""
         self.upload_to_graph_db(backend="neo4j", clear=clear)
 
-    def generate_training_data(self, kg: dict[str, Any], chunks: list[Document]) -> None:
-        """Generate QA training pairs from KG (and raw chunks as baseline)."""
+    def generate_training_data(
+        self, kg: dict[str, Any], chunks: list[Document]
+    ) -> tuple[Path, Path]:
+        """Generate QA training pairs from KG (and raw chunks as baseline).
+
+        Returns:
+            Paths to the generated (train, test) JSONL files.
+        """
         from polygraph.finetune.dataset import QADatasetGenerator
 
         gen = QADatasetGenerator(language="en", seed=42, max_hops=3, test_split=0.2)
         out = self.output_dir / "training_data"
         out.mkdir(parents=True, exist_ok=True)
 
-        kg_qa = gen.generate_from_kg(kg["graph"], kg["entities"], kg["triples"])
-        for split_name, pairs in kg_qa.items():
-            (out / f"kg_grounded_{split_name}.json").write_text(
-                json.dumps(pairs, indent=2, ensure_ascii=False)
-            )
-        print(f"[training_data] KG-grounded pairs → {out}/")
+        train_path, test_path = gen.generate_from_kg(
+            kg["graph"], kg["entities"], kg["triples"], output_dir=out
+        )
+        print(f"[training_data] KG-grounded pairs → {train_path}")
+        return train_path, test_path
 
     # ── Orchestration ───────────────────────────────────────────
 
@@ -286,24 +271,29 @@ class Pipeline(ABC):
         self,
         input_paths: list[str | Path] | None = None,
         output_dir: str | Path | None = None,
-        eval_config: EvalConfig | None = None,
         export_config: ExportConfig | None = None,
         cache: bool = False,
         force: bool = False,
-    ) -> None:
-        """Full pipeline: preprocess → build → evaluate → export.
+    ) -> dict[str, Any]:
+        """Full pipeline: preprocess → build → export.
+
+        Evaluation is intentionally NOT part of the pipeline.  Score the
+        returned KG with ``polygraph.kg_eval.evaluate_kg`` (or run through
+        ``BenchmarkRunner``, which evaluates automatically).
 
         Args:
             input_paths: Data files or directories.  Replaces any previously
                 set value on the instance.  Required if not set at construction.
             output_dir: Where results are written.  Created if it doesn't exist.
-            eval_config: Evaluation configuration (optional).
             export_config: Export configuration (optional).
             cache: If True, skip the entire pipeline when
                 ``knowledge_graph.json`` and ``metrics.json`` already
                 exist for the current input hash.  Pass ``force=True``
                 to re-run regardless.
             force: Ignore cache and re-run all stages.
+
+        Returns:
+            The built KG dict (``graph``, ``entities``, ``triples``).
         """
         if input_paths is not None:
             self.input_paths = [Path(p) for p in input_paths]
@@ -328,7 +318,7 @@ class Pipeline(ABC):
                         f"(hash={cache_key[:8]}…) — skipping.\n"
                         f"        Pass force=True to re-run."
                     )
-                    return
+                    return {}
 
         print()
 
@@ -339,8 +329,8 @@ class Pipeline(ABC):
             self._cache_root.mkdir(parents=True, exist_ok=True)
             (self._cache_root / "hash.txt").write_text(self._pipeline_hash())
 
-        self.evaluate(kg, config=eval_config)
         self.export(kg, config=export_config)
         self._write_run_manifest(kg)
 
         print(f"\nDone — results in {self.output_dir}/")
+        return kg

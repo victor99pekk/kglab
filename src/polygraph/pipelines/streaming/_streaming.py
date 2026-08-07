@@ -108,14 +108,10 @@ class StreamingPipeline(Pipeline):
                 return chunk.by_sentence(docs)
 
             def build_kg_streaming(self, chunks, builder):
-                for i, c in enumerate(chunks):
-                    builder.merge_chunk(c.doc_id, text=c.content, index=i)
-
                 entities, triples = extract.with_methods(chunks, ontology)
-                for e in entities:
-                    builder.merge_entity(e["id"], name=e["name"], entity_type=e["type"])
-                for s, p, o in triples:
-                    builder.merge_edge(s, o, p)
+                # Shared, storage-agnostic build routine — the SAME call also
+                # works with NetworkXGraphWriter for an in-memory graph.
+                build_kg_into(builder, chunks, entities, triples)
     """
 
     def __init__(
@@ -223,26 +219,7 @@ class StreamingPipeline(Pipeline):
         )
         return {"graph": None, "entities": [], "triples": [], "neo4j_stats": stats}
 
-    def evaluate(self, kg: dict[str, Any] | None = None) -> dict[str, Any]:  # noqa: ARG002
-        """Evaluate KG quality by querying Neo4j.
-
-        Computes node/edge counts and label distributions directly from the
-        database.  Override to add custom metrics or LLM-based evaluation.
-        """
-        builder = self._require_builder()
-        stats = builder.compute_stats()
-        report: dict[str, Any] = {
-            "num_nodes": stats.get("num_nodes", 0),
-            "num_edges": stats.get("num_edges", 0),
-            "label_distribution": stats.get("label_distribution", {}),
-        }
-
-        path = self.output_dir / "metrics.json"
-        path.write_text(json.dumps(report, indent=2, default=str))
-        print(f"[evaluate] {report['num_nodes']} nodes, {report['num_edges']} edges → {path}")
-        return report
-
-    def export(self, kg: dict[str, Any] | None = None) -> None:  # noqa: ARG002
+    def export(self, kg: dict[str, Any] | None = None, config: Any = None) -> None:  # noqa: ARG002
         """Export the KG from Neo4j to JSON (and optionally GraphML).
 
         Streams nodes and edges directly from the Neo4j cursor to disk so
@@ -303,11 +280,16 @@ class StreamingPipeline(Pipeline):
 
     # ── Orchestration ──────────────────────────────────────────
 
-    def execute(self) -> None:
-        """Full pipeline: connect → clear → preprocess → stream → evaluate → export.
+    def execute(self) -> dict[str, Any]:
+        """Full pipeline: connect → clear → preprocess → stream → export.
 
         Manages the Neo4j connection lifecycle so subclasses only need to
         implement ``preprocess()`` and ``build_kg_streaming()``.
+        Evaluation is external — score the returned KG summary with
+        ``polygraph.kg_eval.evaluate_kg`` (graph is ``None`` for streaming).
+
+        Returns:
+            The KG summary dict (``graph=None``, ``neo4j_stats``, ...).
         """
         print(f"=== {self.__class__.__name__} ===")
         print(f"Input:  {self.input_paths}")
@@ -320,7 +302,7 @@ class StreamingPipeline(Pipeline):
                 print("[neo4j] Clearing database...")
                 self._require_builder().clear_database()
 
-            super().execute()
+            return super().execute()
         finally:
             self._disconnect()
 
@@ -330,7 +312,6 @@ class StreamingPipeline(Pipeline):
         self,
         batch_size: int = 100,
         *,
-        skip_evaluate: bool = False,
         skip_export: bool = False,
     ) -> None:
         """Stream documents in batches to avoid loading everything into RAM.
@@ -348,7 +329,6 @@ class StreamingPipeline(Pipeline):
 
         Args:
             batch_size: Number of documents to process per batch.
-            skip_evaluate: If ``True``, skip the final evaluation step.
             skip_export: If ``True``, skip the final JSON export step.
 
         Example::
@@ -398,8 +378,6 @@ class StreamingPipeline(Pipeline):
                 f"{total_stats['edges_written']} edges total"
             )
 
-            if not skip_evaluate:
-                self.evaluate()
             if not skip_export:
                 self.export()
 

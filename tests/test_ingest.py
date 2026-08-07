@@ -83,3 +83,58 @@ def test_english_cleaner_normalizes_unicode_and_mojibake():
     # Unicode quote normalization (always active, independent of ftfy)
     result = cleaner.clean("\u201chello\u201d")
     assert '"' in result
+
+
+def test_data_download_defaults_path_to_data_dir(monkeypatch):
+    """Data.download() with no path= writes to data/{name}.jsonl and enriches."""
+    from polygraph.data import _api
+
+    seen: dict = {}
+    enrich_calls: list[dict] = []
+
+    def fake_import_fn(import_path):
+        def fake_download(**kwargs):
+            seen.update(kwargs)
+            return 1
+
+        def fake_enrich(**kwargs):
+            enrich_calls.append(kwargs)
+            return 1
+
+        return fake_download if "download" in import_path else fake_enrich
+
+    monkeypatch.setattr(_api, "_import_fn", fake_import_fn)
+
+    result = _api.Data.download("wikipedia", count=5, language="vi")
+    assert result["path"] == "data/wikipedia.jsonl"
+    assert seen["path"] == Path("data/wikipedia.jsonl")
+    # Enrichment always runs after download — no enrich=True needed.
+    assert result["enriched"] == 1
+    assert enrich_calls[0]["input_path"] == Path("data/wikipedia.jsonl")
+    assert enrich_calls[0]["language"] == "vi"
+
+    # An explicit path is still honored.
+    result = _api.Data.download("wikipedia", path="data/en/articles.jsonl")
+    assert result["path"] == "data/en/articles.jsonl"
+    assert enrich_calls[1]["input_path"] == Path("data/en/articles.jsonl")
+
+
+def test_data_download_without_enrich_skips_enrichment(monkeypatch, tmp_path):
+    """Datasets without an enrich step download cleanly and omit 'enriched'."""
+    from polygraph.data import _api
+
+    calls: list[str] = []
+
+    def fake_import_fn(import_path):
+        def fake_download(**kwargs):
+            calls.append(import_path)
+            return 1
+
+        return fake_download
+
+    monkeypatch.setattr(_api, "_import_fn", fake_import_fn)
+
+    result = _api.Data.download("bench_ner", path=str(tmp_path / "ner.jsonl"))
+    assert result["downloaded"] == 1
+    assert "enriched" not in result
+    assert len(calls) == 1  # only the download step ran

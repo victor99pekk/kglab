@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from polygraph._shared import Ontology
+from polygraph.kg_build.build.writer import GraphWriter
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,14 @@ def ensure_schema(session: Any) -> None:
         )
 
 
-class Neo4jGraphBuilder:
-    """Build a knowledge graph by writing directly to a Neo4j database."""
+class Neo4jGraphBuilder(GraphWriter):
+    """Build a knowledge graph by writing directly to a Neo4j database.
+
+    Implements the shared ``GraphWriter`` interface (see
+    ``polygraph.kg_build.build.writer``), so the same ``build_kg_into``
+    routine drives both this streaming backend and the in-memory
+    ``NetworkXGraphWriter``.
+    """
 
     def __init__(
         self,
@@ -144,8 +151,13 @@ class Neo4jGraphBuilder:
         confidence_score: float = 1.0,
         embedding: list[float] | None = None,
         aliases: list[str] | None = None,
+        properties: dict[str, Any] | None = None,
     ) -> None:
-        """Create or update an ``:Entity`` node."""
+        """Create or update an ``:Entity`` node.
+
+        Extra ``properties`` are merged onto the node (they must not clash
+        with the explicitly-set keys above).
+        """
         self.session.run(
             """
             MERGE (n:Entity {id: $id})
@@ -155,6 +167,7 @@ class Neo4jGraphBuilder:
                 n.importanceScore  = $importanceScore,
                 n.confidenceScore  = $confidenceScore,
                 n.embedding        = $embedding
+            SET n += $properties
             REMOVE n.entityType
             WITH n
             WHERE $aliases IS NOT NULL AND size($aliases) > 0
@@ -169,6 +182,7 @@ class Neo4jGraphBuilder:
             confidenceScore=confidence_score,
             embedding=embedding,
             aliases=aliases or [],
+            properties=properties or {},
         )
         self._node_count += 1
 

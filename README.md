@@ -11,7 +11,8 @@
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM / 🔍 Graph RAG
 
-A research toolkit for building highly customizable Knowledge-Graph generation pipelines. This repo provides support for using pre-built KG-generation pipelines and for customizing them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc.), as well as knowledge-building stages like entity extraction and resolution. The pipelines are implemented as classes that can be easily benchmarked with pre-defined code. The hope is that this will make it easy for people to use the existing pipelines defined in this repo, modify them, and benchmark the changes with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
+A research toolkit for building highly customizable Knowledge-Graph generation pipelines. Can either be used to generate knowledge graphs, or to experiment with new KG-generation pipelines with existing benchmarking tests.
+This repo provides support for using pre-built KG-generation pipelines and for customizing them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc.), as well as knowledge-building stages like entity extraction and resolution. The pipelines are implemented as classes that can be easily benchmarked with pre-defined code. The hope is that this will make it easy for people to use the existing pipelines defined in this repo, modify them, and benchmark the changes with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
 
 <details>
 <summary><strong>📑 Contents</strong></summary>
@@ -20,9 +21,7 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
     - [Installation](#installation)
-    - [Build a Knowledge Graph](#build-a-knowledge-graph)
-    - [Create new KG-generation pipelines](#create-new-kg-generation-pipelines)
-    - [Upload KG to Neo4j](#upload-kg-to-neo4j)
+    - [End-to-end example](#end-to-end-example)
   - [Documentation](#documentation)
   - [Contributing](#contributing)
   - [License](#license)
@@ -33,14 +32,14 @@ A research toolkit for building highly customizable Knowledge-Graph generation p
 
 <img src="figures/meta_award.png" alt="Meta Award" width="350" align="right"/>
 
-Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge**, co-organized by the National Innovation Center (NIC), Meta, and the AI for Vietnam Foundation. Built over 48 hours, it tackled the real-world problem of generating high-quality, fact-grounded training data for LLMs.
+Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge** where we tackled the problem of creating a data management system for LLM training on vietnamese data. We built a pipeline that scrapes the web for vientamese text data, cleans it, generates a knowledge graph, and fines tunes an LLM on it.
 
-The project won the **$5,000 USD Meta Prize** and has since been refactored into a modular research toolkit for studying how knowledge graph quality affects downstream LLM performance — whether through fine-tuning on KG-structured data or through Graph RAG (retrieval-augmented generation over the knowledge graph).
+The project won the **$5,000 USD Meta Prize** and has since been refactored into a research project for studying how knowledge graphs
 
 <details>
-<summary><strong>🏆 Hackathon Results</strong></summary>
+<summary><strong>More about hackathon...</strong></summary>
 
-During the 48-hour competition, we ran an ablation study on 10 Wikipedia articles with 50 held-out test samples:
+During the competition we tackled the goal of data management in LLM training on vietnamese data, where the task was to build a data management system. We chose to approach this problem by building a pipeline that scraped vietnamese websites for text data, and from this generates knowledge graph (insert why knowledge graph). We then wanted to prove that our knowledge graph enriched the training data. We did this by doing fine tuning an LLM (Qwen2.5-1.5B) on vietnamese text data. We compared three variants, (i) the original LLM-model, (ii) the LLM fine tuned on the vietnamese text data, not structured as a knowledge graph (we call this Flat below), and lastly (iii) the LLM fine tuned on the knowledge graph data. It was a small model fine tuned on a small set of text, but we saw that the variant fine tuned on the KG-data performed by far best in later benchmarking. Worth noting is that though these benchmarks show promise, it is far from enough to ensure a trend as the trainnig data was too little as we didnt have time to perform better test duringt the 48 hours.
 
 | Metric | Base Model | KG-Trained (B) | Flat (C) | Improvement |
 |---|---|---|---|---|
@@ -105,131 +104,51 @@ make install         # syncs all deps + downloads spaCy model
 
 Run `make help` to see all available targets.
 
-### Build a Knowledge Graph
+### End-to-end example
+
+Create a pipeline variant and benchmark it against the baseline in one test:
 
 ```python
-from polygraph.pipelines import Baseline
+from polygraph._shared.stage_config import PreprocessConfig
+from polygraph.benchmark_pipeline import Benchmark
+from polygraph.pipelines import Baseline, PIPELINE_REGISTRY
 
-pipeline = Baseline(
-    input_paths=["data/my_corpus/"],
-    output_dir="output/my_experiment/",
+# 1. Create a new pipeline — subclass Baseline and override a stage
+class SmallChunks(Baseline):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("preprocess", PreprocessConfig(
+            chunk_method="sentence", chunk_target_tokens=300))
+        super().__init__(**kwargs)
+
+PIPELINE_REGISTRY["small_chunks"] = SmallChunks  # now discoverable by name
+
+# 2. Benchmark both pipelines — pass them into one benchmark test
+result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+    pipelines={"baseline": Baseline(), "small_chunks": SmallChunks()},
 )
-pipeline.execute()
+print(result)                  # aligned per-pipeline table
+print("best:", result.best_pipeline())
 ```
 
-The KG is written to `output/my_experiment/` as `knowledge_graph.json` and
-`knowledge_graph.graphml`, plus a `metrics.json` with quality scores.
-
-The pipeline uses a default ontology (`configs/default_ontology.yaml`) that defines
-which entity types and relations to extract. Swap it out to target a different domain.
-
-### Create new KG-generation pipelines
-Subclass a pipeline and override any stage — preprocessing (chunk, clean, dedup),
-extraction, resolution, or graph construction:
-
-Custom methods like `with_new_extraction_method` and `with_new_resolve_method` are wired in `kg_build/__init__.py` — add your extraction and resolution backends there so they're callable as `extract.with_new_method` and `resolve.with_new_method`. Register it in `src/polygraph/pipelines/__init__.py`:
+Every benchmark test (`Dedup`, `Chunking`, `Resolution`, `Extraction`, `Quality`,
+`RAG`) accepts any number of pipelines and scores them side by side — that's how
+you compare variants, so there is no separate `compare()` API. `sentence` chunking
+keeps the demo fast — the default is `semantic`. For a whole-pipeline run
+(preprocess → build → export), use `BenchmarkRunner` directly. To fetch data for
+such a run, pick a sampler and download:
 
 ```python
-# src/polygraph/pipelines/my_variant.py
-from polygraph.pipelines import Baseline
-from polygraph.kg_build import extract, resolve, build
+from polygraph.data import Data, DegreeSampler, RandomSampler, SpecificSampler
 
-class MyVariant(Baseline):
-    def build_kg(self, chunks):
-        entities, triples = extract.with_new_extraction_method(
-            chunks, self.ontology,
-            entity_method="spacy",
-            relation_method="structured_llm",
-        )
-        resolved = resolve.with_new_resolve_method(entities, threshold=0.85)
-        graph = build.from_resolved(resolved, triples)
-        return {"graph": graph, "entities": resolved, "triples": triples}
+Data.download("wikipedia", sampler=RandomSampler(count=20))
+# SpecificSampler(urls=[...])                      — fetch explicit articles
+# DegreeSampler(count=50, target_degree=5.0)       — grow a connected, link-rich set
 ```
 
-```python
-from polygraph.pipelines.my_variant import MyVariant
-PIPELINE_REGISTRY["my_variant"] = MyVariant
-```
+Downloads are automatically enriched with outgoing Wikipedia hyperlinks.
 
-Then instantiate and run your pipeline:
-
-```python
-pipeline = MyVariant(
-    input_paths=["data/wikipedia/"],
-    output_dir="experiments/kg/002_my_variant/outputs/",
-)
-pipeline.execute()
-```
-
-### Upload KG to Neo4j
-
-```python
-from polygraph.kg_export.neo4j.upload import upload_graph
-
-upload_graph(
-    "output/my_experiment/knowledge_graph.json",
-    clear=True,
-    uri="bolt://localhost:7687",
-    user="neo4j",
-    password="your-password",
-)
-```
-
-
-
-<!--
-## Benchmarking & Experiments
-
-All pipelines can be run and compared via experiment YAML configs:
-
-```bash
-# Run a pipeline experiment — produces results_summary.json with all metrics
-make experiment EXP=kg/001_baseline
-```
-
-```yaml
-# experiments/kg/NNN_my_experiment/config.yaml
-name: "My experiment"
-pipeline:
-  variant: "baseline"          # picks from PIPELINE_REGISTRY
-input:
-  paths:
-    - "data/wikipedia/"
-output:
-  dir: "outputs/"              # generated KGs, metrics, reports
-ontology: "configs/default_ontology.yaml"
-neo4j:
-  upload: true                 # export to Neo4j (requires env vars)
-  clear: false
-```
-
-The `BenchmarkRunner` runs the pipeline, collects metrics, exports the KG, and
-writes a `results_summary.json` — making experiments reproducible and comparable.
-See `experiments/kg/_template/` for a full annotated config.
-
-## ML Model Training
-
-Train models to improve KG quality — entity resolution, node classification,
-link prediction. Training code lives in `src/ml/`; inference tools are in
-`src/polygraph/models/`.
-
-```bash
-cp -r experiments/ML_models/_template/ experiments/ML_models/001_my_experiment/
-# edit config.yaml → set task, model variant, hyperparameters
-```
-
-Multiple architecture variants per task, selected by YAML config:
-
-```yaml
-training:
-  task: "node_classification"
-  model:
-    variant: "gcn"      # or "gat" — picks from MODEL_REGISTRY
-  epochs: 100
-```
-
-GNN models use PyTorch Geometric — install with `uv sync --extra gnn`.
-See `src/ml/README.md` for the full guide on adding new tasks. -->
+See [docs/tutorial.md](docs/tutorial.md) for more workflows, including uploading a
+KG to Neo4j.
 
 ## Documentation
 
@@ -241,12 +160,6 @@ See `src/ml/README.md` for the full guide on adding new tasks. -->
 | [Contributing Guide](CONTRIBUTING.md) | How to add custom extractors, resolvers, and pipelines |
 | [Example Scripts](examples/) | Runnable Python examples for common workflows |
 
-To build a searchable documentation site locally:
-
-```bash
-uv sync --extra docs
-mkdocs serve
-```
 
 ## Contributing
 

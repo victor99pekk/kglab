@@ -4,6 +4,11 @@ from polygraph._shared import Ontology
 from polygraph.kg_build.build.networkx import GraphBuilder
 from polygraph.kg_build.build.registry import BUILD_METHODS, create_build_method
 from polygraph.kg_build.build.sqlite import SQLiteGraphBuilder
+from polygraph.kg_build.build.writer import (
+    GraphWriter,
+    NetworkXGraphWriter,
+    build_kg_into,
+)
 
 
 def from_resolved(
@@ -34,7 +39,10 @@ def from_resolved(
 __all__ = [
     "BUILD_METHODS",
     "GraphBuilder",
+    "GraphWriter",
+    "NetworkXGraphWriter",
     "SQLiteGraphBuilder",
+    "build_kg_into",
     "create_build_method",
     "from_resolved",
 ]
