@@ -34,7 +34,8 @@ class Entity:
         return sorted({mention.casefold() for mention in self.mentions})
 
     @property
-    def displayName(self) -> str:
+    def display_name(self) -> str:
+        """Human-readable display name (defaults to ``name``)."""
         return self.name
 
     def to_dict(self) -> dict[str, Any]:

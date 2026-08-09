@@ -185,13 +185,13 @@ class DatasetCurationPipeline:
             content = self.processor.normalize(
                 document.content if isinstance(document.content, str) else ""
             )
-            base_id = document.doc_id or f"doc-{sha256_text(f'{document.source}\n{content}')[:16]}"
+            content_key = sha256_text(f"{document.source}\n{content}")[:16]
+            base_id = document.doc_id or f"doc-{content_key}"
             stable_id = str(base_id)
             collision = 1
             while stable_id in used_ids:
-                stable_id = (
-                    f"{base_id}-{sha256_text(f'{document.source}\n{content}\n{collision}')[:8]}"
-                )
+                collision_key = sha256_text(f"{document.source}\n{content}\n{collision}")[:8]
+                stable_id = f"{base_id}-{collision_key}"
                 collision += 1
             used_ids.add(stable_id)
             words = self.processor.word_tokens(content) if content else []

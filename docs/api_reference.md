@@ -490,7 +490,7 @@ from polygraph.kg_build.extract import Entity
 | `node_id` | `str` | Optional explicit node ID |
 | `source_chunk_ids` | `list[str]` | Chunks that mention this entity |
 
-Properties: `.id` (resolved node ID), `.aliases` (normalized mentions), `.displayName`.
+Properties: `.id` (resolved node ID), `.aliases` (normalized mentions), `.display_name`.
 
 ### `EntityExtractor` (ABC)
 
