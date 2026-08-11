@@ -238,7 +238,8 @@ uses a custom entity extractor:
 from polygraph.pipelines._base import Pipeline
 from polygraph._shared import Document
 from polygraph.preprocess import chunk, clean, dedup, load, quality
-from polygraph.kg_build import extract, resolve, build
+from polygraph.kg_build import build_kg_into, extract, resolve
+from polygraph.kg_build.build import NetworkXGraphWriter
 from polygraph._shared.config import Ontology
 from pathlib import Path
 
@@ -264,8 +265,10 @@ class MyPipeline(Pipeline):
         # Resolve duplicates by string matching
         resolved = resolve.by_string(entities, threshold=0.85)
 
-        # Build the graph
-        graph = build.from_resolved(resolved, triples, ontology=ontology)
+        # Build the graph (storage-agnostic — swap the writer to change backend)
+        writer = NetworkXGraphWriter(ontology=ontology)
+        build_kg_into(writer, chunks, resolved, triples)
+        graph = writer.graph
 
         return {"graph": graph, "entities": resolved, "triples": triples}
 ```

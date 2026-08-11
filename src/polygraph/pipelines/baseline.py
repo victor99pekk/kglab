@@ -52,7 +52,8 @@ from polygraph._shared.stage_config import (
     PreprocessConfig,
     ResolutionConfig,
 )
-from polygraph.kg_build import build, build_kg_into, extract, resolve
+from polygraph.kg_build import build_kg_into, extract, resolve
+from polygraph.kg_build.build.sqlite import SQLiteGraphWriter
 from polygraph.kg_build.build.writer import NetworkXGraphWriter
 from polygraph.kg_export.graph_store import (
     GraphStore,
@@ -365,30 +366,26 @@ class Baseline(Pipeline):
                 f"{neo4j_stats.get('edges_written', 0)} edges)"
             )
         else:
+            # One shared build path for every backend: write through a
+            # GraphWriter via build_kg_into.  Chunk/Document nodes and
+            # PART_OF/NEXT edges are derived from `chunks`; only entity
+            # nodes and semantic/APPEARS_IN triples are passed in.  Swap the
+            # writer to change where the graph is stored — the routine is
+            # storage-agnostic.
             if bld_cfg.method == "sqlite":
-                # SQLite remains a dedicated batch backend (file-backed).
-                build_kwargs: dict[str, Any] = {}
-                build_kwargs["db_path"] = str(self.output_dir / "knowledge_graph.db")
-                graph = build.from_resolved(
-                    resolved,
-                    triples,
-                    method="sqlite",
+                writer = SQLiteGraphWriter(
+                    db_path=str(self.output_dir / "knowledge_graph.db"),
                     ontology=ontology,
-                    **build_kwargs,
                 )
             else:
-                # One shared build path for every backend: write through a
-                # GraphWriter via build_kg_into.  Chunk/Document nodes and
-                # PART_OF/NEXT edges are derived from `chunks`; only entity
-                # nodes and semantic/APPEARS_IN triples are passed in.
                 writer = NetworkXGraphWriter(ontology=ontology)
-                build_kg_into(
-                    writer,
-                    chunks,
-                    [e for e in resolved if e.get("type") not in ("Chunk", "Document")],
-                    [t for t in triples if t[1] not in ("part_of", "next")],
-                )
-                graph = writer.graph
+            build_kg_into(
+                writer,
+                chunks,
+                [e for e in resolved if e.get("type") not in ("Chunk", "Document")],
+                [t for t in triples if t[1] not in ("part_of", "next")],
+            )
+            graph = writer.graph
 
             # Continue building on top of an existing KG when one is provided.
             if existing_store is not None:

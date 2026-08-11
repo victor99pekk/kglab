@@ -268,24 +268,35 @@ linked = link.entities(resolved, method="wikidata")  # adds kb_id / kb_source
 
 Registry: `LINKER_REGISTRY`; base contract: `EntityLinker` (`linker.link(entity)`). Add backends via `LINKER_REGISTRY["my_kb"] = MyLinker`.
 
-### `build.from_resolved()`
+### `build_kg_into()` + `GraphWriter`
+
+The build step is storage-agnostic: one routine writes through any
+`GraphWriter` backend.
 
 ```python
-from polygraph.kg_build import build
+from polygraph.kg_build import build_kg_into
+from polygraph.kg_build.build import NetworkXGraphWriter, SQLiteGraphWriter
 
 # In-memory (default)
-graph = build.from_resolved(resolved, triples, method="networkx", ontology=ontology)
-# Returns: networkx.DiGraph
+writer = NetworkXGraphWriter(ontology=ontology)
+build_kg_into(writer, chunks, resolved, triples)
+graph = writer.graph  # Returns: networkx.DiGraph
 
 # File-backed (for large graphs — avoids OOM)
-graph = build.from_resolved(resolved, triples, method="sqlite")
-# Returns: SQLiteGraph (disk-resident, same API as nx.DiGraph)
+writer = SQLiteGraphWriter(db_path="output/knowledge_graph.db")
+build_kg_into(writer, chunks, resolved, triples)
+graph = writer.graph  # Returns: SQLiteGraph (disk-resident, same API as nx.DiGraph)
+
+# Neo4j (streamed, no in-memory graph)
+from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
+build_kg_into(builder, chunks, resolved, triples)
 ```
 
-| Method | Backend | RAM usage | File |
+| Writer | Backend | RAM usage | File |
 |---|---|---|---|
-| `"networkx"` | NetworkX | All nodes + edges | None |
-| `"sqlite"` | SQLite | Queried data only | `knowledge_graph.db` |
+| `NetworkXGraphWriter` | NetworkX | All nodes + edges | None |
+| `SQLiteGraphWriter` | SQLite | Queried data only | `knowledge_graph.db` |
+| `Neo4jGraphBuilder` | Neo4j | None (streamed) | Neo4j DB |
 
 To use SQLite with a pipeline:
 

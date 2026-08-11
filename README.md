@@ -11,8 +11,16 @@
 
 🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM / 🔍 Graph RAG
 
-A research toolkit for building highly customizable Knowledge-Graph generation pipelines. Can either be used to generate knowledge graphs, or to experiment with new KG-generation pipelines with existing benchmarking tests.
-This repo provides support for using pre-built KG-generation pipelines and for customizing them by overriding pipeline stages, such as preprocessing stages (chunking, cleaning, deduping, etc.), as well as knowledge-building stages like entity extraction and resolution. The pipelines are implemented as classes that can be easily benchmarked with pre-defined code. The hope is that this will make it easy for people to use the existing pipelines defined in this repo, modify them, and benchmark the changes with minimal effort and code. This repo also contains support for training GNNs to enhance knowledge graphs.
+A toolkit for building highly customizable Knowledge-Graph generation pipelines. Our hope with this library is twofold. Each point below is backed by a runnable notebook in [`tutorial/`](tutorial/).
+
+1. `Enable easy research with KG generation.` We want it to be easy to try out different KG generation pipelines. We do this by
+    - making it simple to extend existing KG generation pipelines with minimal code — see [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb).
+    - making the KG generation pipeline modular, enabling highly customizable pipelines built with this library.
+    - providing code for benchmarking existing pipelines against new pipelines, with benchmark tests covering chunking, deduplication, extraction, entity resolution, quality, and RAG retrieval — each scored side-by-side — see [benchmarking.ipynb](tutorial/benchmarking.ipynb).
+
+2. `Make it easy to use our built custom KG generation pipelines.` We do this by
+    - providing pre-built pipelines that can be customized by setting parameters and customizing specific pipeline stages — see [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) for turning a KG into LLM training data.
+    - keeping the graph storage agnostic of the Pipeline classes, so the same pipeline code can be used on small graphs generated locally, or large graphs being generated and continuously streamed to a remote backend (e.g. Neo4j) — see [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb).
 
 <details>
 <summary><strong>📑 Contents</strong></summary>
@@ -22,6 +30,7 @@ This repo provides support for using pre-built KG-generation pipelines and for c
   - [Getting Started](#getting-started)
     - [Installation](#installation)
     - [End-to-end example](#end-to-end-example)
+  - [Tutorial Notebooks](#tutorial-notebooks)
   - [Documentation](#documentation)
   - [Contributing](#contributing)
   - [License](#license)
@@ -150,11 +159,25 @@ Downloads are automatically enriched with outgoing Wikipedia hyperlinks.
 See [docs/tutorial.md](docs/tutorial.md) for more workflows, including uploading a
 KG to Neo4j.
 
+## Tutorial Notebooks
+
+Runnable notebooks in [`tutorial/`](tutorial/) demonstrate the main workflows
+end-to-end:
+
+| Notebook | What it covers |
+|---|---|
+| [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb) | Create a new pipeline variant — subclass, register, and benchmark it against the baseline |
+| [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb) | The **same pipeline** built locally and in Neo4j — graph storage is agnostic of the pipeline |
+| [kg_neo4j_streaming.ipynb](tutorial/kg_neo4j_streaming.ipynb) | Stream KG creation directly into Neo4j for corpora too large for RAM |
+| [benchmarking.ipynb](tutorial/benchmarking.ipynb) | Benchmark pipelines against each other |
+| [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) | Turn a generated KG into training data for an LLM |
+
 ## Documentation
 
 | Resource | Description |
 |---|---|
 | [Tutorial](docs/tutorial.md) | Step-by-step walkthrough — from input data to exported KG |
+| [Tutorial Notebooks](tutorial/) | Runnable notebooks — custom pipelines, storage-agnostic builds, Neo4j streaming, benchmarking, KG for LLM training |
 | [API Reference](docs/api_reference.md) | Complete reference for all public classes and functions |
 | [Input Data Format](docs/input_data_format.md) | JSONL schema specification |
 | [Contributing Guide](CONTRIBUTING.md) | How to add custom extractors, resolvers, and pipelines |

@@ -11,7 +11,7 @@ import networkx as nx
 import pytest
 
 from polygraph._shared.stage_config import BuildConfig, ExtractionConfig, PreprocessConfig
-from polygraph.kg_build.build import from_resolved
+from polygraph.kg_build.build import SQLiteGraphWriter
 from polygraph.kg_eval import evaluate_kg
 from polygraph.kg_export import exporter
 from polygraph.kg_export.graph_store import (
@@ -90,9 +90,16 @@ def test_json_store_round_trips_export(tmp_path):
 
 
 def test_sqlite_store_reads_file_backed_graph(tmp_path):
-    entities = [{"id": "e1", "name": "Einstein", "type": "PERSON"}]
-    triples = [("e1", "worked_at", "e2", "evidence one", "chunk1")]
-    graph = from_resolved(entities, triples, method="sqlite", db_path=str(tmp_path / "kg.db"))
+    writer = SQLiteGraphWriter(db_path=str(tmp_path / "kg.db"))
+    writer.merge_entity("e1", name="Einstein", entity_type="PERSON")
+    writer.merge_edge(
+        "e1",
+        "e2",
+        "worked_at",
+        evidence_sentence="evidence one",
+        source_chunk_id="chunk1",
+    )
+    graph = writer.graph
 
     store = create_graph_store("sqlite", graph=graph)
 

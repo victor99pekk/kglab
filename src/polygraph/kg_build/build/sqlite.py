@@ -1,28 +1,31 @@
-"""SQLite graph-construction method — builds a file-backed graph.
+"""SQLite graph writer — storage-agnostic build into a file-backed graph.
 
-Nodes and edges are written to an SQLite database file instead of held in
-memory. The returned ``SQLiteGraph`` object mimics ``nx.DiGraph`` enough for
-evaluation and export to work transparently.
+Implements the shared ``GraphWriter`` interface (see
+``polygraph.kg_build.build.writer``) so the same ``build_kg_into`` routine
+used for in-memory (``NetworkXGraphWriter``) and Neo4j (``Neo4jGraphBuilder``)
+builds also targets a SQLite database file. The returned ``SQLiteGraph``
+object mimics ``nx.DiGraph`` enough for evaluation and export to work
+transparently.
 
 Usage::
 
-    from polygraph.kg_build.build import from_resolved
-    graph = from_resolved(entities, triples, method="sqlite")
-    graph.number_of_nodes()  # → SQL query, not RAM count
+    from polygraph.kg_build.build import SQLiteGraphWriter, build_kg_into
+
+    writer = SQLiteGraphWriter(db_path="output/knowledge_graph.db")
+    build_kg_into(writer, chunks, entities, triples)
+    graph = writer.graph  # → SQL queries, not RAM counts
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
-import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-from polygraph._shared import GraphBackend, Ontology, entity_id
-
-logger = logging.getLogger(__name__)
+from polygraph._shared import Ontology
+from polygraph.kg_build.build.writer import GraphWriter
 
 # ── SQLite graph wrapper (drop-in for nx.DiGraph) ──────────────
 
@@ -186,41 +189,47 @@ class _EdgesView:
         return self._graph.has_edge(u, v)
 
 
-# ── Builder ────────────────────────────────────────────────────
+# ── Writer (storage-agnostic GraphWriter backend) ─────────────
 
 
-class SQLiteGraphBuilder:
-    """Build a file-backed knowledge graph using SQLite.
+class SQLiteGraphWriter(GraphWriter):
+    """``GraphWriter`` that builds a file-backed knowledge graph in SQLite.
+
+    Implements the shared ``GraphWriter`` interface so the same
+    ``build_kg_into`` routine used by the in-memory (``NetworkXGraphWriter``)
+    and Neo4j (``Neo4jGraphBuilder``) backends also targets a SQLite file —
+    swap the writer to change where the graph is stored, keep the pipeline
+    code.
+
+    Node writes are buffered and flushed with ``executemany`` inside a single
+    transaction (WAL mode); edges are merged read-modify-write, accumulating
+    ``predicates`` / ``relations`` / ``source_texts`` / ``source_chunk_ids``
+    arrays exactly like the batch builder did.
 
     Args:
         db_path: Where to write the ``.db`` file. Defaults to
-            ``output_dir/knowledge_graph.db`` when called via the pipeline.
+            ``knowledge_graph.db``.
         ontology: Optional ontology for structural validation.
     """
+
+    _NODE_FLUSH_THRESHOLD = 5000
 
     def __init__(
         self,
         db_path: str | Path | None = None,
         ontology: Ontology | None = None,
-        backend: GraphBackend | None = None,
     ) -> None:
         self.db_path = str(db_path) if db_path else "knowledge_graph.db"
         self.ontology = ontology
+        self._graph = SQLiteGraph(self.db_path)
+        self._node_buffer: list[tuple[str, str]] = []
+        self._node_count = 0
+        self._edge_count = 0
+        self._init_tables()
 
-    def build(
-        self,
-        entities: list[dict[str, Any]],
-        triples: list[tuple[str, ...]],
-    ) -> SQLiteGraph:
-        """Build a SQLite-backed graph from entities and triples.
-
-        Returns a ``SQLiteGraph`` that can be passed to evaluators and
-        exporters just like an ``nx.DiGraph``.
-        """
-        graph = SQLiteGraph(self.db_path)
-        conn = graph._conn
-
-        # Create tables
+    def _init_tables(self) -> None:
+        """Create the schema and start from a clean graph (per build)."""
+        conn = self._graph._conn
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS nodes (
@@ -242,131 +251,227 @@ class SQLiteGraphBuilder:
         conn.execute("DELETE FROM nodes")
         conn.execute("DELETE FROM edges")
 
-        entity_types: dict[str, str] = {}
+    # ── GraphWriter implementation ───────────────────────────────
 
-        # Insert nodes
-        for entity in entities:
-            node_type = entity.get("type", entity.get("label", "ENTITY"))
-            node_id = entity.get("id") or entity_id(node_type, entity.get("name", ""))
-            entity_types[node_id] = node_type
-            node_data = {
-                "id": node_id,
-                "name": entity.get("name", ""),
-                "type": node_type,
-                "aliases": entity.get("aliases", []),
-                "description": entity.get("description", ""),
-                "importanceScore": entity.get("importanceScore", 0.0),
-                "confidenceScore": entity.get("confidenceScore", 1.0),
-                "source": entity.get("source", []),
-                "source_chunk_ids": entity.get("source_chunk_ids", []),
-                "embedding": entity.get("embedding"),
-                "updatedAt": entity.get("updatedAt", ""),
-                "text": entity.get("text", ""),
-                "tokenCount": entity.get("tokenCount", 0),
-                "index": entity.get("index", 0),
-                "chunk_count": entity.get("chunk_count", 0),
-                "upload_date": entity.get("upload_date", ""),
+    def merge_document(
+        self,
+        doc_id: str,
+        *,
+        name: str = "",
+        description: str = "",
+        source: str = "",
+        chunk_count: int = 0,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        self._buffer_node(
+            {
+                "id": doc_id,
+                "type": "Document",
+                "name": name or doc_id,
+                "description": description,
+                "source": source,
+                "chunk_count": chunk_count,
+                **(properties or {}),
             }
-            for key in (
-                "title",
-                "url",
-                "license",
-                "source_domain",
-                "scraped_at",
-                "crawler",
-                "content_hash",
-                "inferred_type",
-            ):
-                if entity.get(key) not in (None, ""):
-                    node_data[key] = entity[key]
+        )
+
+    def merge_chunk(
+        self,
+        chunk_id: str,
+        *,
+        source: str = "",
+        text: str = "",
+        token_count: int = 0,
+        index: int = 0,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        self._buffer_node(
+            {
+                "id": chunk_id,
+                "type": "Chunk",
+                "name": chunk_id,
+                "source": source,
+                "text": text,
+                "tokenCount": token_count,
+                "index": index,
+                **(properties or {}),
+            }
+        )
+
+    def merge_entity(
+        self,
+        entity_id: str,
+        *,
+        name: str = "",
+        entity_type: str = "Entity",
+        description: str = "",
+        importance_score: float = 0.0,
+        confidence_score: float = 1.0,
+        embedding: list[float] | None = None,
+        aliases: list[str] | None = None,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        self._buffer_node(
+            {
+                "id": entity_id,
+                "name": name,
+                "type": entity_type,
+                "description": description,
+                "importanceScore": importance_score,
+                "confidenceScore": confidence_score,
+                "embedding": embedding,
+                "aliases": aliases or [],
+                **(properties or {}),
+            }
+        )
+
+    def merge_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        predicate: str,
+        *,
+        evidence_sentence: str = "",
+        source_chunk_id: str = "",
+        description: str = "",
+        weight: int = 1,
+    ) -> None:
+        self._merge_edge(
+            source_id,
+            target_id,
+            predicate,
+            evidence_sentence,
+            source_chunk_id,
+            description,
+        )
+        self._edge_count += 1
+
+    def merge_structural_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship_type: str,
+    ) -> None:
+        self._merge_edge(source_id, target_id, relationship_type, "", "", "")
+        self._edge_count += 1
+
+    def _merge_edge(
+        self,
+        subject: str,
+        object_id: str,
+        predicate: str,
+        evidence_sentence: str,
+        source_chunk_id: str,
+        description: str,
+    ) -> None:
+        """Insert or merge a directed edge, accumulating predicates/evidence."""
+        conn = self._graph._conn
+
+        # Ensure both endpoints exist (minimal ENTITY nodes, like the batch
+        # builder did — real nodes written via merge_* are left untouched).
+        for nid in (subject, object_id):
             conn.execute(
-                "INSERT OR REPLACE INTO nodes (id, attrs) VALUES (?, ?)",
-                (node_id, json.dumps(node_data)),
+                "INSERT OR IGNORE INTO nodes (id, attrs) VALUES (?, ?)",
+                (nid, json.dumps({"id": nid, "type": "ENTITY", "name": nid})),
             )
 
-        # Insert edges
-        for triple in triples:
-            subject, predicate, object_id = triple[0], triple[1], triple[2]
-            evidence_sentence = triple[3] if len(triple) > 3 else ""
-            source_chunk_id = triple[4] if len(triple) > 4 else ""
-            description = triple[5] if len(triple) > 5 else ""
+        # Merge with an existing edge if present
+        existing = conn.execute(
+            "SELECT attrs FROM edges WHERE subject = ? AND object = ?",
+            (subject, object_id),
+        ).fetchone()
 
-            # Ensure both endpoints exist
-            for nid in (subject, object_id):
-                conn.execute(
-                    "INSERT OR IGNORE INTO nodes (id, attrs) VALUES (?, ?)",
-                    (nid, json.dumps({"id": nid, "type": "ENTITY", "name": nid})),
-                )
+        if existing:
+            edge_data = json.loads(existing["attrs"]) if existing["attrs"] else {}
+            preds = edge_data.get("predicates", [])
+            if predicate not in preds:
+                preds.append(predicate)
+            edge_data["predicates"] = preds
+            edge_data["weight"] = len(preds)
 
-            # Merge with existing edge if present
-            existing = conn.execute(
-                "SELECT attrs FROM edges WHERE subject = ? AND object = ?",
-                (subject, object_id),
-            ).fetchone()
+            texts = edge_data.get("source_texts", [])
+            if evidence_sentence and evidence_sentence not in texts:
+                texts.append(evidence_sentence)
+            edge_data["source_texts"] = texts
 
-            if existing:
-                edge_data = json.loads(existing["attrs"]) if existing["attrs"] else {}
-                preds = edge_data.get("predicates", [])
-                if predicate not in preds:
-                    preds.append(predicate)
-                edge_data["predicates"] = preds
-                edge_data["weight"] = len(preds)
+            chunks = edge_data.get("source_chunk_ids", [])
+            if source_chunk_id and source_chunk_id not in chunks:
+                chunks.append(source_chunk_id)
+            edge_data["source_chunk_ids"] = chunks
 
-                texts = edge_data.get("source_texts", [])
-                if evidence_sentence and evidence_sentence not in texts:
-                    texts.append(evidence_sentence)
-                edge_data["source_texts"] = texts
+            rels = edge_data.get("relations", [])
+            rel_record = {
+                "predicate": predicate,
+                "evidence_sentence": evidence_sentence,
+                "source_chunk_id": source_chunk_id,
+            }
+            if description:
+                rel_record["description"] = description
+            if rel_record not in rels:
+                rels.append(rel_record)
+            edge_data["relations"] = rels
+            if description:
+                edge_data["description"] = description
 
-                chunks = edge_data.get("source_chunk_ids", [])
-                if source_chunk_id and source_chunk_id not in chunks:
-                    chunks.append(source_chunk_id)
-                edge_data["source_chunk_ids"] = chunks
+            conn.execute(
+                "UPDATE edges SET attrs = ? WHERE subject = ? AND object = ?",
+                (json.dumps(edge_data), subject, object_id),
+            )
+        else:
+            edge_data = {
+                "predicates": [predicate],
+                "weight": 1,
+                "source_texts": [evidence_sentence] if evidence_sentence else [],
+                "source_chunk_ids": [source_chunk_id] if source_chunk_id else [],
+                "relations": [
+                    {
+                        "predicate": predicate,
+                        "evidence_sentence": evidence_sentence,
+                        "source_chunk_id": source_chunk_id,
+                    }
+                ],
+            }
+            if description:
+                edge_data["description"] = description
+            conn.execute(
+                "INSERT INTO edges (subject, object, attrs) VALUES (?, ?, ?)",
+                (subject, object_id, json.dumps(edge_data)),
+            )
 
-                rels = edge_data.get("relations", [])
-                rel_record = {
-                    "predicate": predicate,
-                    "evidence_sentence": evidence_sentence,
-                    "source_chunk_id": source_chunk_id,
-                }
-                if description:
-                    rel_record["description"] = description
-                if rel_record not in rels:
-                    rels.append(rel_record)
-                edge_data["relations"] = rels
-                if description:
-                    edge_data["description"] = description
+    # ── Buffering ────────────────────────────────────────────────
 
-                conn.execute(
-                    "UPDATE edges SET attrs = ? WHERE subject = ? AND object = ?",
-                    (json.dumps(edge_data), subject, object_id),
-                )
-            else:
-                edge_data = {
-                    "predicates": [predicate],
-                    "weight": 1,
-                    "source_texts": [evidence_sentence] if evidence_sentence else [],
-                    "source_chunk_ids": [source_chunk_id] if source_chunk_id else [],
-                    "relations": [
-                        {
-                            "predicate": predicate,
-                            "evidence_sentence": evidence_sentence,
-                            "source_chunk_id": source_chunk_id,
-                        }
-                    ],
-                }
-                if description:
-                    edge_data["description"] = description
-                conn.execute(
-                    "INSERT INTO edges (subject, object, attrs) VALUES (?, ?, ?)",
-                    (subject, object_id, json.dumps(edge_data)),
-                )
+    def _buffer_node(self, data: dict[str, Any]) -> None:
+        self._node_buffer.append((data["id"], json.dumps(data)))
+        self._node_count += 1
+        if len(self._node_buffer) >= self._NODE_FLUSH_THRESHOLD:
+            self._flush_nodes()
 
-        conn.commit()
-
-        logger.info(
-            "Built SQLite graph: %d nodes, %d edges → %s",
-            graph.number_of_nodes(),
-            graph.number_of_edges(),
-            self.db_path,
+    def _flush_nodes(self) -> None:
+        if not self._node_buffer:
+            return
+        self._graph._conn.executemany(
+            "INSERT OR REPLACE INTO nodes (id, attrs) VALUES (?, ?)",
+            self._node_buffer,
         )
-        return graph
+        self._node_buffer = []
+
+    def _flush(self) -> None:
+        """Flush buffered nodes and commit the single write transaction."""
+        self._flush_nodes()
+        self._graph._conn.commit()
+
+    # ── Access ───────────────────────────────────────────────────
+
+    @property
+    def graph(self) -> SQLiteGraph:
+        """The file-backed ``SQLiteGraph`` (flushes pending writes first)."""
+        self._flush()
+        return self._graph
+
+    @property
+    def stats(self) -> dict[str, int]:
+        return {"nodes_written": self._node_count, "edges_written": self._edge_count}
+
+    def close(self) -> None:
+        """Flush pending writes (the ``SQLiteGraph`` owns its connection)."""
+        self._flush()

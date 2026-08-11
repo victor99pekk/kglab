@@ -8,7 +8,7 @@ from polygraph.kg_build.build import (
     GraphBuilder,
     GraphWriter,
     NetworkXGraphWriter,
-    SQLiteGraphBuilder,
+    SQLiteGraphWriter,
     build_kg_into,
 )
 from polygraph.kg_build.build.sqlite import SQLiteGraph
@@ -35,7 +35,7 @@ __all__ = [
     "SimpleExtractor",
     "SpacyExtractor",
     "SQLiteGraph",
-    "SQLiteGraphBuilder",
+    "SQLiteGraphWriter",
     "StructuredLLMRelationExtractor",
     "build",
     "build_kg_into",

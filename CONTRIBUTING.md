@@ -58,14 +58,16 @@ extract.my_extractor = my_extractor
 ```python
 # pipelines/my_variant.py
 from polygraph.pipelines import Baseline
-from polygraph.kg_build import extract, resolve, build
+from polygraph.kg_build import build_kg_into, extract, resolve
+from polygraph.kg_build.build import NetworkXGraphWriter
 
 class MyVariant(Baseline):
     def build_kg(self, chunks):
         entities, triples = extract.my_extractor(chunks)
         resolved = resolve.by_string(entities, threshold=0.85)
-        graph = build.from_resolved(resolved, triples)
-        return {"graph": graph, "entities": resolved, "triples": triples}
+        writer = NetworkXGraphWriter()
+        build_kg_into(writer, chunks, resolved, triples)
+        return {"graph": writer.graph, "entities": resolved, "triples": triples}
 ```
 
 Export it in `pipelines/__init__.py`:
@@ -81,7 +83,7 @@ Run: `python main.py --variant myvariant`
 |---|---|---|
 | `extract` | `(chunks, **kwargs)` | `(list[dict], list[tuple])` |
 | `resolve` | `(entities, threshold, **kwargs)` | `list[dict]` |
-| `build` | `(resolved, triples, **kwargs)` | `nx.DiGraph` |
+| `build_kg_into` | `(writer, chunks, resolved, triples)` | any `GraphWriter` backend |
 
 Triples: `(subject_id, predicate, object_id, evidence_text, source_chunk_id)`
 

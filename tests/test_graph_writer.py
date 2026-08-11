@@ -12,6 +12,7 @@ from polygraph.kg_build.build import (
     GraphBuilder,
     GraphWriter,
     NetworkXGraphWriter,
+    SQLiteGraphWriter,
     build_kg_into,
 )
 from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
@@ -96,3 +97,37 @@ def test_build_kg_into_stats_reflect_writer_counts():
     stats = build_kg_into(writer, [], [], [])
     assert stats == {"nodes_written": 0, "edges_written": 0}
     assert writer.graph.number_of_nodes() == 0
+
+
+def test_sqlite_writer_builds_file_backed_graph(tmp_path):
+    """SQLiteGraphWriter must satisfy the GraphWriter contract and write the
+    same structure through build_kg_into into a SQLite file instead of RAM."""
+    assert issubclass(SQLiteGraphWriter, GraphWriter)
+
+    chunks = [
+        Document(
+            content="Alpha works at Beta.",
+            doc_id="d:chunk0",
+            metadata={"parent_doc_id": "d"},
+        )
+    ]
+    entities = [{"id": "alpha", "name": "Alpha", "type": "PERSON"}]
+    triples = [("alpha", "works_at", "beta", "Alpha works at Beta.", "d:chunk0")]
+
+    writer = SQLiteGraphWriter(db_path=str(tmp_path / "kg.db"))
+    stats = build_kg_into(writer, chunks, entities, triples)
+    graph = writer.graph
+
+    # 1 document + 1 chunk + 1 entity (beta auto-created as an endpoint)
+    assert stats["nodes_written"] == 3
+    assert stats["edges_written"] == 2  # PART_OF + works_at
+    assert graph.number_of_nodes() == 4
+    assert graph.number_of_edges() == 2
+    assert "d" in graph
+    assert "d:chunk0" in graph
+    assert graph.has_edge("d:chunk0", "d")
+    assert graph.has_edge("alpha", "beta")
+    assert graph.nodes["alpha"]["type"] == "PERSON"
+    assert (tmp_path / "kg.db").exists()
+
+    graph.close()
