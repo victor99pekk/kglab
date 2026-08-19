@@ -1,4 +1,4 @@
-# Polygraph: Customizable Knowledge Graph Pipelines
+# KGLab: Customizable Knowledge Graph Pipelines
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -41,7 +41,7 @@ A toolkit for building highly customizable Knowledge-Graph generation pipelines.
 
 <img src="figures/meta_award.png" alt="Meta Award" width="350" align="right"/>
 
-Polygraph began as a hackathon project at the **Vietnam AI Innovation Challenge** where we tackled the problem of creating a data management system for LLM training on vietnamese data. We built a pipeline that scrapes the web for vientamese text data, cleans it, generates a knowledge graph, and fines tunes an LLM on it.
+KGLab began as a hackathon project at the **Vietnam AI Innovation Challenge** where we tackled the problem of creating a data management system for LLM training on vietnamese data. We built a pipeline that scrapes the web for vietnamesse text data, cleans it, generates a knowledge graph, and fine-tunes an LLM on it.
 
 The project won the **$5,000 USD Meta Prize** and has since been refactored into a research project for studying how knowledge graphs
 
@@ -70,7 +70,7 @@ These early results suggested that KG-structured training data could eliminate h
 
 ```
 src/
-├── polygraph/           # KG library (core)
+├── kglab/               # KG library (core)
 │   ├── pipelines/       #   swappable variants — subclass Pipeline
 │   ├── benchmark_pipeline/  # BenchmarkRunner — runs any pipeline from YAML config
 │   ├── models/          #   inference tools — load trained checkpoints
@@ -118,9 +118,9 @@ Run `make help` to see all available targets.
 Create a pipeline variant and benchmark it against the baseline in one test:
 
 ```python
-from polygraph._shared.stage_config import PreprocessConfig
-from polygraph.benchmark_pipeline import Benchmark
-from polygraph.pipelines import Baseline, PIPELINE_REGISTRY
+from kglab._shared.stage_config import PreprocessConfig
+from kglab.benchmark_pipeline import Benchmark
+from kglab.pipelines import Baseline, PIPELINE_REGISTRY
 
 # 1. Create a new pipeline — subclass Baseline and override a stage
 class SmallChunks(Baseline):
