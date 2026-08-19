@@ -1,8 +1,8 @@
 # `src/ml/` — ML Training Library
 
 All model architectures, training loops, and data preparation live here —
-**parallel** to `src/polygraph/`. The library (`polygraph`) only imports
-inference tools from `polygraph.models/`; it never touches training code.
+**parallel** to `src/kglab/`. The library (`kglab`) only imports
+inference tools from `kglab.models/`; it never touches training code.
 
 ---
 
@@ -11,13 +11,13 @@ inference tools from `polygraph.models/`; it never touches training code.
 | Concept | Location |
 |---|---|
 | Training code (models, datasets, loops) | `src/ml/<task>/` |
-| Inference tools (what pipelines import) | `src/polygraph/models/<task>.py` |
+| Inference tools (what pipelines import) | `src/kglab/models/<task>.py` |
 | Saved checkpoints | `experiments/ML_models/<NNN>_<name>/models/` |
 | Experiment configs | `experiments/ML_models/<NNN>_<name>/config.yaml` |
 | Shared training utilities | `src/ml/training_utils.py` |
 | GNN dependencies | `uv sync --extra gnn` |
 | KG pipeline experiments | `experiments/kg/` |
-| Benchmark & Neo4j upload | `BenchmarkRunner` in `src/polygraph/benchmark_pipeline/` |
+| Benchmark & Neo4j upload | `BenchmarkRunner` in `src/kglab/benchmark_pipeline/` |
 
 ---
 
@@ -65,7 +65,7 @@ src/ml/
 
 ```
 ┌─────────────────────────────────┐    ┌──────────────────────────────┐
-│  src/ml/  (training code)       │    │  src/polygraph/models/       │
+│  src/ml/  (training code)       │    │  src/kglab/models/       │
 │                                 │    │  (inference only)            │
 │  - model architectures          │    │                              │
 │  - dataset preparation          │    │  - ModelRegistry             │
@@ -95,11 +95,11 @@ training samples with labels.
 
 ### Pipeline benchmarking & Neo4j export
 
-Pipeline variants in `src/polygraph/pipelines/` can all be run and compared
+Pipeline variants in `src/kglab/pipelines/` can all be run and compared
 via `BenchmarkRunner`:
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+from kglab.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
 config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
 runner = BenchmarkRunner(config)
@@ -244,7 +244,7 @@ __all__ = ["TaskConfig", "TaskDataset", "TaskTrainer", ...]
 
 ### Step 7 — Create the inference tool
 
-In `src/polygraph/models/<task_name>.py`:
+In `src/kglab/models/<task_name>.py`:
 
 ```python
 class TaskTool:
@@ -252,16 +252,16 @@ class TaskTool:
     def predict(self, *inputs): ...
 
 # Auto-register
-from polygraph.models.registry import ModelRegistry
+from kglab.models.registry import ModelRegistry
 ModelRegistry.register("<task_name>", TaskTool)
 ```
 
 ### Step 8 — Wire up auto-registration
 
-In `src/polygraph/models/__init__.py`, add:
+In `src/kglab/models/__init__.py`, add:
 
 ```python
-import polygraph.models.<task_name>  # noqa: F401 — registers tool
+import kglab.models.<task_name>  # noqa: F401 — registers tool
 ```
 
 ### Step 9 — Create an experiment

@@ -14,7 +14,7 @@ description: >
 
 pipeline:
   # Which pipeline variant to run. Must match a key in the pipeline registry
-  # (src/polygraph/pipelines/__init__.py). Available: baseline
+  # (src/kglab/pipelines/__init__.py). Available: baseline
   variant: "baseline"
 
   # Compose independent entity and relation methods.
@@ -55,7 +55,7 @@ input:
     - "data/wikipedia/"
 
   # Optional: auto-download a supported dataset before running.
-  # When set, BenchmarkRunner calls polygraph.data.Data.download() to ensure
+  # When set, BenchmarkRunner calls kglab.data.Data.download() to ensure
   # the data exists at the first input path. Cached data is never re-downloaded.
   #
   # Supported dataset names: see Data.list()

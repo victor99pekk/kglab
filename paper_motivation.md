@@ -1,4 +1,4 @@
-# Polygraph Paper — Motivation & Research Direction
+# KGLab Paper — Motivation & Research Direction
 
 > Modeled after *"Fast Graph Representation Learning with PyTorch Geometric"* (Fey & Lenssen, ICLR 2019)
 
@@ -16,7 +16,7 @@ Every research group that builds KGs from text reinvents: chunking, entity extra
 
 ## The Opportunity
 
-Polygraph fills this gap. It provides:
+KGLab fills this gap. It provides:
 
 1. **A modular, end-to-end pipeline** — preprocessing → extraction → resolution → building → evaluation → export → QA generation — with swappable components at every stage via a registry pattern.
 
@@ -30,12 +30,12 @@ Polygraph fills this gap. It provides:
 
 - **LLMs need better training data.** KG-structured data demonstrably reduces hallucination (0% vs 94% in initial experiments).
 - **LLM-based extraction is changing the game.** GraphGen, structured LLM prompting, and other LLM-native approaches need systematic comparison against traditional IE — no framework exists for this.
-- **KG quality is underexplored.** The community lacks consensus on what makes a KG "good." Polygraph's evaluation suite is a proposal for standardization.
+- **KG quality is underexplored.** The community lacks consensus on what makes a KG "good." KGLab's evaluation suite is a proposal for standardization.
 - **The field is fragmented.** AKBC, NLP, and Semantic Web communities all build KGs but don't share tools. A unifying library could bridge these communities.
 
 ## The PyG Parallel
 
-| PyTorch Geometric (2019) | Polygraph (proposed) |
+| PyTorch Geometric (2019) | KGLab (proposed) |
 |---|---|
 | Standardized GNN operations | Standardized KG construction stages |
 | CUDA kernels + mini-batching | Registry pattern + lazy imports |
@@ -46,7 +46,7 @@ Polygraph fills this gap. It provides:
 ## The Core Paper Narrative
 
 1. **Problem:** KG construction is fragmented; no standard library, no fair benchmarks, no shared evaluation.
-2. **Solution:** Polygraph — a modular, extensible library for end-to-end KG construction with built-in evaluation and benchmarking.
+2. **Solution:** KGLab — a modular, extensible library for end-to-end KG construction with built-in evaluation and benchmarking.
 3. **Architecture:** The registry pattern, the tripartite model (entities/documents/chunks), the pipeline abstraction.
 4. **Benchmarks:** Comparative results across extraction methods (spaCy vs. GraphGen vs. structured LLM), ontologies, and resolution strategies on a shared corpus.
 5. **Case study:** KG-structured training data reduces LLM hallucination (QA generation → fine-tuning → evaluation).
@@ -59,7 +59,7 @@ Polygraph fills this gap. It provides:
 - [ ] Add 1–2 more extraction baselines (e.g., OpenIE-style) for a richer comparison
 - [ ] Produce the hallucination comparison rigorously (KG-trained vs. flat-trained LLM)
 - [ ] Document the API with tutorials and examples (largely done)
-- [ ] Package for PyPI with `pip install polygraph`
+- [ ] Package for PyPI with `pip install kglab`
 
 ## Target Venues (in priority order)
 
@@ -79,7 +79,7 @@ Polygraph fills this gap. It provides:
 
 - **PyTorch Geometric** (Fey & Lenssen, 2019) — the model for this paper
 - **DGL** (Wang et al., 2019) — another GNN library
-- **GraphGen** — the joint extraction algorithm implemented in Polygraph
+- **GraphGen** — the joint extraction algorithm implemented in KGLab
 - **DeepKE, OpenNRE, spaCy** — traditional IE tools
 - **Neo4j, NetworkX** — graph backends
 - **LLM-as-judge** (Zheng et al., 2023) — evaluation methodology

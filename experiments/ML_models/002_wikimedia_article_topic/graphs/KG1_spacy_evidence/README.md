@@ -105,7 +105,7 @@ Upload through the existing repository uploader without clearing other data:
 
 ```bash
 uv run --frozen python -c \
-  "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_from_output; upload_from_output('experiments/ML_models/002_wikimedia_article_topic/artifacts/kg1_revision_pilot', clear=False)"
+  "from dotenv import load_dotenv; load_dotenv(); from kglab.kg_export.neo4j.upload import upload_from_output; upload_from_output('experiments/ML_models/002_wikimedia_article_topic/artifacts/kg1_revision_pilot', clear=False)"
 ```
 
 Do not use root `make neo4j-upload` for this pilot: that target currently passes

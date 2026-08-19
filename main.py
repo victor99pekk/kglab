@@ -1,4 +1,4 @@
-"""Polygraph — research pipeline for building high-quality KGs.
+"""KGLab — research pipeline for building high-quality KGs.
 
 Usage:
     # Run an experiment from a YAML config (recommended)
@@ -11,7 +11,7 @@ Usage:
     python main.py --neo4j --clear-neo4j                        # Wipe Neo4j then stream
     python main.py --ontology configs/my_ontology.yaml          # Custom ontology
 
-Create custom pipelines in src/polygraph/pipelines/
+Create custom pipelines in src/kglab/pipelines/
 """
 
 import argparse
@@ -19,10 +19,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from polygraph._shared.run_manifest import next_run_dir
-from polygraph._shared.stage_config import LinkingConfig
-from polygraph.kg_eval import evaluate_kg
-from polygraph.pipelines import PIPELINE_REGISTRY
+from kglab._shared.run_manifest import next_run_dir
+from kglab._shared.stage_config import LinkingConfig
+from kglab.kg_eval import evaluate_kg
+from kglab.pipelines import PIPELINE_REGISTRY
 
 load_dotenv()
 
@@ -40,7 +40,7 @@ def _resolve_output_dir(output_arg: Path | None) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Polygraph — build and evaluate knowledge graphs",
+        description="KGLab — build and evaluate knowledge graphs",
     )
     parser.add_argument(
         "--experiment",
@@ -100,8 +100,8 @@ def main() -> None:
 
     # ── Experiment mode (YAML config) ──────────────────────────
     if args.experiment:
-        from polygraph.benchmark_pipeline import BenchmarkRunner
-        from polygraph.benchmark_pipeline.config import ExperimentConfig
+        from kglab.benchmark_pipeline import BenchmarkRunner
+        from kglab.benchmark_pipeline.config import ExperimentConfig
 
         config = ExperimentConfig.from_yaml(args.experiment)
         runner = BenchmarkRunner(config)

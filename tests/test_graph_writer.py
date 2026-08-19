@@ -7,15 +7,15 @@ or a Neo4j stream (``Neo4jGraphBuilder``).
 
 import networkx as nx
 
-from polygraph._shared import Document
-from polygraph.kg_build.build import (
+from kglab._shared import Document
+from kglab.kg_build.build import (
     GraphBuilder,
     GraphWriter,
     NetworkXGraphWriter,
     SQLiteGraphWriter,
     build_kg_into,
 )
-from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
+from kglab.kg_export.neo4j.builder import Neo4jGraphBuilder
 
 
 def test_networkx_writer_matches_batch_graph_builder():

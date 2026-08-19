@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for your interest in contributing to Polygraph!
+Thanks for your interest in contributing to KGLab!
 
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/polygraph.git
-cd polygraph
+git clone https://github.com/your-org/kglab.git
+cd kglab
 uv sync
 uv run python -m spacy download en_core_web_sm
 uv run pytest tests/ -v
@@ -21,7 +21,7 @@ uv run pytest tests/ -v
 ## Project Structure
 
 ```
-src/polygraph/
+src/kglab/
 ├── pipelines/       # Swappable pipeline variants (subclass + override stages)
 ├── preprocess/      # load/ clean/ chunk/ quality/ dedup/  — one folder per stage
 ├── kg_build/        # extract/ resolve/ build/             — one folder per stage
@@ -49,7 +49,7 @@ kg_build/build/my_builder.py         # (resolved, triples, **kw) → graph
 
 Wire it in `kg_build/__init__.py` (2 lines):
 ```python
-from polygraph.kg_build.extract.my_extractor import my_extractor
+from kglab.kg_build.extract.my_extractor import my_extractor
 extract.my_extractor = my_extractor
 ```
 
@@ -57,9 +57,9 @@ extract.my_extractor = my_extractor
 
 ```python
 # pipelines/my_variant.py
-from polygraph.pipelines import Baseline
-from polygraph.kg_build import build_kg_into, extract, resolve
-from polygraph.kg_build.build import NetworkXGraphWriter
+from kglab.pipelines import Baseline
+from kglab.kg_build import build_kg_into, extract, resolve
+from kglab.kg_build.build import NetworkXGraphWriter
 
 class MyVariant(Baseline):
     def build_kg(self, chunks):
@@ -72,7 +72,7 @@ class MyVariant(Baseline):
 
 Export it in `pipelines/__init__.py`:
 ```python
-from polygraph.pipelines.my_variant import MyVariant
+from kglab.pipelines.my_variant import MyVariant
 ```
 
 Run: `python main.py --variant myvariant`

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Download Wikipedia data for Polygraph — edit the values below to change behavior."""
+"""Download Wikipedia data for KGLab — edit the values below to change behavior."""
 
-from polygraph.data import Data, DegreeSampler, RandomSampler, SpecificSampler
+from kglab.data import Data, DegreeSampler, RandomSampler, SpecificSampler
 
 # ── Edit these ────────────────────────────────────────────────
 PATH = "data/wikipedia/connected.jsonl"

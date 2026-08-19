@@ -14,16 +14,16 @@ from typing import Any
 
 import pytest
 
-from polygraph._shared import Document
-from polygraph._shared.stage_config import PreprocessConfig
-from polygraph._shared.types import PreprocessResult
-from polygraph.benchmark_pipeline import Benchmark, BenchmarkResult, BenchmarkRunner
-from polygraph.benchmark_pipeline.chunking import runner as chunking_mod
-from polygraph.benchmark_pipeline.dedup import runner as dedup_mod
-from polygraph.benchmark_pipeline.quality import runner as quality_mod
-from polygraph.benchmark_pipeline.rag import runner as rag_mod
-from polygraph.data import Data, _benchmarks
-from polygraph.pipelines import Baseline, Pipeline
+from kglab._shared import Document
+from kglab._shared.stage_config import PreprocessConfig
+from kglab._shared.types import PreprocessResult
+from kglab.benchmark_pipeline import Benchmark, BenchmarkResult, BenchmarkRunner
+from kglab.benchmark_pipeline.chunking import runner as chunking_mod
+from kglab.benchmark_pipeline.dedup import runner as dedup_mod
+from kglab.benchmark_pipeline.quality import runner as quality_mod
+from kglab.benchmark_pipeline.rag import runner as rag_mod
+from kglab.data import Data, _benchmarks
+from kglab.pipelines import Baseline, Pipeline
 
 ALL_STAGES = ["Dedup", "Chunking", "Resolution", "Extraction", "Quality", "RAG"]
 
@@ -66,7 +66,7 @@ def test_pipeline_registry_has_baseline_alias() -> None:
     example YAML configs use ``variant: baseline``, so the registry must know
     that name (a ``BenchmarkRunner.from_config`` with it used to crash).
     """
-    from polygraph.pipelines import PIPELINE_REGISTRY, Baseline
+    from kglab.pipelines import PIPELINE_REGISTRY, Baseline
 
     assert PIPELINE_REGISTRY["baseline"] is Baseline
     assert BenchmarkRunner._resolve_pipeline("baseline") is Baseline
@@ -228,7 +228,7 @@ def test_rag_runner_small_gold(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
 def test_compare_matrix_merges_chunk_and_dedup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sweeping both axes must not silently overwrite one config (bug fix)."""
-    import polygraph.benchmark_pipeline.compare as compare_mod
+    import kglab.benchmark_pipeline.compare as compare_mod
 
     captured: dict[str, Any] = {}
 
@@ -349,7 +349,7 @@ def test_dblp_deepmatcher_parser(tmp_path: Path) -> None:
 
 def test_chunking_semantic_builds_one_chunker(monkeypatch: pytest.MonkeyPatch) -> None:
     """Semantic chunking must reuse one model-backed chunker per run."""
-    from polygraph.preprocess.chunk import SemanticChunker as RealChunker
+    from kglab.preprocess.chunk import SemanticChunker as RealChunker
 
     init_count = {"n": 0}
 
@@ -438,7 +438,7 @@ def test_dedup_predict_pair_semantic_uses_shared_encoder(
 
 def test_extraction_golds_registered() -> None:
     """The extraction benchmark exposes a pick-your-gold family (test splits)."""
-    from polygraph.data import DATASET_REGISTRY
+    from kglab.data import DATASET_REGISTRY
 
     for key in ("bench_ner_test", "bench_ner_wikiann", "bench_ner_fewnerd"):
         assert key in DATASET_REGISTRY
@@ -452,7 +452,7 @@ def test_extraction_golds_registered() -> None:
 
 def test_span_metrics_is_schema_scoped_with_aliases() -> None:
     """Labels outside the gold's set are not scored; aliases normalize names."""
-    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+    from kglab.benchmark_pipeline.extraction import runner as extraction_mod
 
     allowed = {"PER", "ORG", "MISC"}
     gold = [(0, 3, "ORG", "IBM"), (10, 13, "PER", "Amy")]
@@ -475,7 +475,7 @@ def test_span_metrics_is_schema_scoped_with_aliases() -> None:
 
 def test_span_metrics_aggregates_per_record() -> None:
     """The same span in different records counts as separate true positives."""
-    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+    from kglab.benchmark_pipeline.extraction import runner as extraction_mod
 
     gold = [(0, 2, "ORG", "EU")]
     predicted = [(0, 2, "ORG", "EU")]
@@ -495,7 +495,7 @@ def test_span_metrics_aggregates_per_record() -> None:
 
 def test_render_stage_table_lists_pipelines_and_marks_best() -> None:
     """Tables must be aligned, contain metric headers, and mark the best."""
-    from polygraph.benchmark_pipeline.render import format_stage
+    from kglab.benchmark_pipeline.render import format_stage
 
     text = format_stage(
         "chunking",
@@ -516,7 +516,7 @@ def test_render_stage_table_lists_pipelines_and_marks_best() -> None:
 
 
 def test_render_all_six_stages_have_metadata() -> None:
-    from polygraph.benchmark_pipeline.render import STAGE_META, format_stages
+    from kglab.benchmark_pipeline.render import STAGE_META, format_stages
 
     assert set(STAGE_META) == {
         "dedup",
@@ -537,7 +537,7 @@ def test_render_all_six_stages_have_metadata() -> None:
 
 
 def test_render_empty_results_does_not_crash() -> None:
-    from polygraph.benchmark_pipeline.render import format_stage
+    from kglab.benchmark_pipeline.render import format_stage
 
     assert "no results" in format_stage("quality", {})
 
@@ -567,7 +567,7 @@ def test_extraction_max_records_scores_a_slice_of_gold(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """max_records caps the gold records passed to the extraction scorer."""
-    from polygraph.benchmark_pipeline.extraction import runner as extraction_mod
+    from kglab.benchmark_pipeline.extraction import runner as extraction_mod
 
     monkeypatch.setattr(Data, "download", lambda *a, **k: None)
     gold = tmp_path / "ner_gold.jsonl"
@@ -597,7 +597,7 @@ def test_extraction_max_records_scores_a_slice_of_gold(
 
 def test_stage_result_str_renders_the_report() -> None:
     """print(result) shows the aligned table with the best metric marked."""
-    from polygraph.benchmark_pipeline import StageResult
+    from kglab.benchmark_pipeline import StageResult
 
     result = StageResult(
         stage="dedup",
@@ -619,7 +619,7 @@ def test_stage_result_str_renders_the_report() -> None:
 
 def test_stage_result_accessors() -> None:
     """__getitem__, headline, best_pipeline, to_dict and pipelines work."""
-    from polygraph.benchmark_pipeline import StageResult
+    from kglab.benchmark_pipeline import StageResult
 
     result = StageResult(
         stage="chunking",
@@ -638,7 +638,7 @@ def test_stage_result_accessors() -> None:
 
 def test_stage_result_is_thin_not_a_dict() -> None:
     """Deliberately dict-like only via __getitem__ — no Mapping emulation."""
-    from polygraph.benchmark_pipeline import StageResult
+    from kglab.benchmark_pipeline import StageResult
 
     result = StageResult(stage="quality", results={"x": {"accuracy": 1.0}})
     assert not hasattr(result, "values")

@@ -1,13 +1,13 @@
-# Polygraph Tutorial
+# KGLab Tutorial
 
 A step-by-step walkthrough of building, evaluating, and exporting a knowledge
-graph with Polygraph.
+graph with KGLab.
 
 ---
 
 ## 1. Prepare your input data
 
-Polygraph expects **JSONL** input — one JSON object per line, with `id` and
+KGLab expects **JSONL** input — one JSON object per line, with `id` and
 `text` fields (see `docs/input_data_format.md` for the full spec).
 
 ```jsonl
@@ -24,7 +24,7 @@ Place your `.jsonl` files in a directory (e.g. `data/my_articles/`).
 The simplest way to build a KG is with the `Baseline` pipeline:
 
 ```python
-from polygraph.pipelines import Baseline
+from kglab.pipelines import Baseline
 
 pipe = Baseline(
     input_paths=["data/my_articles/"],
@@ -49,8 +49,8 @@ When it finishes you'll find these files in `output/baseline/`:
 The `Baseline` pipeline accepts typed configuration objects for each stage:
 
 ```python
-from polygraph.pipelines import Baseline
-from polygraph._shared.stage_config import ExtractionConfig, ResolutionConfig
+from kglab.pipelines import Baseline
+from kglab._shared.stage_config import ExtractionConfig, ResolutionConfig
 
 pipe = Baseline(
     input_paths=["data/my_articles/"],
@@ -91,7 +91,7 @@ pipe.execute()
 | `"sqlite"` | File-backed graph (`.db` file, disk-resident, handles large KGs) |
 
 ```python
-from polygraph._shared.stage_config import BuildConfig
+from kglab._shared.stage_config import BuildConfig
 
 # For large graphs — avoids OOM by writing to disk
 pipe = Baseline(
@@ -109,8 +109,8 @@ pipe.execute()
 You can run evaluation independently of a full pipeline:
 
 ```python
-from polygraph.kg_eval import metrics, structural
-from polygraph.kg_eval.metrics import AccuracyEvaluator
+from kglab.kg_eval import metrics, structural
+from kglab.kg_eval.metrics import AccuracyEvaluator
 import json
 
 # Load a previously built KG
@@ -146,7 +146,7 @@ accuracy_report = accuracy_eval.evaluate(kg["graph"], kg["entities"], kg["triple
 Export a KG to various formats programmatically:
 
 ```python
-from polygraph.kg_export import GraphExporter
+from kglab.kg_export import GraphExporter
 from pathlib import Path
 
 exporter = GraphExporter()
@@ -164,7 +164,7 @@ for p in paths:
 Or use the convenience function API:
 
 ```python
-from polygraph.kg_export import exporter
+from kglab.kg_export import exporter
 
 exporter.to_json(kg["graph"], kg["entities"], kg["triples"], "output/kg.json")
 exporter.to_graphml(kg["graph"], "output/kg.graphml")
@@ -200,7 +200,7 @@ To add support for another graph database (e.g. ArangoDB, Neptune), subclass
 `GraphDBUploader` and register it:
 
 ```python
-from polygraph.kg_export.graph_db import GraphDBUploader, BACKENDS
+from kglab.kg_export.graph_db import GraphDBUploader, BACKENDS
 
 class ArangoUploader(GraphDBUploader):
     def __init__(self, host="localhost", port=8529, **kwargs):
@@ -235,12 +235,12 @@ Subclass `Pipeline` and override any stage. Here's a minimal example that
 uses a custom entity extractor:
 
 ```python
-from polygraph.pipelines._base import Pipeline
-from polygraph._shared import Document
-from polygraph.preprocess import chunk, clean, dedup, load, quality
-from polygraph.kg_build import build_kg_into, extract, resolve
-from polygraph.kg_build.build import NetworkXGraphWriter
-from polygraph._shared.config import Ontology
+from kglab.pipelines._base import Pipeline
+from kglab._shared import Document
+from kglab.preprocess import chunk, clean, dedup, load, quality
+from kglab.kg_build import build_kg_into, extract, resolve
+from kglab.kg_build.build import NetworkXGraphWriter
+from kglab._shared.config import Ontology
 from pathlib import Path
 
 class MyPipeline(Pipeline):
@@ -277,7 +277,7 @@ Register it so the benchmark runner can discover it:
 
 ```python
 # In your own code, after defining MyPipeline:
-from polygraph.pipelines import PIPELINE_REGISTRY
+from kglab.pipelines import PIPELINE_REGISTRY
 PIPELINE_REGISTRY["my_pipeline"] = MyPipeline
 ```
 
@@ -291,8 +291,8 @@ directly (no YAML required) or with a YAML config for reproducibility.
 ### Direct API (simplest)
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner
-from polygraph.pipelines import Baseline
+from kglab.benchmark_pipeline import BenchmarkRunner
+from kglab.pipelines import Baseline
 
 runner = BenchmarkRunner(
     pipeline=Baseline,
@@ -311,8 +311,8 @@ print(f"Num triples:   {result.num_triples}")
 Every benchmark test accepts multiple pipelines and scores them side by side:
 
 ```python
-from polygraph.benchmark_pipeline import Benchmark
-from polygraph.pipelines import Baseline
+from kglab.benchmark_pipeline import Benchmark
+from kglab.pipelines import Baseline
 
 result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
     pipelines={"baseline": Baseline(), "my_pipeline": MyCustomPipeline()},
@@ -324,7 +324,7 @@ print(result.best_pipeline())  # pipeline with the best score
 ### YAML config (for version-controlled experiments)
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+from kglab.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
 config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
 runner = BenchmarkRunner.from_config(config)
@@ -340,7 +340,7 @@ See `experiments/kg/_template/` for an example experiment config.
 Every stage is callable independently — you don't need a full pipeline:
 
 ```python
-from polygraph.preprocess import load, clean, chunk, quality, dedup
+from kglab.preprocess import load, clean, chunk, quality, dedup
 
 docs = load.from_paths(["data/my_articles/"])
 docs = clean.normalize(docs)

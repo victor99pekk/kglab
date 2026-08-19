@@ -1,29 +1,29 @@
 """Tests for document-to-document relation extraction."""
 
-from polygraph._shared import Document, entity_id
-from polygraph.kg_build.extract.document_relation._base import DocumentRelationExtractor
-from polygraph.kg_build.extract.document_relation.citation import (
+from kglab._shared import Document, entity_id
+from kglab.kg_build.extract.document_relation._base import DocumentRelationExtractor
+from kglab.kg_build.extract.document_relation.citation import (
     CitationExtractor,
 )
-from polygraph.kg_build.extract.document_relation.composite import (
+from kglab.kg_build.extract.document_relation.composite import (
     CompositeDocRelationExtractor,
 )
-from polygraph.kg_build.extract.document_relation.hyperlink import (
+from kglab.kg_build.extract.document_relation.hyperlink import (
     HyperlinkExtractor,
 )
-from polygraph.kg_build.extract.document_relation.registry import (
+from kglab.kg_build.extract.document_relation.registry import (
     create_doc_relation_method,
 )
-from polygraph.kg_build.extract.document_relation.series import (
+from kglab.kg_build.extract.document_relation.series import (
     SeriesExtractor,
 )
-from polygraph.kg_build.extract.document_relation.shared_authors import (
+from kglab.kg_build.extract.document_relation.shared_authors import (
     SharedAuthorsExtractor,
 )
-from polygraph.kg_build.extract.document_relation.shared_references import (
+from kglab.kg_build.extract.document_relation.shared_references import (
     SharedReferencesExtractor,
 )
-from polygraph.preprocess.link.normalize import normalize_links
+from kglab.preprocess.link.normalize import normalize_links
 
 # ── Helpers ────────────────────────────────────────────────────
 

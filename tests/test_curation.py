@@ -10,15 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from polygraph.preprocess._internal.manifest import SourceManifest
-from polygraph.preprocess.curate.en.processing import (
+from kglab.preprocess._internal.manifest import SourceManifest
+from kglab.preprocess.curate.en.processing import (
     SemanticReviewer,
     TextSpan,
     split_text_to_token_limit,
 )
-from polygraph.preprocess.curate.pipeline import CurationConfig, DatasetCurationPipeline
-from polygraph.preprocess.dedup import GlobalDeduplicator, SemanticDeduplicator
-from polygraph.preprocess.quality import QualityProfiler, QualityThresholds
+from kglab.preprocess.curate.pipeline import CurationConfig, DatasetCurationPipeline
+from kglab.preprocess.dedup import GlobalDeduplicator, SemanticDeduplicator
+from kglab.preprocess.quality import QualityProfiler, QualityThresholds
 
 
 def word_counter(text: str) -> int:
@@ -124,7 +124,7 @@ def test_english_cleaner_works_without_ftfy_installed():
     """EnglishCleaner remains functional when ftfy is not available."""
     import sys
 
-    from polygraph.preprocess.clean.en.normalizer import EnglishCleaner
+    from kglab.preprocess.clean.en.normalizer import EnglishCleaner
 
     cleaner = EnglishCleaner()
 

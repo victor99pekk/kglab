@@ -16,9 +16,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from polygraph._shared.stage_config import PreprocessConfig, ResolutionConfig
-from polygraph.benchmark_pipeline import Benchmark, StageResult, format_stages
-from polygraph.pipelines import Baseline, Semantic
+from kglab._shared.stage_config import PreprocessConfig, ResolutionConfig
+from kglab.benchmark_pipeline import Benchmark, StageResult, format_stages
+from kglab.pipelines import Baseline, Semantic
 
 ALL_STAGES = ["dedup", "chunking", "extraction", "resolution", "quality", "rag"]
 
@@ -87,7 +87,7 @@ def _run_stage(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run Polygraph benchmark stages across pipeline variants.",
+        description="Run KGLab benchmark stages across pipeline variants.",
     )
     parser.add_argument(
         "--stage",

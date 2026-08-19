@@ -2,7 +2,7 @@
 
 import pytest
 
-from polygraph._shared.stage_config import DocumentRelationConfig, ExtractionConfig
+from kglab._shared.stage_config import DocumentRelationConfig, ExtractionConfig
 
 
 def test_document_relations_can_be_disabled_without_specifying_methods():
@@ -26,9 +26,7 @@ def test_document_relation_config_preserves_explicit_methods():
 
 
 def test_disabled_document_relations_allow_an_explicit_empty_method_list():
-    config = ExtractionConfig.from_dict(
-        {"document_relation": {"enabled": False, "methods": []}}
-    )
+    config = ExtractionConfig.from_dict({"document_relation": {"enabled": False, "methods": []}})
 
     assert config.document_relation.enabled is False
     assert config.document_relation.methods == []

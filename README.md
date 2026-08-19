@@ -107,7 +107,7 @@ experiments/
 ```bash
 git clone git@github.com:victor99pekk/kglab.git
 cd kglab
-make install         # syncs all deps + downloads spaCy model
+make install
 ```
 
 Run `make help` to see all available targets.

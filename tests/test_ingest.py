@@ -3,8 +3,8 @@
 import tempfile
 from pathlib import Path
 
-from polygraph._shared import Document, Language
-from polygraph.preprocess.load import DataLoader
+from kglab._shared import Document, Language
+from kglab.preprocess.load import DataLoader
 
 
 def test_load_txt():
@@ -34,7 +34,7 @@ def test_load_json():
 
 
 def test_cleaner_normalizes_whitespace():
-    from polygraph.preprocess.clean import TextCleaner
+    from kglab.preprocess.clean import TextCleaner
 
     doc = Document(content="  Hello   world!\n\nExtra  spaces.  ")
     cleaner = TextCleaner()
@@ -44,7 +44,7 @@ def test_cleaner_normalizes_whitespace():
 
 
 def test_semantic_chunker_splits_at_topic_shift_with_fake_encoder():
-    from polygraph.preprocess.chunk import SemanticChunker
+    from kglab.preprocess.chunk import SemanticChunker
 
     text = "Mèo thích ngủ trong nhà. Mèo thường chơi vào buổi tối. Tên lửa đưa vệ tinh lên quỹ đạo."
 
@@ -66,7 +66,7 @@ def test_semantic_chunker_splits_at_topic_shift_with_fake_encoder():
 
 def test_english_cleaner_normalizes_unicode_and_mojibake():
     """EnglishCleaner applies NFC normalization and ftfy mojibake repair."""
-    from polygraph.preprocess.clean.en.normalizer import EnglishCleaner
+    from kglab.preprocess.clean.en.normalizer import EnglishCleaner
 
     cleaner = EnglishCleaner()
 
@@ -87,7 +87,7 @@ def test_english_cleaner_normalizes_unicode_and_mojibake():
 
 def test_data_download_defaults_path_to_data_dir(monkeypatch):
     """Data.download() with no path= writes to data/{name}.jsonl and enriches."""
-    from polygraph.data import _api
+    from kglab.data import _api
 
     seen: dict = {}
     enrich_calls: list[dict] = []
@@ -121,7 +121,7 @@ def test_data_download_defaults_path_to_data_dir(monkeypatch):
 
 def test_data_download_without_enrich_skips_enrichment(monkeypatch, tmp_path):
     """Datasets without an enrich step download cleanly and omit 'enriched'."""
-    from polygraph.data import _api
+    from kglab.data import _api
 
     calls: list[str] = []
 

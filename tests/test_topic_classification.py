@@ -1,5 +1,10 @@
 import json
 
+import pytest
+
+# Skip these tests if optional ML deps aren't installed in the environment
+pytest.importorskip("torch_geometric")
+
 import torch
 
 from ml.topic_classification import (
@@ -72,9 +77,7 @@ def test_dataset_and_graph_keep_topic_labels_out_of_message_edges(tmp_path):
         ("article:one", "entity:energy"),
         ("article:two", "entity:space"),
     )
-    assert graph.edges[("article", "links_to", "article")] == (
-        ("article:one", "article:two"),
-    )
+    assert graph.edges[("article", "links_to", "article")] == (("article:one", "article:two"),)
     assert indexed.target_indices[0][0] == 0
 
 
@@ -102,9 +105,7 @@ def test_heterogeneous_graphsage_scores_every_article_topic_pair():
         ("article", "mentions", "entity"): torch.tensor([[0, 1], [0, 2]]),
         ("entity", "mentioned_by", "article"): torch.tensor([[0, 2], [0, 1]]),
         ("topic", "in_domain", "domain"): torch.tensor([[0, 1, 2, 3], [0, 0, 1, 1]]),
-        ("domain", "contains_topic", "topic"): torch.tensor(
-            [[0, 0, 1, 1], [0, 1, 2, 3]]
-        ),
+        ("domain", "contains_topic", "topic"): torch.tensor([[0, 0, 1, 1], [0, 1, 2, 3]]),
     }
 
     logits = model(features, edge_indices)
@@ -141,8 +142,7 @@ def test_pyg_adapter_preserves_targets_without_label_edges(tmp_path):
     )
     graph = build_topic_graph(dataset)
     features = {
-        node_type: torch.randn(len(node_ids), 8)
-        for node_type, node_ids in graph.node_ids.items()
+        node_type: torch.randn(len(node_ids), 8) for node_type, node_ids in graph.node_ids.items()
     }
 
     data = to_hetero_data(graph, features)
@@ -168,8 +168,7 @@ def test_topic_trainer_runs_and_saves_pyg_checkpoint(tmp_path):
     ]
     graph = build_topic_graph(TopicClassificationDataset(examples, taxonomy))
     features = {
-        node_type: torch.randn(len(node_ids), 8)
-        for node_type, node_ids in graph.node_ids.items()
+        node_type: torch.randn(len(node_ids), 8) for node_type, node_ids in graph.node_ids.items()
     }
     data = to_hetero_data(graph, features)
     graph_path = tmp_path / "topic_graph.pt"

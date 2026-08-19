@@ -11,7 +11,6 @@ import argparse
 import bz2
 import hashlib
 import json
-import os
 import ssl
 import sys
 import urllib.request
@@ -21,7 +20,7 @@ from typing import Any
 
 import yaml
 
-USER_AGENT = "Polygraph-Wikimedia-Experiment/0.1 (research dataset preparation)"
+USER_AGENT = "KGLab-Wikimedia-Experiment/0.1 (research dataset preparation)"
 
 
 def verified_ssl_context() -> ssl.SSLContext:
@@ -43,9 +42,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 def taxonomy_labels(taxonomy_path: Path) -> tuple[str, ...]:
     taxonomy = load_yaml(taxonomy_path)
     labels = tuple(
-        str(label)
-        for domain in taxonomy.get("domains", [])
-        for label in domain.get("labels", [])
+        str(label) for domain in taxonomy.get("domains", []) for label in domain.get("labels", [])
     )
     expected = int(taxonomy.get("label_count", 0))
     if len(labels) != expected:
@@ -99,9 +96,7 @@ def verify_download(path: Path, record: dict[str, Any]) -> None:
     expected_md5 = str(record["md5"])
     actual_md5 = file_md5(path)
     if actual_md5 != expected_md5:
-        raise ValueError(
-            f"MD5 mismatch for {path.name}: expected {expected_md5}, got {actual_md5}"
-        )
+        raise ValueError(f"MD5 mismatch for {path.name}: expected {expected_md5}, got {actual_md5}")
 
 
 def download_file(
@@ -224,9 +219,9 @@ def prepare(
     processed = 0
 
     try:
-        with bz2.open(input_path, mode="rt", encoding="utf-8") as source_handle:
-            with temporary.open("w", encoding="utf-8") as output_handle:
-                for line_number, line in enumerate(source_handle, start=1):
+        with bz2.open(input_path, mode="rt", encoding="utf-8") as source_handle, \
+            temporary.open("w", encoding="utf-8") as output_handle:
+            for line_number, line in enumerate(source_handle, start=1):
                     if not line.strip():
                         continue
                     source = json.loads(line)
@@ -336,9 +331,7 @@ def main() -> None:
         else:
             if args.limit is not None and args.limit < 1:
                 raise ValueError("--limit must be positive")
-            input_path = args.input or (
-                raw_dir / "labeled_enwiki_with_topics_metadata.json.bz2"
-            )
+            input_path = args.input or (raw_dir / "labeled_enwiki_with_topics_metadata.json.bz2")
             output_path = args.output or (prepared_dir / "article_topic_labels.jsonl")
             summary_path = args.summary or (prepared_dir / "summary.json")
             result = prepare(

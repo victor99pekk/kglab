@@ -1,5 +1,5 @@
 [project]
-name = "kg-generator"
+name = "kglab"
 version = "0.1.0"
 description = "A tool for generating knowledge bases to support LLM training and Graph RAG workflows"
 readme = "README.md"
@@ -133,7 +133,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["kg_generator"]
+known-first-party = ["kglab"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -143,7 +143,7 @@ ignore_missing_imports = true
 exclude = ["tests/"]
 
 [tool.coverage.run]
-source = ["src/kg_generator"]
+source = ["src/kglab"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

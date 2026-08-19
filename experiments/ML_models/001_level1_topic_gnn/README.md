@@ -1,7 +1,7 @@
 # Training Experiment 001 — Level-1 Topic GNN
 
-**Date:** 2026-07-29  
-**Task:** multilabel article-topic link prediction  
+**Date:** 2026-07-29
+**Task:** multilabel article-topic link prediction
 **Status:** in progress
 
 ## Research question
@@ -11,12 +11,12 @@ text-only encoder for the fixed 110-topic taxonomy?
 
 ## Boundary
 
-- KG creation remains a `polygraph` responsibility.
+- KG creation remains a `kglab` responsibility.
 - Dataset construction, graph tensorization, models, and training live in
   `src/ml/topic_classification/`.
 - This experiment owns configuration, label mappings, splits, results, and
   conclusions.
-- Production inference code will not be added to `polygraph.models` until a
+- Production inference code will not be added to `kglab.models` until a
   checkpoint and inference contract are validated.
 
 ## Graph contract

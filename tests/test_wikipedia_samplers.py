@@ -1,9 +1,9 @@
-"""Tests for the Wikipedia sampler API (``polygraph.data``)."""
+"""Tests for the Wikipedia sampler API (``kglab.data``)."""
 
 import pytest
 
-import polygraph.data._wikipedia as wiki
-from polygraph.data import (
+import kglab.data._wikipedia as wiki
+from kglab.data import (
     Data,
     DegreeSampler,
     RandomSampler,
@@ -11,7 +11,7 @@ from polygraph.data import (
     _api,
     sampler_from_config,
 )
-from polygraph.data._wikipedia import download_wikipedia
+from kglab.data._wikipedia import download_wikipedia
 
 # ── Sampler config validation ─────────────────────────────────
 

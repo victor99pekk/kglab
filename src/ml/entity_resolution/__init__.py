@@ -6,7 +6,7 @@ real-world entity. The trained model can then be used as a drop-in replacement
 for string-based or embedding-based resolution in any pipeline.
 
 The training code lives here in ``src/ml/``. The inference-only tool that
-pipelines import lives in ``src/polygraph/models/entity_resolution.py``.
+pipelines import lives in ``src/kglab/models/entity_resolution.py``.
 
 Usage:
     from ml.entity_resolution import EntityResolutionTrainer

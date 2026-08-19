@@ -13,7 +13,7 @@ Each line in a `.jsonl` file is a single, complete JSON object. Two fields are r
 | `id`     | string | ✅ Yes   | Unique identifier for the document. Must be stable across pipeline runs (used for deduplication and version tracking). |
 | `text`   | string | ✅ Yes   | Full body text of the document. Must be non-empty and UTF-8 encoded. |
 | `title`  | string | No       | Human-readable title or heading of the document. Defaults to `id` if omitted. Used for entity linking and graph node labels. |
-| `url`    | string | No       | Source URL or canonical reference. Defaults to `polygraph://{id}` if omitted. Used for provenance tracking. |
+| `url`    | string | No       | Source URL or canonical reference. Defaults to `kglab://{id}` if omitted. Used for provenance tracking. |
 
 ### Examples
 
@@ -26,7 +26,7 @@ Each line in a `.jsonl` file is a single, complete JSON object. Two fields are r
 ```jsonl
 {"id": "doc_001", "text": "Some document content here..."}
 ```
-> `title` defaults to `"doc_001"` and `url` defaults to `"polygraph://doc_001"`.
+> `title` defaults to `"doc_001"` and `url` defaults to `"kglab://doc_001"`.
 
 ---
 
@@ -49,7 +49,7 @@ Each line in a `.jsonl` file is a single, complete JSON object. Two fields are r
 
 ### `url`
 - **Purpose**: Provenance link back to the original source.
-- **Constraints**: Optional. If omitted, defaults to `polygraph://{id}` (a synthetic identifier indicating no real URL was provided). May be a real URL, a `file://` URI for local documents, or any string.
+- **Constraints**: Optional. If omitted, defaults to `kglab://{id}` (a synthetic identifier indicating no real URL was provided). May be a real URL, a `file://` URI for local documents, or any string.
 - **Used by**: Metadata management, source manifest generation, dataset auditing.
 
 ---

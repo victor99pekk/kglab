@@ -124,9 +124,9 @@ experiment:
 ##   make neo4j-upload GRAPH_PATH=/tmp/polygraph_test/knowledge_graph.json   # arbitrary path
 neo4j-upload:
 	@if [ -n "$(GRAPH_PATH)" ]; then \
-		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('$(GRAPH_PATH)', clear=True); print('Uploaded $(GRAPH_PATH) to Neo4j (cleared first)')"; \
+		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from kglab.kg_export.neo4j.upload import upload_graph; upload_graph('$(GRAPH_PATH)', clear=True); print('Uploaded $(GRAPH_PATH) to Neo4j (cleared first)')"; \
 	else \
-		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from polygraph.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/results/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/results/knowledge_graph.json to Neo4j (cleared first)')"; \
+		uv run python -c "from dotenv import load_dotenv; load_dotenv(); from kglab.kg_export.neo4j.upload import upload_graph; upload_graph('experiments/$(GRAPH)/results/knowledge_graph.json', clear=True); print('Uploaded experiments/$(GRAPH)/results/knowledge_graph.json to Neo4j (cleared first)')"; \
 	fi
 
 # ═══════════════════════════════════════════════════════════
@@ -137,17 +137,17 @@ neo4j-upload:
 test:
 	uv run pytest tests/ -v
 
-## download-wikipedia: Download Wikipedia articles as Polygraph JSONL
+## download-wikipedia: Download Wikipedia articles as KGLab JSONL
 ##   make download-wikipedia WIKI_STRATEGY=degree WIKI_COUNT=20 WIKI_TARGET_DEGREE=3.0
 ##   make download-wikipedia WIKI_EXCLUDE_NS=""  # include all namespaces
 download-wikipedia:
-	uv run python -c "from polygraph.data import Data, RandomSampler, SpecificSampler, DegreeSampler; \
+	uv run python -c "from kglab.data import Data, RandomSampler, SpecificSampler, DegreeSampler; \
 	sampler = DegreeSampler(count=$(WIKI_COUNT), target_degree=$(WIKI_TARGET_DEGREE), max_scan=$(WIKI_MAX_SCAN)$(WIKI_SEED_ARG), exclude_namespaces=[ns for ns in '$(WIKI_EXCLUDE_NS)'.split(',') if ns]) if '$(WIKI_STRATEGY)' == 'degree' else (SpecificSampler() if '$(WIKI_STRATEGY)' == 'specific' else RandomSampler(count=$(WIKI_COUNT), max_scan=$(WIKI_MAX_SCAN)$(WIKI_SEED_ARG))); \
 	Data.download('wikipedia', path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)', snapshot='$(WIKI_SNAPSHOT)', sampler=sampler)"
 
 ## enrich-wikipedia: Add outgoing Wikipedia hyperlinks to existing JSONL
 enrich-wikipedia:
-	uv run python -c "from polygraph.data import Data; Data.enrich('wikipedia', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
+	uv run python -c "from kglab.data import Data; Data.enrich('wikipedia', input_path='$(WIKI_OUTPUT)', language='$(WIKI_LANGUAGE)')"
 
 ## download-data: Download Wikipedia data (edit values in tools/data_retrieval/download_data.py)
 download-data:
@@ -160,7 +160,7 @@ wikipedia-full: download-wikipedia
 ## benchmarks-data: Download and cache all benchmark gold datasets
 benchmarks-data:
 	uv run python -c "
-	from polygraph.data import Data
+	from kglab.data import Data
 	datasets = [
 	    ('bench_ner',        'benchmarks/data/ner_gold.jsonl'),
 	    ('bench_dedup',      'benchmarks/data/dedup_gold.jsonl'),

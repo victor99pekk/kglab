@@ -5,7 +5,7 @@ node (PERSON, ORG, GPE, ...) from its features and graph neighborhood.
 
 The training code lives in ``src/ml/node_classification/``.
 The inference-only tool that pipelines import lives in
-``src/polygraph/models/node_classification.py``.
+``src/kglab/models/node_classification.py``.
 
 Usage:
     from ml.node_classification import NodeClassificationTrainer

@@ -3,10 +3,10 @@
 import networkx as nx
 import pytest
 
-from polygraph._shared import Ontology
-from polygraph.kg_build.build import GraphBuilder
-from polygraph.kg_build.resolve import with_method_and_mapping
-from polygraph.pipelines.baseline import _entity_chunk_membership_triples
+from kglab._shared import Ontology
+from kglab.kg_build.build import GraphBuilder
+from kglab.kg_build.resolve import with_method_and_mapping
+from kglab.pipelines.baseline import _entity_chunk_membership_triples
 
 
 def test_build_graph():
@@ -162,7 +162,7 @@ def test_graph_validation_accepts_structural_nodes_and_case_insensitive(caplog):
         {"id": "chunk:one", "name": "chunk one", "type": "Chunk"},
     ]
 
-    with caplog.at_level("WARNING", logger="polygraph.kg_build.build.networkx"):
+    with caplog.at_level("WARNING", logger="kglab.kg_build.build.networkx"):
         GraphBuilder(ontology=ontology).build(entities, [])
 
     assert "not in schema" not in caplog.text
@@ -178,15 +178,15 @@ def test_graph_validation_warns_for_undeclared_entity_type(caplog):
         {"id": "entity:two", "name": "two", "type": "CARDINAL"},
     ]
 
-    with caplog.at_level("WARNING", logger="polygraph.kg_build.build.networkx"):
+    with caplog.at_level("WARNING", logger="kglab.kg_build.build.networkx"):
         GraphBuilder(ontology=ontology).build(entities, [])
 
     assert "node labels not in schema" in caplog.text
 
 
 def test_deduplication_removes_exact_duplicates():
-    from polygraph._shared import Document
-    from polygraph.preprocess.dedup import Deduplicator
+    from kglab._shared import Document
+    from kglab.preprocess.dedup import Deduplicator
 
     docs = [
         Document(content="Unique document one.", doc_id="1"),
@@ -203,8 +203,8 @@ def test_deduplication_removes_exact_duplicates():
 
 
 def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
-    from polygraph._shared import Document
-    from polygraph.preprocess.dedup import Deduplicator
+    from kglab._shared import Document
+    from kglab.preprocess.dedup import Deduplicator
 
     documents = [
         Document(content="London is the capital of England.", doc_id="a"),
@@ -224,7 +224,7 @@ def test_semantic_deduplication_is_selectable_with_multilingual_embeddings():
 
 
 def test_embedding_resolution_does_not_merge_semantically_related_names():
-    from polygraph.kg_build.resolve import EntityResolver
+    from kglab.kg_build.resolve import EntityResolver
 
     entities = [
         {"id": "a", "name": "khoa học", "type": "CONCEPT", "aliases": []},
@@ -316,8 +316,8 @@ def test_relationless_entity_still_gets_chunk_membership():
 
 
 def test_quality_filter_removes_short_docs():
-    from polygraph._shared import Document
-    from polygraph.preprocess.quality import QualityFilter
+    from kglab._shared import Document
+    from kglab.preprocess.quality import QualityFilter
 
     docs = [
         Document(content="Short."),
@@ -333,9 +333,9 @@ def test_quality_filter_removes_short_docs():
 
 def test_quality_filter_uses_new_default_thresholds():
     """Documents below 200 chars / 40 words are rejected at default config."""
-    from polygraph._shared import Document
-    from polygraph._shared.stage_config import PreprocessConfig
-    from polygraph.preprocess.quality import QualityFilter
+    from kglab._shared import Document
+    from kglab._shared.stage_config import PreprocessConfig
+    from kglab.preprocess.quality import QualityFilter
 
     cfg = PreprocessConfig()
     assert cfg.quality_min_chars == 200
@@ -357,8 +357,8 @@ def test_quality_filter_uses_new_default_thresholds():
 
 def test_layered_dedup_combines_minhash_and_semantic():
     """Layered dedup method chains MinHash → Semantic deduplication."""
-    from polygraph._shared import Document
-    from polygraph.preprocess.dedup import Deduplicator
+    from kglab._shared import Document
+    from kglab.preprocess.dedup import Deduplicator
 
     docs = [
         Document(content="Marie Curie discovered radium in 1898.", doc_id="a"),
@@ -388,8 +388,8 @@ def test_layered_dedup_raises_when_too_many_records():
     The library fails loudly: the semantic layer is never silently dropped in
     favor of MinHash-only results.
     """
-    from polygraph._shared import Document
-    from polygraph.preprocess.dedup import Deduplicator
+    from kglab._shared import Document
+    from kglab.preprocess.dedup import Deduplicator
 
     # Create more documents than semantic_max_records (5000)
     docs = [

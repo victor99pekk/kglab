@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from polygraph.kg_export.graph_db.neo4j import Neo4jUploader
-from polygraph.kg_export.neo4j import upload
-from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder, _safe_rel_type
+from kglab.kg_export.graph_db.neo4j import Neo4jUploader
+from kglab.kg_export.neo4j import upload
+from kglab.kg_export.neo4j.builder import Neo4jGraphBuilder, _safe_rel_type
 
 
 class _Result:

@@ -3,18 +3,18 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-import polygraph.kg_build.extract as extract_module
-from polygraph._shared import Ontology
-from polygraph.benchmark_pipeline.config import ExperimentConfig
-from polygraph.kg_build.extract._base import Entity
-from polygraph.kg_build.extract.entity import SimpleExtractor
-from polygraph.kg_build.extract.joint import GraphGenExtractor
-from polygraph.kg_build.extract.registry import (
+import kglab.kg_build.extract as extract_module
+from kglab._shared import Ontology
+from kglab.benchmark_pipeline.config import ExperimentConfig
+from kglab.kg_build.extract._base import Entity
+from kglab.kg_build.extract.entity import SimpleExtractor
+from kglab.kg_build.extract.joint import GraphGenExtractor
+from kglab.kg_build.extract.registry import (
     create_entity_method,
     create_joint_method,
     create_relation_method,
 )
-from polygraph.kg_build.extract.relation import (
+from kglab.kg_build.extract.relation import (
     OntologyRuleRelationExtractor,
     StructuredLLMRelationExtractor,
 )
@@ -436,7 +436,7 @@ def test_composite_registry_instantiation():
         methods=["ontology_rules"],
     )
 
-    from polygraph.kg_build.extract.relation.composite import CompositeRelationExtractor
+    from kglab.kg_build.extract.relation.composite import CompositeRelationExtractor
 
     assert isinstance(extractor, CompositeRelationExtractor)
     assert extractor.ontology is ontology
@@ -448,7 +448,7 @@ def test_composite_registry_instantiation():
 
 def _make_composite_with_fakes(ontology, *fake_classes):
     """Build a CompositeRelationExtractor that uses manually instantiated fake extractors."""
-    from polygraph.kg_build.extract.relation.composite import CompositeRelationExtractor
+    from kglab.kg_build.extract.relation.composite import CompositeRelationExtractor
 
     composite = CompositeRelationExtractor(ontology, methods=[])
     composite._extractors = [cls(ontology=ontology) for cls in fake_classes]

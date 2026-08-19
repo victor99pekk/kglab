@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Download Wikipedia articles — random, specific URLs, or degree-targeted.
 
-Thin CLI wrapper around :func:`polygraph.data._wikipedia.download_wikipedia`.
-For programmatic use, import ``polygraph.data.Data`` instead.
+Thin CLI wrapper around :func:`kglab.data._wikipedia.download_wikipedia`.
+For programmatic use, import ``kglab.data.Data`` instead.
 
 Usage::
 
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from polygraph.data._wikipedia import (
+from kglab.data._wikipedia import (
     DEFAULT_MAX_SCAN,
     DEFAULT_SNAPSHOT,
     DegreeSampler,
@@ -41,7 +41,7 @@ LOGGER = logging.getLogger("download_wikipedia")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Download Wikipedia articles as Polygraph JSONL.")
+    parser = argparse.ArgumentParser(description="Download Wikipedia articles as KGLab JSONL.")
     parser.add_argument("--count", type=int, default=20, help="Number of articles to download")
     parser.add_argument("--language", default="en", help="Wikipedia language code (default: en)")
     parser.add_argument(

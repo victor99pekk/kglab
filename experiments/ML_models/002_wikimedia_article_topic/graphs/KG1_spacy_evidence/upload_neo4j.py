@@ -11,23 +11,14 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from polygraph.kg_export.neo4j.upload import _get_connection
+from kglab.kg_export.neo4j.upload import _get_connection
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXPERIMENT_DIR = SCRIPT_DIR.parents[1]
 DEFAULT_INPUT = (
-    EXPERIMENT_DIR
-    / "artifacts"
-    / "kg1_revision_pilot"
-    / "neo4j_import"
-    / "knowledge_graph.json"
+    EXPERIMENT_DIR / "artifacts" / "kg1_revision_pilot" / "neo4j_import" / "knowledge_graph.json"
 )
-DEFAULT_REPORT = (
-    EXPERIMENT_DIR
-    / "artifacts"
-    / "kg1_revision_pilot"
-    / "neo4j_confirmation.json"
-)
+DEFAULT_REPORT = EXPERIMENT_DIR / "artifacts" / "kg1_revision_pilot" / "neo4j_confirmation.json"
 CURRENT_GRAPH = "KG1-A.2"
 REPLACEABLE_GRAPHS = ("KG1-A", CURRENT_GRAPH)
 
@@ -83,9 +74,7 @@ PROPERTY_KEYS = {
 
 def node_properties(node: dict[str, Any]) -> dict[str, Any]:
     properties = {
-        key: value
-        for key, value in node.items()
-        if key in PROPERTY_KEYS and value is not None
+        key: value for key, value in node.items() if key in PROPERTY_KEYS and value is not None
     }
     if "spacy_type_counts" in node:
         properties["spacyTypeCountsJson"] = json.dumps(
@@ -105,9 +94,7 @@ def group_payload(
         node_type = node["type"]
         if node_type not in NODE_QUERIES:
             raise ValueError(f"Unsupported Neo4j node type: {node_type!r}")
-        nodes_by_type[node_type].append(
-            {"id": node["id"], "properties": node_properties(node)}
-        )
+        nodes_by_type[node_type].append({"id": node["id"], "properties": node_properties(node)})
 
     edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for edge in data["graph"]["edges"]:
@@ -181,6 +168,7 @@ def upload(path: Path) -> dict[str, Any]:
     driver = _get_connection()
     try:
         with driver.session() as session:
+
             def write(tx: Any) -> None:
                 _write_payload(tx, nodes_by_type, edges_by_type)
 
@@ -199,6 +187,7 @@ def replace(path: Path) -> dict[str, Any]:
     driver = _get_connection()
     try:
         with driver.session() as session:
+
             def write(tx: Any) -> dict[str, int]:
                 previous = tx.run(
                     """
@@ -305,20 +294,12 @@ def inspect(path: Path) -> dict[str, Any]:
                 WHERE relationship.kg1Graph IN $stale_graphs
                 RETURN count(relationship) AS count
                 """,
-                stale_graphs=[
-                    graph
-                    for graph in REPLACEABLE_GRAPHS
-                    if graph != CURRENT_GRAPH
-                ],
+                stale_graphs=[graph for graph in REPLACEABLE_GRAPHS if graph != CURRENT_GRAPH],
             ).single()["count"]
     finally:
         driver.close()
 
-    stale_nodes = sum(
-        count
-        for graph, count in graph_inventory.items()
-        if graph != CURRENT_GRAPH
-    )
+    stale_nodes = sum(count for graph, count in graph_inventory.items() if graph != CURRENT_GRAPH)
     return {
         "nodes": node_count,
         "relationships": sum(relationships.values()),

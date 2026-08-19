@@ -1,8 +1,8 @@
-# Polygraph — Agent Instructions
+# KGLab — Agent Instructions
 
 ## Project Identity
 
-Polygraph is both a **research project** and an **open-source library** for knowledge graph generation. All code must balance two goals:
+KGLab is both a **research project** and an **open-source library** for knowledge graph generation. All code must balance two goals:
 
 1. **Research agility** — enable rapid experimentation and iteration on novel KG construction techniques. The knowldege graph will only ever support three types of nodes: entities, documents, and chunks, for now at least.
   - user should be able to quickly swap out components (e.g., chunkers, extractors, resolvers) and run experiments with minimal boilerplate.
@@ -25,7 +25,7 @@ When writing or modifying code, ask: *Would a new user understand how to use thi
 - Group imports in this order, separated by a blank line:
   1. Standard library imports
   2. Third-party imports
-  3. Local (polygraph) imports
+  3. Local (kglab) imports
 
 ### General
 

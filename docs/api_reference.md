@@ -1,15 +1,15 @@
 # API Reference
 
-Complete reference for all public classes, functions, and types in Polygraph.
+Complete reference for all public classes, functions, and types in KGLab.
 
 ---
 
-## Core Types (`polygraph._shared`)
+## Core Types (`kglab._shared`)
 
 ### `Document`
 
 ```python
-from polygraph._shared import Document
+from kglab._shared import Document
 ```
 
 The universal data currency between all pipeline stages. Represents a raw
@@ -28,7 +28,7 @@ source file, a cleaned text, or a chunk.
 ### `Ontology`
 
 ```python
-from polygraph._shared.config import Ontology
+from kglab._shared.config import Ontology
 ```
 
 Defines the KG schema: which entity types, relations, and attributes exist.
@@ -44,12 +44,12 @@ See `configs/default_ontology.yaml` for the default schema.
 
 ---
 
-## Pipelines (`polygraph.pipelines`)
+## Pipelines (`kglab.pipelines`)
 
 ### `Pipeline` (abstract base)
 
 ```python
-from polygraph.pipelines._base import Pipeline
+from kglab.pipelines._base import Pipeline
 ```
 
 Base class for all KG generation pipelines. Subclass and override stage methods
@@ -67,7 +67,7 @@ to create variants.
 | `execute(input_paths=None, output_dir=None, export_config=None, cache=False, force=False)` | `(...) -> dict` | Full pipeline: preprocess → build → export. Returns the built KG. |
 
 > **Evaluation is not part of `Pipeline`.** Pipelines only build + export.
-> Score the returned KG with `polygraph.kg_eval.evaluate_kg(kg, output_dir=...)`,
+> Score the returned KG with `kglab.kg_eval.evaluate_kg(kg, output_dir=...)`,
 > or use `BenchmarkRunner`, which evaluates automatically.
 
 ---
@@ -75,7 +75,7 @@ to create variants.
 ### `Baseline`
 
 ```python
-from polygraph.pipelines import Baseline
+from kglab.pipelines import Baseline
 ```
 
 Standard pipeline with configurable extraction, resolution, and build methods.
@@ -105,7 +105,7 @@ Additional bundled variants:
 ### `PIPELINE_REGISTRY`
 
 ```python
-from polygraph.pipelines import PIPELINE_REGISTRY
+from kglab.pipelines import PIPELINE_REGISTRY
 ```
 
 Registry mapping variant name strings → `Pipeline` subclasses. Add your custom
@@ -117,7 +117,7 @@ PIPELINE_REGISTRY["my_variant"] = MyPipeline
 
 ---
 
-## Stage Configuration (`polygraph._shared.stage_config`)
+## Stage Configuration (`kglab._shared.stage_config`)
 
 ### `ExtractionConfig`
 
@@ -166,10 +166,10 @@ Tiered preprocessing control:
 
 ---
 
-## Pre-processing (`polygraph.preprocess`)
+## Pre-processing (`kglab.preprocess`)
 
 ```python
-from polygraph.preprocess import load, clean, chunk, quality, dedup
+from kglab.preprocess import load, clean, chunk, quality, dedup
 ```
 
 Each stage is a callable namespace. Available methods per stage:
@@ -216,12 +216,12 @@ Also available: `load.stream(paths)` (streaming loader) and the class API — `D
 
 ---
 
-## KG Build (`polygraph.kg_build`)
+## KG Build (`kglab.kg_build`)
 
 ### `extract.with_methods()`
 
 ```python
-from polygraph.kg_build import extract
+from kglab.kg_build import extract
 
 entities, triples = extract.with_methods(
     chunks, ontology,
@@ -246,7 +246,7 @@ entities, triples = extract.jointly(
 ### `resolve.by_string()` / `resolve.by_embedding()`
 
 ```python
-from polygraph.kg_build import resolve
+from kglab.kg_build import resolve
 
 # Fast token-overlap resolution
 resolved = resolve.by_string(entities, threshold=0.85)
@@ -261,7 +261,7 @@ resolved = resolve.by_embedding(
 ### `link.entities()`
 
 ```python
-from polygraph.kg_build import link
+from kglab.kg_build import link
 
 linked = link.entities(resolved, method="wikidata")  # adds kb_id / kb_source
 ```
@@ -274,8 +274,8 @@ The build step is storage-agnostic: one routine writes through any
 `GraphWriter` backend.
 
 ```python
-from polygraph.kg_build import build_kg_into
-from polygraph.kg_build.build import NetworkXGraphWriter, SQLiteGraphWriter
+from kglab.kg_build import build_kg_into
+from kglab.kg_build.build import NetworkXGraphWriter, SQLiteGraphWriter
 
 # In-memory (default)
 writer = NetworkXGraphWriter(ontology=ontology)
@@ -288,7 +288,7 @@ build_kg_into(writer, chunks, resolved, triples)
 graph = writer.graph  # Returns: SQLiteGraph (disk-resident, same API as nx.DiGraph)
 
 # Neo4j (streamed, no in-memory graph)
-from polygraph.kg_export.neo4j.builder import Neo4jGraphBuilder
+from kglab.kg_export.neo4j.builder import Neo4jGraphBuilder
 build_kg_into(builder, chunks, resolved, triples)
 ```
 
@@ -301,18 +301,18 @@ build_kg_into(builder, chunks, resolved, triples)
 To use SQLite with a pipeline:
 
 ```python
-from polygraph._shared.stage_config import BuildConfig
+from kglab._shared.stage_config import BuildConfig
 
 pipe = Baseline(..., build=BuildConfig(method="sqlite"))
 ```
 
 ---
 
-## KG Evaluation (`polygraph.kg_eval`)
+## KG Evaluation (`kglab.kg_eval`)
 
 ```python
-from polygraph.kg_eval import metrics, structural, evaluate_kg
-from polygraph.kg_eval.metrics import AccuracyEvaluator
+from kglab.kg_eval import metrics, structural, evaluate_kg
+from kglab.kg_eval.metrics import AccuracyEvaluator
 
 # One-shot: quality + structural, writes metrics.json
 # (this is what BenchmarkRunner uses after pipeline.execute())
@@ -334,10 +334,10 @@ accuracy = eval.evaluate(graph, entities, triples)
 
 ---
 
-## KG Export (`polygraph.kg_export`)
+## KG Export (`kglab.kg_export`)
 
 ```python
-from polygraph.kg_export import GraphExporter, exporter
+from kglab.kg_export import GraphExporter, exporter
 
 # Class API — export to multiple formats at once
 ge = GraphExporter()
@@ -362,10 +362,10 @@ exporter.to_graph_db("output/kg.json", backend="neo4j",
 | `rdf` | `"rdf"` | RDF/Turtle triples |
 | `cytoscape` | `"cytoscape"` | Cytoscape.js JSON |
 
-### Graph Database Upload (`polygraph.kg_export.graph_db`)
+### Graph Database Upload (`kglab.kg_export.graph_db`)
 
 ```python
-from polygraph.kg_export.graph_db import Neo4jUploader, GraphDBUploader, BACKENDS
+from kglab.kg_export.graph_db import Neo4jUploader, GraphDBUploader, BACKENDS
 
 # Direct uploader usage
 uploader = Neo4jUploader(uri="bolt://localhost:7687", user="neo4j", password="secret")
@@ -381,13 +381,13 @@ BACKENDS["arangodb"] = ArangoUploader
 
 ---
 
-## Benchmark Runner (`polygraph.benchmark_pipeline`)
+## Benchmark Runner (`kglab.benchmark_pipeline`)
 
 ### Direct API (recommended)
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner
-from polygraph.pipelines import Baseline
+from kglab.benchmark_pipeline import BenchmarkRunner
+from kglab.pipelines import Baseline
 
 # Single pipeline run
 runner = BenchmarkRunner(
@@ -420,7 +420,7 @@ result = runner.run()
 ### `Benchmark` (stage benchmarks)
 
 ```python
-from polygraph.benchmark_pipeline import Benchmark
+from kglab.benchmark_pipeline import Benchmark
 
 result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
     pipelines={"baseline": Baseline(), "semantic": Semantic()}
@@ -432,7 +432,7 @@ Stages: `Dedup`, `Resolution`, `Chunking`, `Extraction`, `Quality`, `RAG`. Pass 
 ### YAML config (for reproducibility)
 
 ```python
-from polygraph.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
+from kglab.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
 config = ExperimentConfig.from_yaml("experiments/kg/001_baseline/config.yaml")
 runner = BenchmarkRunner.from_config(config)
@@ -443,10 +443,10 @@ See `experiments/kg/_template/config.yaml` for the full config schema.
 
 ---
 
-## Data Download (`polygraph.data`)
+## Data Download (`kglab.data`)
 
 ```python
-from polygraph.data import Data, DegreeSampler, RandomSampler, SpecificSampler
+from kglab.data import Data, DegreeSampler, RandomSampler, SpecificSampler
 
 Data.list()                                                            # available datasets
 Data.download("wikipedia", sampler=RandomSampler(count=20))
@@ -470,22 +470,22 @@ outgoing Wikipedia hyperlinks; `Data.enrich(...)` re-enriches an existing file.
 ## Fine-tuning & Models
 
 ```python
-from polygraph.finetune.dataset import QADatasetGenerator
+from kglab.finetune.dataset import QADatasetGenerator
 
 gen = QADatasetGenerator(language="en", seed=42, max_hops=3, test_split=0.2)
 pairs = gen.generate_from_kg(graph, entities, triples)  # {split: [QA pairs]}
 ```
 
-`polygraph.models` provides pluggable model backends (node classification, entity resolution) via `polygraph.models.registry`.
+`kglab.models` provides pluggable model backends (node classification, entity resolution) via `kglab.models.registry`.
 
 ---
 
-## Entity & Relation Types (`polygraph.kg_build.extract`)
+## Entity & Relation Types (`kglab.kg_build.extract`)
 
 ### `Entity`
 
 ```python
-from polygraph.kg_build.extract import Entity
+from kglab.kg_build.extract import Entity
 ```
 
 | Field | Type | Description |
@@ -517,14 +517,14 @@ Abstract base for joint entity+relation extraction. Implement `extract(text, sou
 
 ---
 
-## Base Evaluator (`polygraph.kg_eval`)
+## Base Evaluator (`kglab.kg_eval`)
 
 ### `BaseEvaluator` (ABC)
 
 Abstract base for custom evaluators. Implement `evaluate(graph, entities, triples) -> dict`.
 
 ```python
-from polygraph.kg_eval._base import BaseEvaluator
+from kglab.kg_eval._base import BaseEvaluator
 
 class MyEvaluator(BaseEvaluator):
     def evaluate(self, graph, entities, triples):

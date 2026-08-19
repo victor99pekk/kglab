@@ -2,7 +2,7 @@
 
 The task is modeled as article-to-topic link prediction over a heterogeneous
 graph.  This package owns training-time data and model code.  Production
-inference wrappers belong in ``polygraph.models`` only after a checkpoint
+inference wrappers belong in ``kglab.models`` only after a checkpoint
 format has been validated by experiments.
 
 PyTorch Geometric conversion and training follow the task-package conventions

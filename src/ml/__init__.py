@@ -1,10 +1,10 @@
 """ML training library — model architectures, training loops, and utilities.
 
-This package lives **parallel** to ``polygraph``. It contains all training-
+This package lives **parallel** to ``kglab``. It contains all training-
 time code: model definitions, dataset preparation, training loops, and
 shared utilities. Pipelines should NOT import from here.
 
-Once a model is trained, the inference-only tool in ``polygraph.models``
+Once a model is trained, the inference-only tool in ``kglab.models``
 loads the checkpoint and exposes a clean public API.
 
 Sub-packages:

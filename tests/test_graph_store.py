@@ -10,11 +10,11 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from polygraph._shared.stage_config import BuildConfig, ExtractionConfig, PreprocessConfig
-from polygraph.kg_build.build import SQLiteGraphWriter
-from polygraph.kg_eval import evaluate_kg
-from polygraph.kg_export import exporter
-from polygraph.kg_export.graph_store import (
+from kglab._shared.stage_config import BuildConfig, ExtractionConfig, PreprocessConfig
+from kglab.kg_build.build import SQLiteGraphWriter
+from kglab.kg_eval import evaluate_kg
+from kglab.kg_export import exporter
+from kglab.kg_export.graph_store import (
     GRAPH_STORE_BACKENDS,
     GraphStore,
     JSONGraphStore,
@@ -23,7 +23,7 @@ from polygraph.kg_export.graph_store import (
     SQLiteGraphStore,
     create_graph_store,
 )
-from polygraph.pipelines import Baseline
+from kglab.pipelines import Baseline
 
 
 def _sample_graph() -> nx.DiGraph:
@@ -295,7 +295,7 @@ class _FakeDriver:
 
 def test_baseline_graph_store_backend_neo4j_streams(tmp_path, monkeypatch):
     """build_kg streams directly into Neo4j — no in-memory graph at all."""
-    from polygraph.kg_export.neo4j import upload as neo4j_upload
+    from kglab.kg_export.neo4j import upload as neo4j_upload
 
     driver = _FakeDriver()
     monkeypatch.setattr(neo4j_upload, "_get_connection", lambda **kw: driver)
@@ -328,7 +328,7 @@ def test_baseline_graph_store_backend_neo4j_streams(tmp_path, monkeypatch):
 
 def test_baseline_accepts_configured_neo4j_store(tmp_path, monkeypatch):
     """Credentials live on the store — pass the store, not messy args."""
-    from polygraph.kg_export.neo4j import upload as neo4j_upload
+    from kglab.kg_export.neo4j import upload as neo4j_upload
 
     connection_calls: list[dict] = []
 
@@ -361,7 +361,7 @@ def test_baseline_accepts_configured_neo4j_store(tmp_path, monkeypatch):
 
 def test_baseline_execute_neo4j_streams_end_to_end(tmp_path, monkeypatch):
     """Full execute() works with the streaming backend (export skips gracefully)."""
-    from polygraph.kg_export.neo4j import upload as neo4j_upload
+    from kglab.kg_export.neo4j import upload as neo4j_upload
 
     driver = _FakeDriver()
     monkeypatch.setattr(neo4j_upload, "_get_connection", lambda **kw: driver)
