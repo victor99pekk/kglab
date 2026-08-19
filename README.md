@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="center">
-  <img src="figures/graph_readme.png" alt="Polygraph pipeline overview" width="30%"/>
+  <img src="figures/graph_readme.png" alt="kglab pipeline overview" width="30%"/>
 </p>
 
 <p align="right"><sub><small>Image adapted from <a href="https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275">Holten &amp; van Wijk (2009)</a>.</small></sub></p>
@@ -14,8 +14,7 @@
 A toolkit for building highly customizable Knowledge-Graph generation pipelines. Our hope with this library is twofold. Each point below is backed by a runnable notebook in [`tutorial/`](tutorial/).
 
 1. `Enable easy research with KG generation.` We want it to be easy to try out different KG generation pipelines. We do this by
-    - making it simple to extend existing KG generation pipelines with minimal code — see [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb).
-    - making the KG generation pipeline modular, enabling highly customizable pipelines built with this library.
+    - making the KG generation pipeline modular, enabling highly customizable pipelines by adding new modules and overriding existing pipelines (or create new pipeline classes) (see [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb)).
     - providing code for benchmarking existing pipelines against new pipelines, with benchmark tests covering chunking, deduplication, extraction, entity resolution, quality, and RAG retrieval — each scored side-by-side — see [benchmarking.ipynb](tutorial/benchmarking.ipynb).
 
 2. `Make it easy to use our built custom KG generation pipelines.` We do this by
@@ -25,7 +24,7 @@ A toolkit for building highly customizable Knowledge-Graph generation pipelines.
 <details>
 <summary><strong>📑 Contents</strong></summary>
 
-- [Polygraph: Customizable Knowledge Graph Pipelines](#polygraph-customizable-knowledge-graph-pipelines)
+- [KGLab: Customizable Knowledge Graph Pipelines](#kglab-customizable-knowledge-graph-pipelines)
   - [About the Project](#about-the-project)
   - [Getting Started](#getting-started)
     - [Installation](#installation)
@@ -81,7 +80,7 @@ src/
 │   ├── finetune/        #   QA dataset generation
 │   └── _shared/         #   config, identity, types
 │
-└── ml/                  # ML training (parallel to polygraph)
+└── ml/                  # ML training (parallel to kglab)
     ├── base_trainer.py  #   BaseTrainer ABC
     ├── training_utils.py #  EarlyStopping, MetricTracker, SaveBest
     ├── entity_resolution/   # binary classifier for merging entities
@@ -106,8 +105,8 @@ experiments/
 **Prerequisites:** Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone git@github.com:victor99pekk/polygraph.git
-cd polygraph
+git clone git@github.com:victor99pekk/kglab.git
+cd kglab
 make install         # syncs all deps + downloads spaCy model
 ```
 
@@ -147,7 +146,7 @@ keeps the demo fast — the default is `semantic`. For a whole-pipeline run
 such a run, pick a sampler and download:
 
 ```python
-from polygraph.data import Data, DegreeSampler, RandomSampler, SpecificSampler
+from kglab.data import Data, DegreeSampler, RandomSampler, SpecificSampler
 
 Data.download("wikipedia", sampler=RandomSampler(count=20))
 # SpecificSampler(urls=[...])                      — fetch explicit articles
