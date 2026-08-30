@@ -1,40 +1,16 @@
-# KGLab: Customizable Knowledge Graph Pipelines
+# KGLab
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<p align="center">
-  <img src="figures/graph_readme.png" alt="kglab pipeline overview" width="30%"/>
-</p>
+KGLab is a Python toolkit for building knowledge graphs from raw text and turning them into useful assets for LLM training, evaluation, and graph retrieval workflows.
 
-<p align="right"><sub><small>Image adapted from <a href="https://www.researchgate.net/figure/Left-The-node-link-diagram-view-renders-glyphs-for-nodes-and-curves-for-edges-The-view_fig3_265011275">Holten &amp; van Wijk (2009)</a>.</small></sub></p>
+It is designed to be:
 
-🌐 Find raw documents → 🧠 Build knowledge graph → 🎯 Train LLM / 🔍 Graph RAG
-
-A toolkit for building highly customizable Knowledge-Graph generation pipelines. Our hope with this library is twofold. Each point below is backed by a runnable notebook in [`tutorial/`](tutorial/).
-
-1. `Enable easy research with KG generation.` We want it to be easy to try out different KG generation pipelines. We do this by
-    - making the KG generation pipeline modular, enabling highly customizable pipelines by adding new modules and overriding existing pipelines (or create new pipeline classes) (see [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb)).
-    - providing code for benchmarking existing pipelines against new pipelines, with benchmark tests covering chunking, deduplication, extraction, entity resolution, quality, and RAG retrieval — each scored side-by-side — see [benchmarking.ipynb](tutorial/benchmarking.ipynb).
-
-2. `Make it easy to use our built custom KG generation pipelines.` We do this by
-    - providing pre-built pipelines that can be customized by setting parameters and customizing specific pipeline stages — see [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) for turning a KG into LLM training data.
-    - keeping the graph storage agnostic of the Pipeline classes, so the same pipeline code can be used on small graphs generated locally, or large graphs being generated and continuously streamed to a remote backend (e.g. Neo4j) — see [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb).
-
-<details>
-<summary><strong>📑 Contents</strong></summary>
-
-- [KGLab: Customizable Knowledge Graph Pipelines](#kglab-customizable-knowledge-graph-pipelines)
-  - [About the Project](#about-the-project)
-  - [Getting Started](#getting-started)
-    - [Installation](#installation)
-    - [End-to-end example](#end-to-end-example)
-  - [Tutorial Notebooks](#tutorial-notebooks)
-  - [Documentation](#documentation)
-  - [Contributing](#contributing)
-  - [License](#license)
-
-</details>
+- modular: swap chunking, extraction, resolution, and export stages without rewriting the pipeline
+- benchmarkable: compare pipeline variants under a shared evaluation setup
+- storage-agnostic: run locally or stream into Neo4j without changing the graph-building logic
+- practical: generate graph assets, QA data, and exported datasets for downstream ML workflows
 
 ## About the Project
 
@@ -47,7 +23,7 @@ The project won the **$5,000 USD Meta Prize** and has since been refactored into
 <details>
 <summary><strong>More about hackathon...</strong></summary>
 
-During the competition we tackled the goal of data management in LLM training on vietnamese data, where the task was to build a data management system. We chose to approach this problem by building a pipeline that scraped vietnamese websites for text data, and from this generates knowledge graph (insert why knowledge graph). We then wanted to prove that our knowledge graph enriched the training data. We did this by doing fine tuning an LLM (Qwen2.5-1.5B) on vietnamese text data. We compared three variants, (i) the original LLM-model, (ii) the LLM fine tuned on the vietnamese text data, not structured as a knowledge graph (we call this Flat below), and lastly (iii) the LLM fine tuned on the knowledge graph data. It was a small model fine tuned on a small set of text, but we saw that the variant fine tuned on the KG-data performed by far best in later benchmarking. Worth noting is that though these benchmarks show promise, it is far from enough to ensure a trend as the trainnig data was too little as we didnt have time to perform better test duringt the 48 hours.
+During the competition we tackled the goal of data management in LLM training on vietnamese data, where the task was to build a data management system. We chose to approach this problem by building a pipeline that scraped vietnamese websites for text data, and from this generates knowledge graph (insert why knowledge graph). We then wanted to prove that our knowledge graph enriched the training data. We did this by doing fine tuning an LLM (Qwen2.5-1.5B) on vietnamese text data. We compared three variants, (i) the original LLM-model, (ii) the LLM fine tuned on the vietnamese text data, not structured as a knowledge graph (we call this Flat below), and lastly (iii) the LLM fine tuned on the knowledge graph data. It was a small model fine tuned on a small set of text, but we saw that the variant fine tuned on the KG-data performed by far best in later benchmarking. Worth noting is that though these benchmarks show promise, it is far from enough to ensure a trend as the training data was too little as we didnt have time to perform better test duringt the 48 hours.
 
 | Metric | Base Model | KG-Trained (B) | Flat (C) | Improvement |
 |---|---|---|---|---|
@@ -62,130 +38,148 @@ These early results suggested that KG-structured training data could eliminate h
 
 </details>
 
-## Getting Started
+## Why KGLab
 
-<details>
-<summary><strong>📁 Architecture</strong></summary>
+KGLab focuses on the full lifecycle of a KG workflow:
 
-```
-kglab/                   # KG library (core)
-├── pipelines/           #   swappable variants — subclass Pipeline
-├── benchmark_pipeline/  #   BenchmarkRunner — runs any pipeline from YAML config
-├── models/              #   inference tools — load trained checkpoints
-├── preprocess/          #   load / clean / chunk / quality / dedup
-├── kg_build/            #   extract / resolve / build
-├── kg_eval/             #   metrics / structural
-├── kg_export/           #   json / graphml / neo4j / rdf
-├── finetune/            #   QA dataset generation
-└── _shared/             #   config, identity, types
+1. ingest and normalize documents
+2. clean, deduplicate, and chunk corpora
+3. extract entities and relations
+4. resolve duplicate mentions and entities
+5. build a graph and validate it against an ontology
+6. export it to JSON, GraphML, RDF, or Neo4j
+7. benchmark variants and prepare downstream training data
 
-ml/                      # ML training (parallel to kglab)
-├── base_trainer.py      #   BaseTrainer ABC
-├── training_utils.py    #   EarlyStopping, MetricTracker, SaveBest
-├── entity_resolution/   #   binary classifier for merging entities
-│   └── models/
-├── node_classification/ #   GNN for entity type prediction
-│   └── models/
-└── topic_classification/#   GNN for document topic prediction
-    └── models/
+This is useful for research projects that need reproducible pipeline experimentation, as well as applied work that needs a graph for LLM training or graph-based retrieval.
 
-experiments/
-├── kg/                  # pipeline experiments (config.yaml → BenchmarkRunner)
-│   └── _template/
-└── ML_models/           # training experiments (config.yaml → BaseTrainer)
-    └── _template/
-```
+## Installation
 
-</details>
-
-
-### Installation
-
-**Prerequisites:** Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+KGLab supports Python 3.10+ and uses uv for development installs.
 
 ```bash
-git clone git@github.com:victor99pekk/kglab.git
+git clone https://github.com/victor99pekk/kglab.git
 cd kglab
-make install
+uv venv
+source .venv/bin/activate
+uv pip install -e "."
 ```
 
-Run `make help` to see all available targets.
+Useful extras:
 
-### End-to-end example
+```bash
+uv pip install -e ".[embeddings]"    # semantic entity resolution
+uv pip install -e ".[llm]"           # LLM-based extraction
+uv pip install -e ".[neo4j]"         # Neo4j export/upload support
+uv pip install -e ".[curation]"      # corpus curation and audit tooling
+```
 
-Create a pipeline variant and benchmark it against the baseline in one test:
+## Quick start
+
+The simplest workflow is to run a built-in pipeline on your corpus:
 
 ```python
-from kglab.benchmark_pipeline import Benchmark
-from kglab.pipelines import Baseline, PIPELINE_REGISTRY
+from kglab.pipelines import Baseline
 
-# 1. Create a new pipeline — override preprocess() to change the chunking
-class SmallChunks(Baseline):
-    def preprocess(self):
-        from kglab.preprocess import chunk, clean, load
-        docs = clean.normalize(load.from_paths(self.input_paths))
-        return chunk.by_sentence(docs, target_tokens=300)
-
-PIPELINE_REGISTRY["small_chunks"] = SmallChunks  # now discoverable by name
-
-# 2. Benchmark both pipelines — pass them into one benchmark test
-#    (each test scores the gold dataset bundled with the library by default)
-result = Benchmark.Dedup().run(
-    pipelines={"baseline": Baseline(), "small_chunks": SmallChunks()},
+pipe = Baseline(
+    input_paths=["data/my_articles/"],
+    output_dir="output/baseline/",
 )
-print(result)                  # aligned per-pipeline table
-print("best:", result.best_pipeline())
+
+pipe.execute()
 ```
 
-Every benchmark test (`Dedup`, `Chunking`, `Resolution`, `Extraction`, `Quality`,
-`RAG`) accepts any number of pipelines and scores them side by side — that's how
-you compare variants, so there is no separate `compare()` API. `sentence` chunking
-keeps the demo fast — the default is `semantic`. For a whole-pipeline run
-(preprocess → build → export), use `BenchmarkRunner` directly. To fetch data for
-such a run, pick a sampler and download:
+This runs the full pipeline lifecycle and writes graph artifacts to the output directory.
+
+You can also run from the command line:
+
+```bash
+kg-gen quick -i data/my_articles/ -o output/baseline
+```
+
+Or use a YAML experiment config with the benchmarking runner:
+
+```bash
+python main.py --experiment experiments/kg/_template/config.yaml
+```
+
+## Current capabilities
+
+### Pipeline architecture
+
+KGLab exposes a modular pipeline interface where each stage can be swapped or customized:
+
+- preprocessing: normalization, deduplication, chunking, quality filtering
+- extraction: entity and relation extraction strategies
+- resolution: string matching or embedding-based entity merging
+- graph build: in-memory or file-backed graph stores
+- export: JSON, GraphML, RDF, Cytoscape, Neo4j, and more
+
+### Benchmarking
+
+KGLab includes stage-level and end-to-end benchmarking support via the benchmark pipeline package. This is designed for comparing extraction strategies, resolution methods, chunking strategies, and full KG variants side by side.
 
 ```python
-from kglab.data import Data, DegreeSampler, RandomSampler, SpecificSampler
+from kglab.benchmark_pipeline import BenchmarkRunner, ExperimentConfig
 
-Data.download("wikipedia", sampler=RandomSampler(count=20))
-# SpecificSampler(urls=[...])                      — fetch explicit articles
-# DegreeSampler(count=50, target_degree=5.0)       — grow a connected, link-rich set
+config = ExperimentConfig.from_yaml("experiments/kg/_template/config.yaml")
+runner = BenchmarkRunner(config)
+runner.run()
 ```
 
-Downloads are automatically enriched with outgoing Wikipedia hyperlinks.
+### Data acquisition and curation
 
-See [docs/tutorial.md](docs/tutorial.md) for more workflows, including uploading a
-KG to Neo4j.
+The library includes utilities for:
 
-## Tutorial Notebooks
+- downloading public datasets and enrichment sources
+- scraping and curating raw corpora for training/evaluation
+- generating auditable, deterministic dataset manifests
 
-Runnable notebooks in [`tutorial/`](tutorial/) demonstrate the main workflows
-end-to-end:
+### LLM and training data workflows
 
-| Notebook | What it covers |
-|---|---|
-| [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb) | Create a new pipeline variant — subclass, register, and benchmark it against the baseline |
-| [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb) | The **same pipeline** built locally and in Neo4j — graph storage is agnostic of the pipeline |
-| [kg_neo4j_streaming.ipynb](tutorial/kg_neo4j_streaming.ipynb) | Stream KG creation directly into Neo4j for corpora too large for RAM |
-| [benchmarking.ipynb](tutorial/benchmarking.ipynb) | Benchmark pipelines against each other |
-| [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) | Turn a generated KG into training data for an LLM |
+KGLab is oriented toward KG-driven ML workflows, including:
 
-## Documentation
+- KG-backed fine-tuning data generation
+- graph quality evaluation
+- graph RAG and retrieval-oriented graph assets
+- graph export for downstream tools and storage backends
 
-| Resource | Description |
-|---|---|
-| [Tutorial](docs/tutorial.md) | Step-by-step walkthrough — from input data to exported KG |
-| [Tutorial Notebooks](tutorial/) | Runnable notebooks — custom pipelines, storage-agnostic builds, Neo4j streaming, benchmarking, KG for LLM training |
-| [API Reference](docs/api_reference.md) | Complete reference for all public classes and functions |
-| [Input Data Format](docs/input_data_format.md) | JSONL schema specification |
-| [Contributing Guide](CONTRIBUTING.md) | How to add custom extractors, resolvers, and pipelines |
-| [Example Scripts](examples/) | Runnable Python examples for common workflows |
+## Documentation and tutorials
 
+The detailed step-by-step workflows live in the notebooks and docs, while this README stays focused on the project summary and first-run usage.
+
+- [docs/tutorial.md](docs/tutorial.md) — end-to-end walkthrough
+- [docs/usage.md](docs/usage.md) — CLI and setup usage guide
+- [docs/api_reference.md](docs/api_reference.md) — public API reference
+- [docs/input_data_format.md](docs/input_data_format.md) — JSONL input schema
+- [tutorial/create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb) — build and benchmark a custom pipeline
+- [tutorial/benchmarking.ipynb](tutorial/benchmarking.ipynb) — compare pipeline variants
+- [tutorial/kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb) — same pipeline with different storage backends
+- [tutorial/kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) — generate LLM training data from a KG
+
+## Project layout
+
+```text
+kglab/                 # core library
+├── benchmark_pipeline/ # benchmark runners and result reporting
+├── data/               # dataset download and curation helpers
+├── kg_build/           # extraction, resolution, graph construction
+├── kg_eval/            # evaluation and validation utilities
+├── kg_export/          # export backends
+├── pipelines/          # baseline and custom pipeline variants
+├── preprocess/         # cleaning, chunking, deduplication, quality filtering
+├── _shared/            # config and shared types
+└── finetune/           # KG-to-training-data utilities
+
+ml/                    # ML experiments and training code
+experiments/           # reproducible KG and ML experiment configs
+configs/               # ontology and configuration defaults
+output/                # generated graph outputs and artifacts
+```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and PR guidelines.
+Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style expectations, and contribution workflow.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
