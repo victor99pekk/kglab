@@ -1322,7 +1322,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kg-generator"
+name = "kglab"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -1393,9 +1393,7 @@ eval-data = [
 eval-model = [
     { name = "accelerate" },
     { name = "bitsandbytes" },
-    { name = "deepeval" },
     { name = "peft" },
-    { name = "sentence-transformers" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -1434,8 +1432,7 @@ requires-dist = [
     { name = "deepeval", marker = "extra == 'eval-data'", specifier = ">=2.0" },
     { name = "faiss-cpu", marker = "extra == 'curation'", specifier = ">=1.8" },
     { name = "ftfy", marker = "extra == 'curation'", specifier = ">=6.2" },
-    { name = "kg-generator", extras = ["embeddings", "curation", "vi", "data", "scraper", "neo4j", "gnn", "llm", "mongo", "dev", "eval-data", "eval-model"], marker = "extra == 'all'" },
-    { name = "kg-generator", extras = ["eval-data"], marker = "extra == 'eval-model'" },
+    { name = "kglab", extras = ["embeddings", "curation", "vi", "data", "scraper", "neo4j", "gnn", "llm", "mongo", "dev", "eval-data", "eval-model"], marker = "extra == 'all'" },
     { name = "langchain", marker = "extra == 'llm'", specifier = ">=0.1" },
     { name = "lxml", marker = "extra == 'scraper'", specifier = ">=5.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5" },

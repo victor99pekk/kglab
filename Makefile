@@ -157,22 +157,14 @@ download-data:
 wikipedia-full: download-wikipedia
 	@echo "Done — $(WIKI_OUTPUT) ready with hyperlinks"
 
-## benchmarks-data: Download and cache all benchmark gold datasets
+## benchmarks-data: Fetch benchmark golds NOT bundled with the library (RAG)
 benchmarks-data:
 	uv run python -c "
 	from kglab.data import Data
-	datasets = [
-	    ('bench_ner',        'benchmarks/data/ner_gold.jsonl'),
-	    ('bench_dedup',      'benchmarks/data/dedup_gold.jsonl'),
-	    ('bench_resolution', 'benchmarks/data/resolution_gold.jsonl'),
-	    ('bench_quality',    'benchmarks/data/quality_gold.jsonl'),
-	    ('bench_rag',        'benchmarks/data/rag_gold.jsonl'),
-	    ('bench_chunking',   'benchmarks/data/chunking_gold.jsonl'),
-	]
-	for name, path in datasets:
-	    Data.download(name, path=path)
-	    print(f'  {name} → {path}')
-	print('Done — all benchmark datasets cached')
+	# Dedup/chunking/NER/quality/resolution golds ship bundled with the
+	# library — nothing to fetch. RAG is network-gated, so it is fetched here.
+	Data.download('bench_rag', path='benchmarks/data/rag_gold.jsonl')
+	print('Done — RAG gold cached; the other stage golds ship with the library')
 	"
 
 ## wikimedia-topic-labels-validate: Validate pinned Wikimedia manifest and taxonomy

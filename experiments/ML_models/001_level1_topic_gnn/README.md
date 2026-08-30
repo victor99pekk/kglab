@@ -13,7 +13,7 @@ text-only encoder for the fixed 110-topic taxonomy?
 
 - KG creation remains a `kglab` responsibility.
 - Dataset construction, graph tensorization, models, and training live in
-  `src/ml/topic_classification/`.
+  `ml/topic_classification/`.
 - This experiment owns configuration, label mappings, splits, results, and
   conclusions.
 - Production inference code will not be added to `kglab.models` until a

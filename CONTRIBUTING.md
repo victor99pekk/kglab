@@ -15,13 +15,13 @@ uv run pytest tests/ -v
 ## Code Style
 
 - Python 3.10+ with type hints
-- Format: `ruff format src/ tests/`
-- Lint: `ruff check src/ tests/`
+- Format: `ruff format kglab/ ml/ tests/`
+- Lint: `ruff check kglab/ ml/ tests/`
 
 ## Project Structure
 
 ```
-src/kglab/
+kglab/
 ├── pipelines/       # Swappable pipeline variants (subclass + override stages)
 ├── preprocess/      # load/ clean/ chunk/ quality/ dedup/  — one folder per stage
 ├── kg_build/        # extract/ resolve/ build/             — one folder per stage

@@ -109,7 +109,7 @@ def test_data_download_defaults_path_to_data_dir(monkeypatch):
     assert result["path"] == "data/wikipedia.jsonl"
     assert seen["path"] == Path("data/wikipedia.jsonl")
     # Enrichment always runs after download — no enrich=True needed.
-    assert result["enriched"] == 1
+    assert len(enrich_calls) == 1
     assert enrich_calls[0]["input_path"] == Path("data/wikipedia.jsonl")
     assert enrich_calls[0]["language"] == "vi"
 

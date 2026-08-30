@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from kglab._shared.stage_config import PreprocessConfig, ResolutionConfig
+from kglab._shared.stage_config import ResolutionConfig
 from kglab.benchmark_pipeline import Benchmark, StageResult, format_stages
 from kglab.pipelines import Baseline, Semantic
 
@@ -28,23 +28,10 @@ def _pipelines_for(stage: str) -> dict:
     surface = Baseline()
     semantic = Semantic()
 
-    if stage == "dedup":
-        return {
-            "surface": surface,
-            "exact": Baseline(preprocess=PreprocessConfig(doc_dedup_method="exact")),
-            "minhash": Baseline(preprocess=PreprocessConfig(doc_dedup_method="minhash")),
-            "semantic": semantic,
-        }
     if stage == "resolution":
         return {
             "string": surface,
             "embed": Baseline(resolution=ResolutionConfig(method="embedding")),
-            "semantic": semantic,
-        }
-    if stage == "chunking":
-        return {
-            "sentence": Baseline(preprocess=PreprocessConfig(chunk_method="sentence")),
-            "surface": surface,
             "semantic": semantic,
         }
     return {"surface": surface, "semantic": semantic}

@@ -10,7 +10,7 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from kglab._shared.stage_config import BuildConfig, ExtractionConfig, PreprocessConfig
+from kglab._shared.stage_config import BuildConfig, ExtractionConfig
 from kglab.kg_build.build import SQLiteGraphWriter
 from kglab.kg_eval import evaluate_kg
 from kglab.kg_export import exporter
@@ -143,14 +143,34 @@ _BOB = "Bob worked at Acme Corp since 2010. He joined as a senior engineer and l
 
 
 def _baseline(tmp_path: Path, **kwargs) -> Baseline:
-    pipe = Baseline(
-        preprocess=PreprocessConfig(
-            quality_min_chars=50,
-            quality_min_words=10,
-            chunk_method="sentence",
-            doc_dedup_method="minhash",
-            chunk_dedup_method="minhash",
-        ),
+    class OfflineBaseline(Baseline):
+        def preprocess(self):
+            from kglab.preprocess import chunk, clean, dedup, link, load, quality
+
+            docs = load.from_paths(self.input_paths)
+            docs = clean.normalize(docs)
+            docs = link.normalize_links(docs)
+            docs = quality.filter(
+                docs, min_chars=self.quality_min_chars, min_words=self.quality_min_words
+            )
+            docs = dedup.remove_duplicates(
+                docs, method="minhash", threshold=self.doc_dedup_threshold
+            )
+            self._raw_docs = docs
+            chunks = chunk.by_sentence(
+                docs,
+                target_tokens=self.chunk_target_tokens,
+                overlap_tokens=self.chunk_overlap_tokens,
+            )
+            chunks = quality.filter(chunks)
+            chunks = dedup.remove_duplicates(
+                chunks, method="minhash", threshold=self.chunk_dedup_threshold
+            )
+            return chunks
+
+    pipe = OfflineBaseline(
+        quality_min_chars=50,
+        quality_min_words=10,
         extraction=ExtractionConfig(
             mode="composed", entity_method="regex", relation_method="ontology_rules"
         ),

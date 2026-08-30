@@ -1,0 +1,9 @@
+{"text": "KGLab is an open-source library for building knowledge graphs from unstructured text. It chains configurable stages: loading raw documents, cleaning and normalizing the text, filtering low-quality content, deduplicating near-identical pages, and splitting the remainder into semantically coherent chunks. Each stage exposes a small registry of methods so researchers can swap implementations and compare results across pipelines.", "label": "keep"}
+{"text": "Entity resolution is the task of deciding whether two mentions refer to the same real-world entity. String methods compare surface forms directly, while embedding methods compare dense vector representations that capture semantic similarity. A good resolver keeps a knowledge graph compact by merging duplicates without collapsing genuinely distinct concepts into a single node.", "label": "keep"}
+{"text": "Retrieval-augmented generation grounds an LLM's answer in external knowledge. A knowledge graph can serve as that source: entities are linked to source chunks, so a query that matches an entity retrieves the evidence needed to answer accurately. This reduces hallucination and makes the model's reasoning traceable to concrete documents.", "label": "keep"}
+{"text": "click here for more", "label": "reject"}
+{"text": "Sign in | Register | Help | Cart", "label": "reject"}
+{"text": "Privacy Policy Terms of Use About", "label": "reject"}
+{"text": "Top stories Opinion Sports Business", "label": "reject"}
+{"text": "Loading... please wait", "label": "reject"}
+{"text": "© 2026 Example Corp. All rights reserved.", "label": "reject"}

@@ -11,7 +11,7 @@ Usage:
     python main.py --neo4j --clear-neo4j                        # Wipe Neo4j then stream
     python main.py --ontology configs/my_ontology.yaml          # Custom ontology
 
-Create custom pipelines in src/kglab/pipelines/
+Create custom pipelines in kglab/pipelines/
 """
 
 import argparse

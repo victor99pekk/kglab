@@ -314,7 +314,7 @@ Every benchmark test accepts multiple pipelines and scores them side by side:
 from kglab.benchmark_pipeline import Benchmark
 from kglab.pipelines import Baseline
 
-result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+result = Benchmark.Dedup().run(  # scores the gold bundled with the library
     pipelines={"baseline": Baseline(), "my_pipeline": MyCustomPipeline()},
 )
 print(result)                  # aligned per-pipeline table

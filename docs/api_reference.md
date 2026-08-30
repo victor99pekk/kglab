@@ -147,14 +147,39 @@ PIPELINE_REGISTRY["my_variant"] = MyPipeline
 | `method` | `str` | `"networkx"` | Graph construction backend |
 | `graphml` | `bool` | `False` | Also export GraphML |
 
-### `PreprocessConfig` / `PreprocessStage`
+### Preprocessing (`Baseline`)
 
-Tiered preprocessing control:
+Preprocessing is a concrete `Baseline.preprocess()` method with a fixed
+architecture (semantic chunking, layered dedup, ftfy cleaning). **Parameters**
+are constructor keyword arguments; the architecture is **not configurable** —
+the only way to change it is to override `preprocess()` in a subclass.
 
-- **Tier 1 knobs**: `clean_enabled`, `link_normalize_enabled`, `quality_min_chars` (200), `quality_min_words` (40), `doc_dedup_method` (`"layered"`), `doc_dedup_threshold` (0.85), `chunk_method` (`"semantic"`), `chunk_target_tokens` (450), `chunk_overlap_tokens` (60), `chunk_dedup_method`, `chunk_dedup_threshold`.
-- **Tier 2** — explicit `stages=[PreprocessStage("load"), PreprocessStage("chunk", "semantic", options={...}), ...]` (overrides knobs).
+```python
+class SentenceChunks(Baseline):
+    def preprocess(self):
+        from kglab.preprocess import chunk, clean, load
+        docs = clean.normalize(load.from_paths(self.input_paths))
+        return chunk.by_sentence(docs, target_tokens=200)
+```
 
-`PreprocessStage(name, method="default", enabled=True, options={})` — one named pipeline step.
+**Parameters — constructor kwargs:**
+
+| Kwarg | Type | Default | Description |
+|---|---|---|---|
+| `chunk_target_tokens` | `int` | 450 | Target chunk size (sentence/semantic) |
+| `chunk_overlap_tokens` | `int` | 60 | Overlap between consecutive chunks |
+| `chunk_semantic_threshold` | `float` | 0.55 | Similarity threshold (semantic only) |
+| `chunk_semantic_model` | `str` | `"paraphrase-multilingual-MiniLM-L12-v2"` | Embedding model (semantic only) |
+| `quality_min_chars` | `int` | 200 | Minimum characters to keep a document |
+| `quality_min_words` | `int` | 40 | Minimum words to keep a document |
+| `doc_dedup_threshold` | `float` | 0.85 | Document dedup threshold |
+| `chunk_dedup_threshold` | `float` | 0.85 | Chunk dedup threshold |
+
+The active settings (parameters + the fixed architecture) are exposed as
+`Baseline.preprocess_summary` (a dict, recorded in the run manifest and read by
+the benchmark runners). A subclass that overrides `preprocess()` with a
+different architecture should also override `preprocess_summary` to stay
+accurate.
 
 ### `EvalConfig` / `ExportConfig` / `LinkingConfig`
 
@@ -212,7 +237,7 @@ Each stage is a callable namespace. Available methods per stage:
 |---|---|
 | `link.normalize_links(docs)` | Normalize hyperlink markup in documents |
 
-Also available: `load.stream(paths)` (streaming loader) and the class API — `DataLoader`, `TextCleaner`, `QualityFilter`, `Deduplicator`, `SentenceChunker`, `SemanticChunker`, `TextChunker`, `Preprocessor`, `DefaultPreprocessor`.
+Also available: `load.stream(paths)` (streaming loader) and the class API — `DataLoader`, `TextCleaner`, `QualityFilter`, `Deduplicator`, `SentenceChunker`, `SemanticChunker`, `TextChunker`.
 
 ---
 
@@ -422,7 +447,7 @@ result = runner.run()
 ```python
 from kglab.benchmark_pipeline import Benchmark
 
-result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+result = Benchmark.Dedup().run(  # scores the gold bundled with the library
     pipelines={"baseline": Baseline(), "semantic": Semantic()}
 )
 ```

@@ -1,0 +1,17 @@
+{
+  "metadata": {},
+  "graph": {
+    "directed": true,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [],
+    "edges": []
+  },
+  "entities": [],
+  "triples": [],
+  "stats": {
+    "num_nodes": 0,
+    "num_edges": 0,
+    "num_triples": 0
+  }
+}

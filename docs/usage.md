@@ -52,7 +52,7 @@ uv pip install -e ".[curation]"
 kg-gen curate -i raw_data/ -m manifest.yaml -o output/curated_datasets --device cuda
 ```
 
-The manifest declares `en` or `vi`. Curate applies exact and MinHash deletion, BGE-M3 semantic review, sentence-safe 2,048-token records, and deterministic training shards. See `src/kg_generator/curate/README.md` for details.
+The manifest declares `en` or `vi`. Curate applies exact and MinHash deletion, BGE-M3 semantic review, sentence-safe 2,048-token records, and deterministic training shards. See `kglab/preprocess/curate/` for details.
 
 ### `kg-gen scrape`
 
@@ -95,29 +95,37 @@ kg-gen evaluate -i output/knowledge_graph.json
 
 ## Configuration
 
-See `configs/pipelines/default.yaml` for all options and `configs/default_ontology.yaml` for entity/relation schema.
-
-Strategy configuration supports nested YAML while retaining the old flat keys:
+Experiments are declared as YAML and run via `python main.py --experiment <path>`
+or `BenchmarkRunner`. See `experiments/kg/_template/config.yaml` for the full
+schema, and `configs/default_ontology.yaml` for the entity/relation schema.
 
 ```yaml
+name: "My Experiment"
+description: "What this experiment tests"
+
 pipeline:
-  language: vi
-  chunking:
-    method: sentence          # none | fixed | sentence | semantic
-    target_tokens: 450
-    overlap_tokens: 60
-  quality:
-    method: heuristic
-  deduplication:
-    document_method: minhash  # none | exact | minhash | simhash | ngram | semantic | layered
-    chunk_method: semantic
-    semantic_threshold: 0.92
+  variant: "baseline"        # key in PIPELINE_REGISTRY (baseline | semantic)
   extraction:
-    method: graphgen          # offline | graphgen
+    mode: "composed"         # composed | joint
+    entity_method: "spacy"   # spacy | regex
+    relation_method: "ontology_rules"
   resolution:
-    method: embedding         # string | embedding
-    threshold: 0.88
+    method: "string"         # string | embedding
+  build:
+    method: "networkx"
+
+input:
+  paths:
+    - "data/wikipedia/"
+
+output:
+  dir: "results/"
 ```
+
+Preprocessing is configured in Python, not YAML — tune parameters with keyword
+arguments (`Baseline(chunk_target_tokens=200)`). The preprocessing architecture
+is fixed; override `preprocess()` in a subclass to change it. See *Preprocessing*
+in `docs/api_reference.md` and `tutorial/create_custom_pipeline.ipynb`.
 
 Every JSON export and `metrics.json` records the selected strategies and the
 document/chunk counts before and after quality filtering and deduplication.

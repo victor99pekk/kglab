@@ -1,0 +1,60 @@
+pipeline:
+  class: Baseline
+run:
+  timestamp: '2026-08-29T15:25:42.783187+00:00'
+  input_paths: []
+  output_dir: .
+  run_duration_seconds: 0.02
+stages:
+  preprocess:
+    clean_enabled: true
+    link_normalize_enabled: true
+    quality_min_chars: 200
+    quality_min_words: 40
+    doc_dedup_method: layered
+    doc_dedup_threshold: 0.85
+    chunk_method: semantic
+    chunk_target_tokens: 450
+    chunk_overlap_tokens: 60
+    chunk_semantic_threshold: 0.55
+    chunk_semantic_model: paraphrase-multilingual-MiniLM-L12-v2
+    chunk_dedup_method: layered
+    chunk_dedup_threshold: 0.85
+    stages: null
+  extraction:
+    mode: composed
+    entity_method: spacy
+    relation_method: ontology_rules
+    joint_method: graphgen
+    entity_options: null
+    relation_options: {}
+    options: {}
+    document_relation:
+      methods:
+      - hyperlink
+      method_options: {}
+      enabled: true
+  resolution:
+    method: string
+    threshold: 0.85
+    options: {}
+  build:
+    method: networkx
+    graphml: false
+  linking:
+    method: ''
+    enabled: false
+    options: {}
+  evaluation:
+    quality_enabled: true
+    structural_enabled: true
+    accuracy_enabled: false
+  export:
+    formats:
+    - json
+    neo4j_clear: false
+results:
+  nodes: 0
+  edges: 0
+  entities: 0
+  triples: 0

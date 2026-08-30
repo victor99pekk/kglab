@@ -68,27 +68,26 @@ These early results suggested that KG-structured training data could eliminate h
 <summary><strong>📁 Architecture</strong></summary>
 
 ```
-src/
-├── kglab/               # KG library (core)
-│   ├── pipelines/       #   swappable variants — subclass Pipeline
-│   ├── benchmark_pipeline/  # BenchmarkRunner — runs any pipeline from YAML config
-│   ├── models/          #   inference tools — load trained checkpoints
-│   ├── preprocess/      #   load / clean / chunk / quality / dedup
-│   ├── kg_build/        #   extract / resolve / build
-│   ├── kg_eval/         #   metrics / structural
-│   ├── kg_export/       #   json / graphml / neo4j / rdf
-│   ├── finetune/        #   QA dataset generation
-│   └── _shared/         #   config, identity, types
-│
-└── ml/                  # ML training (parallel to kglab)
-    ├── base_trainer.py  #   BaseTrainer ABC
-    ├── training_utils.py #  EarlyStopping, MetricTracker, SaveBest
-    ├── entity_resolution/   # binary classifier for merging entities
-    │   └── models/
-    ├── node_classification/  # GNN for entity type prediction
-    │   └── models/
-    └── topic_classification/ # GNN for document topic prediction
-        └── models/
+kglab/                   # KG library (core)
+├── pipelines/           #   swappable variants — subclass Pipeline
+├── benchmark_pipeline/  #   BenchmarkRunner — runs any pipeline from YAML config
+├── models/              #   inference tools — load trained checkpoints
+├── preprocess/          #   load / clean / chunk / quality / dedup
+├── kg_build/            #   extract / resolve / build
+├── kg_eval/             #   metrics / structural
+├── kg_export/           #   json / graphml / neo4j / rdf
+├── finetune/            #   QA dataset generation
+└── _shared/             #   config, identity, types
+
+ml/                      # ML training (parallel to kglab)
+├── base_trainer.py      #   BaseTrainer ABC
+├── training_utils.py    #   EarlyStopping, MetricTracker, SaveBest
+├── entity_resolution/   #   binary classifier for merging entities
+│   └── models/
+├── node_classification/ #   GNN for entity type prediction
+│   └── models/
+└── topic_classification/#   GNN for document topic prediction
+    └── models/
 
 experiments/
 ├── kg/                  # pipeline experiments (config.yaml → BenchmarkRunner)
@@ -117,21 +116,21 @@ Run `make help` to see all available targets.
 Create a pipeline variant and benchmark it against the baseline in one test:
 
 ```python
-from kglab._shared.stage_config import PreprocessConfig
 from kglab.benchmark_pipeline import Benchmark
 from kglab.pipelines import Baseline, PIPELINE_REGISTRY
 
-# 1. Create a new pipeline — subclass Baseline and override a stage
+# 1. Create a new pipeline — override preprocess() to change the chunking
 class SmallChunks(Baseline):
-    def __init__(self, **kwargs):
-        kwargs.setdefault("preprocess", PreprocessConfig(
-            chunk_method="sentence", chunk_target_tokens=300))
-        super().__init__(**kwargs)
+    def preprocess(self):
+        from kglab.preprocess import chunk, clean, load
+        docs = clean.normalize(load.from_paths(self.input_paths))
+        return chunk.by_sentence(docs, target_tokens=300)
 
 PIPELINE_REGISTRY["small_chunks"] = SmallChunks  # now discoverable by name
 
 # 2. Benchmark both pipelines — pass them into one benchmark test
-result = Benchmark.Dedup(dataset="benchmarks/data/dedup_gold.jsonl").run(
+#    (each test scores the gold dataset bundled with the library by default)
+result = Benchmark.Dedup().run(
     pipelines={"baseline": Baseline(), "small_chunks": SmallChunks()},
 )
 print(result)                  # aligned per-pipeline table

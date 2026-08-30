@@ -14,7 +14,7 @@ description: >
 
 pipeline:
   # Which pipeline variant to run. Must match a key in the pipeline registry
-  # (src/kglab/pipelines/__init__.py). Available: baseline
+  # (kglab/pipelines/__init__.py). Available: baseline
   variant: "baseline"
 
   # Compose independent entity and relation methods.

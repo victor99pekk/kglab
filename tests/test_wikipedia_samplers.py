@@ -137,5 +137,5 @@ def test_data_download_forwards_sampler(monkeypatch, tmp_path):
     assert seen["sampler"] == RandomSampler(count=3)
     assert result["downloaded"] == 1
     # Enrichment always runs after download — no enrich=True needed.
-    assert result["enriched"] == 1
+    assert len(enrich_calls) == 1
     assert enrich_calls[0]["input_path"] == tmp_path / "out.jsonl"

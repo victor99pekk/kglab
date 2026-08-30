@@ -1,7 +1,7 @@
 # Training Experiment 002 — Wikimedia Article Topics
 
-**Date:** 2026-07-29  
-**Task:** multilabel article-topic classification  
+**Date:** 2026-07-29
+**Task:** multilabel article-topic classification
 **Status:** data prepared; KG1-A.2 Neo4j pilot confirmed; embedding baselines not implemented
 **Labels:** Wikimedia original 64-topic taxonomy
 
@@ -246,7 +246,7 @@ high-precision rule audit.
 
 ## Approval boundary
 
-Label preparation is now a shared retrieval tool. Extending `src/ml`, changing
+Label preparation is now a shared retrieval tool. Extending `ml`, changing
 dependencies, or writing other shared data still requires explicit approval.
 
 [figshare]: https://figshare.com/articles/dataset/Wikipedia_Articles_and_Associated_WikiProject_Templates/10248344

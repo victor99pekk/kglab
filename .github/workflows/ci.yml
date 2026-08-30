@@ -47,4 +47,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --extra dev
-      - run: uv run mypy src/ --ignore-missing-imports
+      - run: uv run mypy kglab/ ml/ --ignore-missing-imports

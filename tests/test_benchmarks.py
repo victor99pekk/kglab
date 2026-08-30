@@ -15,7 +15,6 @@ from typing import Any
 import pytest
 
 from kglab._shared import Document
-from kglab._shared.stage_config import PreprocessConfig
 from kglab._shared.types import PreprocessResult
 from kglab.benchmark_pipeline import Benchmark, BenchmarkResult, BenchmarkRunner
 from kglab.benchmark_pipeline.chunking import runner as chunking_mod
@@ -226,11 +225,11 @@ def test_rag_runner_small_gold(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 # ── compare_matrix regression (config merge) ───────────────────
 
 
-def test_compare_matrix_merges_chunk_and_dedup(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sweeping both axes must not silently overwrite one config (bug fix)."""
+def test_compare_matrix_sweeps_resolutions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """compare_matrix sweeps resolution methods across the variant."""
     import kglab.benchmark_pipeline.compare as compare_mod
 
-    captured: dict[str, Any] = {}
+    captured: list[dict[str, Any]] = []
 
     class _FakeResult:
         overall_score = 0.0
@@ -240,7 +239,7 @@ def test_compare_matrix_merges_chunk_and_dedup(monkeypatch: pytest.MonkeyPatch) 
 
     class _FakeRunner:
         def __init__(self, **kwargs: Any) -> None:
-            captured.update(kwargs)
+            captured.append(kwargs)
 
         def run(self) -> _FakeResult:
             return _FakeResult()
@@ -250,14 +249,11 @@ def test_compare_matrix_merges_chunk_and_dedup(monkeypatch: pytest.MonkeyPatch) 
     compare_mod.compare_matrix(
         variants=["surface"],
         input_paths=["data/"],
-        chunkers=["sentence"],
-        doc_dedup_methods=["minhash"],
-        chunk_dedup_methods=["minhash"],
+        output_dir=str(tmp_path),
+        resolutions=["string", "embedding"],
     )
-    preprocess = captured["extra"]["preprocess"]
-    assert preprocess.chunk_method == "sentence"
-    assert preprocess.doc_dedup_method == "minhash"
-    assert preprocess.chunk_dedup_method == "minhash"
+    methods = sorted(k["resolution"].method for k in captured)
+    assert methods == ["embedding", "string"]
 
 
 # ── Whole-pipeline BenchmarkRunner (fake pipeline) ─────────────
@@ -402,9 +398,14 @@ def test_runner_errors_propagate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
         json.dumps({"text": "hello world foo bar baz.", "chunks": []}) + "\n",
         encoding="utf-8",
     )
-    bad = Baseline(preprocess=PreprocessConfig(chunk_method="does_not_exist"))
+
+    class Bad(Baseline):
+        @property
+        def preprocess_summary(self):
+            return {"chunk_method": "does_not_exist"}
+
     with pytest.raises(ValueError, match="Unknown chunk method"):
-        Benchmark.Chunking(dataset=gold).run(pipelines={"bad": bad})
+        Benchmark.Chunking(dataset=gold).run(pipelines={"bad": Bad()})
 
 
 def test_dedup_predict_pair_semantic_uses_shared_encoder(
@@ -547,6 +548,8 @@ def test_chunking_max_records_scores_a_slice_of_gold(
 ) -> None:
     """max_records caps how many bundled gold records a stage scores."""
     monkeypatch.setattr(Data, "download", lambda *a, **k: None)
+    # Pin the chunk method so the test stays hermetic (no model download).
+    monkeypatch.setattr(chunking_mod, "_chunk_config", lambda pipeline: ("sentence", {}))
     gold = tmp_path / "chunking_gold.jsonl"
     gold.write_text(
         "\n".join(
@@ -557,7 +560,7 @@ def test_chunking_max_records_scores_a_slice_of_gold(
         encoding="utf-8",
     )
     metrics = Benchmark.Chunking(dataset=gold).run(
-        pipelines={"p": Baseline(preprocess=PreprocessConfig(chunk_method="sentence"))},
+        pipelines={"p": Baseline()},
         max_records=3,
     )["p"]
     assert metrics["n_samples"] == 3

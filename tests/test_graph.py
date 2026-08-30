@@ -334,12 +334,12 @@ def test_quality_filter_removes_short_docs():
 def test_quality_filter_uses_new_default_thresholds():
     """Documents below 200 chars / 40 words are rejected at default config."""
     from kglab._shared import Document
-    from kglab._shared.stage_config import PreprocessConfig
+    from kglab.pipelines import Baseline
     from kglab.preprocess.quality import QualityFilter
 
-    cfg = PreprocessConfig()
-    assert cfg.quality_min_chars == 200
-    assert cfg.quality_min_words == 40
+    pipe = Baseline()
+    assert pipe.quality_min_chars == 200
+    assert pipe.quality_min_words == 40
 
     # A document below the new thresholds should be filtered
     short_doc = Document(
@@ -348,8 +348,8 @@ def test_quality_filter_uses_new_default_thresholds():
     )
 
     qf = QualityFilter(
-        min_chars=cfg.quality_min_chars,
-        min_words=cfg.quality_min_words,
+        min_chars=pipe.quality_min_chars,
+        min_words=pipe.quality_min_words,
     )
     result = qf.filter([short_doc])
     assert len(result) == 0
