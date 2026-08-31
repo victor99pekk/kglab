@@ -32,9 +32,8 @@ uv run pytest tests/ -v
 
 Follow this pattern when extending the project:
 
-1. Add the new logic to the relevant stage folder, e.g. [kglab/preprocess](kglab/preprocess), [kglab/kg_build](kglab/kg_build), [kglab/kg_export](kglab/kg_export), or [kglab/pipelines](kglab/pipelines).
-2. Keep the implementation modular and aligned with the existing stage interfaces instead of editing core logic in place.
-3. Use the new functions in a new pipeline variant or override an existing pipeline step where appropriate.
+1. Add the new logic in the relevant pipeline stage-folders, in [kglab/preprocess](kglab/preprocess), [kglab/kg_build](kglab/kg_build), [kglab/kg_export](kglab/kg_export), (e.g. [kglab/kg_build/extract/entity](kglab/kg_build/extract/entity/) for new enitity extraction logic). If the new logic is language dependent add it in the language subfolder (e.g. [kglab/kg_build/extract/entity/en](kglab/kg_build/extract/entity/en/) for english)
+2. Use the new functions in a new pipeline variant or override an existing pipeline step where appropriate, [kglab/pipelines](kglab/pipelines).
 
 ## Pull requests
 
