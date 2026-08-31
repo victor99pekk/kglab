@@ -13,6 +13,8 @@ It is designed to support:
 - storage-agnostic execution: run locally or stream directly into disk-backend (e.g. Neo4j) (helpful when building large KGs) without changing the core graph-building logic (see Tutorial: [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb))
 - reproducible benchmarking: compare KG pipeline variants under a shared evaluation setup (see Tutorial: [benchmarking.ipynb](tutorial/benchmarking.ipynb))
 - production-ready KG generation pipelines for LLM training and RAG (see Tutorial: [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb))
+- multilingual support
+
 
 <details>
 <summary><strong> README contents</strong></summary>
