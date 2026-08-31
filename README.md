@@ -37,7 +37,7 @@ git clone https://github.com/victor99pekk/kglab.git
 cd kglab
 uv venv
 source .venv/bin/activate
-uv pip install -e "."
+uv pip install -e "."                # base library + core dependencies
 ```
 
 Useful extras:

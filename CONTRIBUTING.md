@@ -30,11 +30,11 @@ uv run pytest tests/ -v
 
 ## Adding new pipeline stages or components
 
-Keep the design modular:
+Follow this pattern when extending the project:
 
-- new chunking, extraction, resolution, or export logic should fit into the existing stage interfaces
-- prefer subclassing or swapping components instead of editing core logic in place
-- keep new pipeline variants easy to register and compare
+1. Add the new logic to the relevant stage folder, e.g. [kglab/preprocess](kglab/preprocess), [kglab/kg_build](kglab/kg_build), [kglab/kg_export](kglab/kg_export), or [kglab/pipelines](kglab/pipelines).
+2. Keep the implementation modular and aligned with the existing stage interfaces instead of editing core logic in place.
+3. Use the new functions in a new pipeline variant or override an existing pipeline step where appropriate.
 
 ## Pull requests
 
@@ -42,7 +42,3 @@ Keep the design modular:
 2. Add or update tests
 3. Run the relevant checks
 4. Submit a PR with a clear summary of the change and why it matters
-
-## Questions
-
-If you are unsure where a change belongs, start by looking at the existing pipeline and stage modules in `kglab/` and the examples in the tutorial notebooks.
