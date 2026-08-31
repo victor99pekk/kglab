@@ -34,10 +34,3 @@ Follow this pattern when extending the project:
 
 1. Add the new logic in the relevant pipeline stage-folders, in [kglab/preprocess](kglab/preprocess), [kglab/kg_build](kglab/kg_build), [kglab/kg_export](kglab/kg_export), (e.g. [kglab/kg_build/extract/entity](kglab/kg_build/extract/entity/) for new enitity extraction logic). If the new logic is language dependent add it in the language subfolder (e.g. [kglab/kg_build/extract/entity/en](kglab/kg_build/extract/entity/en/) for english)
 2. Use the new functions in a new pipeline variant or override an existing pipeline step where appropriate, [kglab/pipelines](kglab/pipelines).
-
-## Pull requests
-
-1. Create a feature branch
-2. Add or update tests
-3. Run the relevant checks
-4. Submit a PR with a clear summary of the change and why it matters
