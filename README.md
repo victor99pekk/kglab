@@ -3,24 +3,23 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-KGLab is a Python library for research in knowledge graph (KG) generation from raw text, to production-ready KGs for LLM training, graph-based retrieval, and downstream knowledge-intensive applications.
+KGLab is a Python library for research in knowledge graph (KG) generation from raw text, to production-ready KGs for LLM training, graph-based retrieval, and other downstream KG related applications.
 
-> Note: The README is kept intentionally high-level; for detailed walkthroughs, see the tutorial notebooks [tutorial/*](tutorial/).
+> The README is kept intentionally high-level; for detailed walkthroughs, see the [tutorials](tutorial/).
 
 It is designed to support:
 
-- modular KG-generation-pipelines: swap chunking, extraction, resolution, and export stages without rewriting the pipeline (see Tutorial: [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb))
+- modular KG generation pipelines: swap chunking, extraction, resolution, and export stages without rewriting the pipeline (see Tutorial: [create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb))
+- storage-agnostic execution: run locally or stream directly into disk-backend (e.g. Neo4j) (helpful when building large KGs) without changing the core graph-building logic (see Tutorial: [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb))
 - reproducible benchmarking: compare KG pipeline variants under a shared evaluation setup (see Tutorial: [benchmarking.ipynb](tutorial/benchmarking.ipynb))
-- storage-agnostic execution: run locally or stream directly into Neo4j (when building large KGs) without changing the core graph-building logic (see Tutorial: [kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb))
 - production-ready KG generation pipelines for LLM training and RAG (see Tutorial: [kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb))
 
 <details>
-<summary><strong>Contents</strong></summary>
+<summary><strong> README contents</strong></summary>
 
 - [KGLab](#kglab)
   - [Installation](#installation)
   - [Quick start](#quick-start)
-  - [Documentation and tutorials](#documentation-and-tutorials)
   - [About the Project](#about-the-project)
   - [Project layout](#project-layout)
   - [Contributing](#contributing)
@@ -52,13 +51,21 @@ uv pip install -e ".[curation]"      # corpus curation and audit tooling
 
 ## Quick start
 
-The simplest workflow is to run a built-in pipeline on your corpus:
+The simplest workflow is to download a small Wikipedia sample and then run a built-in pipeline on it:
 
 ```python
+from kglab.data import Data, RandomSampler
 from kglab.pipelines import Baseline
 
+Data.download(
+    "wikipedia",                     # dataset
+    path="data/wikipedia/",          # write to path
+    sampler=RandomSampler(count=10), # uniformly random sample 10 wiki articles
+)
+
+# Builds the knowledge graph and writes the resulting artifact files to output_dir
 pipe = Baseline(
-    input_paths=["data/my_articles/"],
+    input_paths=["data/wikipedia/"],
     output_dir="output/baseline/",
 )
 
@@ -67,19 +74,6 @@ pipe.execute()
 
 This runs the full pipeline lifecycle and writes graph artifacts to the output directory.
 
-
-## Documentation and tutorials
-
-The detailed step-by-step workflows live in the notebooks and docs, while this README stays focused on the project summary and first-run usage.
-
-- [docs/tutorial.md](docs/tutorial.md) — end-to-end walkthrough
-- [docs/usage.md](docs/usage.md) — CLI and setup usage guide
-- [docs/api_reference.md](docs/api_reference.md) — public API reference
-- [docs/input_data_format.md](docs/input_data_format.md) — JSONL input schema
-- [tutorial/create_custom_pipeline.ipynb](tutorial/create_custom_pipeline.ipynb) — build and benchmark a custom pipeline
-- [tutorial/benchmarking.ipynb](tutorial/benchmarking.ipynb) — compare pipeline variants
-- [tutorial/kg_storage_agnostic.ipynb](tutorial/kg_storage_agnostic.ipynb) — same pipeline with different storage backends
-- [tutorial/kg_for_llm_training.ipynb](tutorial/kg_for_llm_training.ipynb) — generate LLM training data from a KG
 
 
 ## About the Project
